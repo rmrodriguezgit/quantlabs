@@ -1,0 +1,9 @@
+flask
+requests
+python-dotenv
+flask-socketio==5.3.6
+eventlet==0.35.2
+yfinance
+pandas
+prophet
+scipy

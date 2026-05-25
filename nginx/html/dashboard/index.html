@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QuantLab AI — Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <link rel="stylesheet" href="./css/style.css?v=2">
+  <link rel="stylesheet" href="./css/bitaxe.css?v=1">
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<header>
+  <a href="/" class="logo">
+    <div class="logo-icon">QL</div>
+    <span class="logo-name">QuantLabs AI</span>
+    <span class="logo-badge">Dashboard</span>
+  </a>
+  <div class="header-right">
+    <div class="session-pill">
+      <div class="session-dot"></div>
+      <span>Sesión activa · JWT</span>
+    </div>
+    <a href="/auth/me" class="session-pill" style="text-decoration:none;border-color:rgba(0,229,255,.2);color:var(--accent);">
+      👤 <span id="session-user-pill">Mi cuenta</span>
+    </a>
+    <a href="/logout" class="btn-logout">⏻ Cerrar sesión</a>
+  </div>
+</header>
+
+<div class="layout">
+
+
+  <aside>
+    <div class="nav-label">Plataforma</div>
+    <a href="/dashboard/" class="nav-link active">
+      <span class="nav-icon">⬡</span> Dashboard
+    </a>
+    <a href="/jupyter/" class="nav-link" target="_blank">
+      <span class="nav-icon">📓</span> Jupyter Diario
+    </a>
+    <a href="/jupyter-gpu/" class="nav-link" target="_blank">
+      <span class="nav-icon">⚙️</span> Jupyter GPU
+    </a>
+    <a href="/llm/" class="nav-link" target="_blank">
+      <span class="nav-icon">🤖</span> LLM Local
+    </a>
+    <a href="/dashboard/api/" class="nav-link">
+      <span class="nav-icon">⚡</span> API QuantLab
+    </a>
+    <a href="/dashboard/bitaxe/" class="nav-link">
+      <span class="nav-icon">⛏️</span> BitAxe Miner
+    </a>
+    <a href="/dashboard/harness/" class="nav-link">
+      <span class="nav-icon">🧠</span> Agent Harness
+    </a>
+    <a href="/dashboard/validation/" class="nav-link">
+      <span class="nav-icon">✓</span> Validation
+    </a>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Cuenta</div>
+    <a href="/auth/me" class="nav-link">
+      <span class="nav-icon">👤</span> Mi sesión
+    </a>
+    <a href="/" class="nav-link">
+      <span class="nav-icon">🏠</span> Landing
+    </a>
+    <a href="/logout" class="nav-link" style="margin-top:auto;color:#ff4466;">
+      <span class="nav-icon">⏻</span> Logout
+    </a>
+  </aside>
+
+
+  <main>
+
+
+    <div class="page-header fade">
+      <h1>Bienvenido, <span id="session-username">Trader</span> 👋</h1>
+      <p>Sesión autenticada con JWT · quantlabs.site · <span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--primary)" id="clock"></span></p>
+    </div>
+
+
+    <div class="stats-row">
+      <div class="stat-card fade">
+        <div class="stat-icon">📈</div>
+        <div class="stat-label">Señales Hoy</div>
+        <div class="stat-value">14</div>
+        <div class="stat-delta delta-up">▲ +3 vs ayer</div>
+      </div>
+      <div class="stat-card fade">
+        <div class="stat-icon">🤖</div>
+        <div class="stat-label">LLM Tokens</div>
+        <div class="stat-value">48.2k</div>
+        <div class="stat-delta delta-up">▲ activo</div>
+      </div>
+      <div class="stat-card fade">
+        <div class="stat-icon">📓</div>
+        <div class="stat-label">Notebooks</div>
+        <div class="stat-value">7</div>
+        <div class="stat-delta delta-up">▲ GPU on</div>
+      </div>
+      <div class="stat-card fade">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-label">API Calls</div>
+        <div class="stat-value">1,203</div>
+        <div class="stat-delta delta-up">▲ +12%</div>
+      </div>
+    </div>
+
+
+    <div class="sparkline-row fade">
+      <div class="spark-card">
+        <div class="spark-info">
+          <div class="spark-sym">AAPL</div>
+          <div class="spark-chg up">▲ +1.23%</div>
+        </div>
+        <svg width="80" height="32" viewBox="0 0 80 32">
+          <polyline points="0,28 13,22 26,24 39,14 52,18 65,8 80,4"
+            fill="none" stroke="#00ff99" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="spark-card">
+        <div class="spark-info">
+          <div class="spark-sym">BTC-USD</div>
+          <div class="spark-chg up">▲ +3.14%</div>
+        </div>
+        <svg width="80" height="32" viewBox="0 0 80 32">
+          <polyline points="0,26 13,20 26,22 39,10 52,15 65,6 80,2"
+            fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="spark-card">
+        <div class="spark-info">
+          <div class="spark-sym">NVDA</div>
+          <div class="spark-chg up">▲ +2.87%</div>
+        </div>
+        <svg width="80" height="32" viewBox="0 0 80 32">
+          <polyline points="0,30 13,26 26,28 39,18 52,22 65,12 80,8"
+            fill="none" stroke="#00ff99" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="spark-card">
+        <div class="spark-info">
+          <div class="spark-sym">SPY</div>
+          <div class="spark-chg dn">▼ −0.19%</div>
+        </div>
+        <svg width="80" height="32" viewBox="0 0 80 32">
+          <polyline points="0,8 13,12 26,10 39,18 52,14 65,22 80,28"
+            fill="none" stroke="#ff4466" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="spark-card">
+        <div class="spark-info">
+          <div class="spark-sym">ETH-USD</div>
+          <div class="spark-chg up">▲ +1.98%</div>
+        </div>
+        <svg width="80" height="32" viewBox="0 0 80 32">
+          <polyline points="0,24 13,20 26,22 39,14 52,16 65,8 80,4"
+            fill="none" stroke="#ff00cc" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+
+    <div class="modules-grid">
+
+      <a href="/jupyter/" class="module-card fade">
+        <div class="module-card-bg bg-green"></div>
+        <div class="module-top">
+          <div class="module-icon icon-green">📓</div>
+          <span class="module-status status-on">Diario</span>
+        </div>
+        <h3>Jupyter Diario</h3>
+        <p>Entorno ligero para explorar datos, limpiar archivos, hacer backtesting, gráficos y notebooks del día a día.</p>
+        <div class="module-footer">
+          <span class="module-meta">scipy-notebook · py311</span>
+          <span class="module-arrow">→</span>
+        </div>
+      </a>
+
+      <a href="/jupyter-gpu/" class="module-card cyan fade">
+        <div class="module-card-bg bg-cyan"></div>
+        <div class="module-top">
+          <div class="module-icon icon-cyan">⚙️</div>
+          <span class="module-status status-gpu">GPU · T4</span>
+        </div>
+        <h3>Jupyter GPU</h3>
+        <p>Entorno pesado para RAPIDS, CUDA, CuPy, PyTorch, TensorFlow y entrenamiento acelerado.</p>
+        <div class="module-footer">
+          <span class="module-meta">rapids · torch · cuda12</span>
+          <span class="module-arrow">→</span>
+        </div>
+      </a>
+
+      <a href="/dashboard/api/" class="module-card mag fade">
+        <div class="module-card-bg bg-magenta"></div>
+        <div class="module-top"><div class="module-icon icon-magenta">⚡</div><span class="module-status status-ai">REST</span></div>
+        <h3>API QuantLab</h3>
+        <p>Consultas especializadas de mercado con selector CPU/GPU, tabla dinámica y JSON técnico.</p>
+        <div class="module-footer"><span class="module-meta">market · cpu · gpu</span><span class="module-arrow">→</span></div>
+      </a>
+
+
+      <a href="/dashboard/harness/" class="module-card cyan fade">
+        <div class="module-card-bg bg-cyan"></div>
+        <div class="module-top"><div class="module-icon icon-cyan">🧠</div><span class="module-status status-ai">Agents</span></div>
+        <h3>Agent Harness</h3>
+        <p>Orquestación multiagente conectada al stack de QuantLab para tareas, memoria y ejecución asistida.</p>
+        <div class="module-footer"><span class="module-meta">agents · tools · memory</span><span class="module-arrow">→</span></div>
+      </a>
+
+      <a href="/dashboard/validation/" class="module-card fade">
+        <div class="module-card-bg bg-green"></div>
+        <div class="module-top"><div class="module-icon icon-green">✓</div><span class="module-status status-on">Risk · Ops</span></div>
+        <h3>Validation Control</h3>
+        <p>Observabilidad institucional para cronjobs, bots, señales, performance, GPU, Docker, logs y health score.</p>
+        <div class="module-footer"><span class="module-meta">validation · risk · audit</span><span class="module-arrow">→</span></div>
+      </a>
+
+      <a href="/llm/" class="module-card cyan fade">
+        <div class="module-card-bg bg-cyan"></div>
+        <div class="module-top">
+          <div class="module-icon icon-cyan">🤖</div>
+          <span class="module-status status-ai">LLM · GPU</span>
+        </div>
+        <h3>LLM Local</h3>
+        <p>Mistral 7B ejecutado localmente con llama.cpp sobre GPU. Análisis de noticias financieras, reportes de earnings y sentimiento de mercado.</p>
+        <div class="module-footer">
+          <span class="module-meta">Nous-Hermes-2-Mistral · Q4_K_M</span>
+          <span class="module-arrow">→</span>
+        </div>
+      </a>
+
+      <a href="/api/" class="module-card fade">
+        <div class="module-card-bg bg-green"></div>
+        <div class="module-top">
+          <div class="module-icon icon-green">⚡</div>
+          <span class="module-status status-on">Online</span>
+        </div>
+        <h3>API QuantLab</h3>
+        <p>API REST con Flask para señales técnicas, backtesting, datos OHLCV y consultas al LLM. Autenticada con JWT en cada endpoint.</p>
+        <div class="module-footer">
+          <span class="module-meta">flask · port 5000</span>
+          <span class="module-arrow">→</span>
+        </div>
+      </a>
+
+      <a href="/auth/me" class="module-card mag fade">
+        <div class="module-card-bg bg-magenta"></div>
+        <div class="module-top">
+          <div class="module-icon icon-magenta">🔐</div>
+          <span class="module-status status-ai">JWT · Activo</span>
+        </div>
+        <h3>Mi Sesión</h3>
+        <p>Información de tu token JWT, permisos asignados, tiempo de expiración y datos de tu cuenta en el sistema de autenticación.</p>
+        <div class="module-footer">
+          <span class="module-meta">auth · postgres · port 7000</span>
+          <span class="module-arrow">→</span>
+        </div>
+      </a>
+
+
+      <a href="/dashboard/bitaxe/" class="module-card cyan fade">
+        <div class="module-card-bg bg-cyan"></div>
+        <div class="module-top">
+          <div class="module-icon icon-cyan">⛏️</div>
+          <span class="module-status status-ai" id="bx-status-badge">⬤ Conectando…</span>
+        </div>
+        <h3>BitAxe Miner</h3>
+        <p>BM1370 · AxeOS · Monitoreo en tiempo real de hashrate, temperatura, potencia y shares del minero Bitcoin.</p>
+        <div class="module-footer">
+          <span class="module-meta" id="bx-footer-meta">192.168.88.181 · BM1370</span>
+          <span class="module-arrow">→</span>
+        </div>
+      </a>
+
+
+    </div>
+<div class="bottom-row">
+
+
+      <div class="info-card fade">
+        <h3>🛡️ Estado de Seguridad</h3>
+        <div class="info-row">
+          <span class="info-key">Autenticación</span>
+          <span class="info-val green">JWT · Válido</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Protocolo</span>
+          <span class="info-val cyan">HTTPS · TLS 1.3</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Proxy</span>
+          <span class="info-val">Nginx + Cloudflare</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Verificación JWT</span>
+          <span class="info-val green">/auth/verify · OK</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">GPU</span>
+          <span class="info-val cyan">NVIDIA T4 · Online</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">DB</span>
+          <span class="info-val green">PostgreSQL 15 · OK</span>
+        </div>
+      </div>
+
+
+      <div class="terminal-card fade">
+        <div class="term-header">
+          <div class="term-dot td-r"></div>
+          <div class="term-dot td-y"></div>
+          <div class="term-dot td-g"></div>
+          <span class="term-title">quantlab-server ~ system log</span>
+        </div>
+        <div class="term-body">
+          <div class="tl"><span class="tp">$</span><span class="tc">systemctl status quantlab</span></div>
+          <div class="to tg">✓ nginx          · active (running)</div>
+          <div class="to tg">✓ auth (JWT)     · active (running)</div>
+          <div class="to ta">✓ jupyter        · active · GPU T4</div>
+          <div class="to tm">✓ llm (Mistral)  · active · 15 GPU layers</div>
+          <div class="to tg">✓ flask api      · active (running)</div>
+          <div class="to tg">✓ postgres       · active (running)</div>
+          <div class="to" style="margin-top:4px;">━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+          <div class="to tg">All services operational ✓</div>
+          <div class="tl" style="margin-top:6px;"><span class="tp">$</span><span class="t-cursor"></span></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="./js/app.js?v=20260517-user"></script>
+<script src="./js/platform-menu.js?v=20260523-shared"></script>
+<script src="./js/session.js?v=20260517-user"></script>
+<script src="./js/bitaxe.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,21 @@
+  # =========================
+  # HARNESS RUNTIME
+  # =========================
+  harness:
+    build: /home/quantlab/quantlab-ai-capital/harness
+    container_name: quantlab_harness
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "5000"
+    volumes:
+      - /home/quantlab/quantlab-ai-capital/harness/storage:/app/storage
+      - /home/quantlab/notebooks:/app/notebooks
+    environment:
+      - LLAMA_BASE_URL=http://llm:8080
+      - QUANTLAB_API_BASE_URL=http://flask:5000
+    depends_on:
+      - auth
+      - llm
+      - flask

@@ -1,0 +1,2 @@
+name: debugging
+steps: [reproduce, inspect, patch, test, summarize]

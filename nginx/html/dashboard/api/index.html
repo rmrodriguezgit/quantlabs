@@ -1,0 +1,76 @@
+<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API QuantLab</title><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/><link rel="stylesheet" href="../css/style.css"><link rel="stylesheet" href="./css/api.css?v=20260523-ticker-modal"><script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script></head><body>
+<div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div>
+<header>
+  <a href="/" class="logo">
+    <div class="logo-icon">QL</div>
+    <span class="logo-name">QuantLabs AI</span>
+    <span class="logo-badge">API</span>
+  </a>
+  <div class="header-right">
+    <div class="session-pill"><div class="session-dot"></div><span>Sesión activa · JWT</span></div>
+    <a href="/auth/me" class="session-pill" style="text-decoration:none;border-color:rgba(0,229,255,.2);color:var(--accent);">👤 <span id="session-user-pill">Mi cuenta</span></a>
+    <a href="/logout" class="btn-logout">⏻ Cerrar sesión</a>
+  </div>
+</header><div class="layout"><aside>
+    <div class="nav-label">Plataforma</div>
+    <a href="/dashboard/" class="nav-link"><span class="nav-icon">⬡</span> Dashboard</a>
+    <a href="/jupyter/" class="nav-link" target="_blank"><span class="nav-icon">📓</span> Jupyter Diario</a>
+    <a href="/jupyter-gpu/" class="nav-link" target="_blank"><span class="nav-icon">⚙️</span> Jupyter GPU</a>
+    <a href="/llm/" class="nav-link" target="_blank"><span class="nav-icon">🤖</span> LLM Local</a>
+    <a href="/dashboard/api/" class="nav-link active"><span class="nav-icon">⚡</span> API QuantLab</a>
+    <a href="/dashboard/bitaxe/" class="nav-link"><span class="nav-icon">⛏️</span> BitAxe Miner</a>
+    <a href="/dashboard/harness/" class="nav-link"><span class="nav-icon">🧠</span> Agent Harness</a>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Cuenta</div>
+    <a href="/auth/me" class="nav-link"><span class="nav-icon">👤</span> Mi sesión</a>
+    <a href="/" class="nav-link"><span class="nav-icon">🏠</span> Landing</a>
+    <a href="/logout" class="nav-link" style="margin-top:auto;color:#ff4466;"><span class="nav-icon">⏻</span> Logout</a>
+  </aside><main>
+<div class="page-header fade"><h1>API <span>QuantLab</span></h1><p>Mercado, forecasting y optimización cuantitativa con pandas CPU o cuDF sobre CUDA T4.</p></div>
+<section class="api-panel fade"><div class="api-controls"><label>Endpoint<select id="endpoint"><option value="market">/api/market</option><option value="market/cpu">/api/market/cpu</option><option value="market/gpu">/api/market/gpu</option><option value="forecast/prophet">/api/forecast/prophet</option><option value="forecast/lstm">/api/forecast/lstm</option><option value="portfolio/markowitz">/api/portfolio/markowitz</option><option value="health">/api/health</option><option value="v1/models">/api/v1/models</option></select></label><label>Forecast<select id="forecastMode"><option value="carry_forward">Carry forward</option><option value="simulated_ohlcv">OHLCV simulado</option></select></label><label>Estilo<select id="style"><option value="scalping">Scalping</option><option value="day_trading">Day Trading</option><option value="swing_trading">Swing Trading</option><option value="position_trading">Position Trading</option><option value="long_term">Inversión largo plazo</option></select></label><label>Ticker<select id="ticker"></select></label><label>Periodo<select id="period"></select></label><label>Intervalo<select id="interval"></select></label><label>Modo<select id="mode"><option value="cpu">CPU pandas</option><option value="gpu">GPU cuDF CUDA T4</option></select></label><button id="run">Ejecutar consulta</button></div><div class="api-panel-footer"><div id="status" class="api-status">Listo para consultar</div><button id="openTickerAdmin" class="ticker-open" type="button">Administrar tickers</button></div></section>
+
+<section class="api-panel fade portfolio-controls" id="portfolioControls" style="display:none"><div class="portfolio-head"><div><h3>Constructor Markowitz</h3><p>Selecciona de 2 a 10 activos por tipo: acciones, criptos o divisas. BRK.B se traduce a BRK-B y MNX=X se corrige a MXN=X.</p></div><div class="portfolio-meta"><label>Benchmark<select id="benchmark"><option>SPY</option><option>QQQ</option></select></label><label>Periodo<select id="portfolioPeriod"><option>6mo</option><option>1y</option><option selected>2y</option><option>5y</option></select></label></div></div><div id="assetPicker" class="asset-picker"></div></section>
+<div class="api-metrics fade" id="metrics"></div><section class="forecast-strip fade" id="forecastStrip" style="display:none"></section>
+<section class="api-card chart-card chart-wide fade" id="marketCandles"><h3>Velas + Bollinger + VWAP + SMA</h3><div id="candles" class="chart chart-main"></div></section>
+<section class="api-card chart-card chart-wide fade" id="secondaryChart"><h3 id="secondary-title">Retorno acumulado</h3><div id="returns" class="chart chart-return"></div></section>
+<div class="chart-grid indicators-grid fade" id="marketIndicators"><section class="api-card chart-card"><h3>RSI 14</h3><div id="rsi" class="chart compact"></div></section><section class="api-card chart-card"><h3>MACD</h3><div id="macd" class="chart compact"></div></section></div>
+<div class="portfolio-grid fade" id="portfolioCharts" style="display:none"><section class="api-card chart-card"><h3>Frontera eficiente</h3><div id="frontier" class="chart compact-large"></div></section><section class="api-card chart-card"><h3>Pesos · Máximo Sharpe</h3><div id="weights" class="chart compact-large"></div></section></div>
+<div class="api-grid fade"><section class="api-card"><h3 id="table-title">Tabla dinámica</h3><div class="table-wrap"><table id="table"></table></div></section><section class="api-card"><h3>JSON viewer</h3><pre id="json">{}</pre></section></div>
+</main></div>
+<div class="ticker-modal" id="tickerModal" aria-hidden="true">
+  <div class="ticker-modal-backdrop" data-close-ticker></div>
+  <section class="ticker-dialog" role="dialog" aria-modal="true" aria-labelledby="tickerModalTitle">
+    <header class="ticker-modal-head">
+      <div>
+        <span class="asset-label">Universo de activos</span>
+        <h2 id="tickerModalTitle">Administración de tickers</h2>
+        <p>Gestiona los activos disponibles para consultas de mercado, forecast y portafolios Markowitz.</p>
+      </div>
+      <div class="ticker-modal-actions">
+        <button class="asset-save ghost" id="assetRefresh" type="button">Actualizar</button>
+        <button class="ticker-close" id="closeTickerAdmin" type="button" aria-label="Cerrar">×</button>
+      </div>
+    </header>
+    <div class="ticker-modal-body">
+      <section class="ticker-section ticker-create">
+        <div class="asset-label">Nuevo ticker</div>
+        <div class="asset-form">
+          <input id="newSymbol" placeholder="Ticker, ej. AAPL">
+          <select id="newType"><option>Acciones</option><option>Criptos</option><option>Divisas</option><option>Otros</option></select>
+          <input id="newLabel" placeholder="Nombre opcional">
+          <button class="asset-save" id="assetCreate" type="button">Agregar</button>
+        </div>
+        <div id="assetMsg" class="asset-msg" role="status"></div>
+      </section>
+      <section class="ticker-section">
+        <div class="ticker-section-head"><div><div class="asset-label">Tickers activos</div><p>Edita símbolo, tipo y etiqueta sin salir de API QuantLab.</p></div><span id="assetCount" class="asset-count">0 activos</span></div>
+        <div id="assetRows" class="asset-list"></div>
+      </section>
+      <section class="ticker-section catalog-note">
+        <div class="ticker-section-head"><div><div class="asset-label">Catálogo sugerido</div><p>Activa o desactiva símbolos comunes por tipo de mercado.</p></div></div>
+        <div id="assetUniverse"></div>
+      </section>
+    </div>
+  </section>
+</div>
+<script src="../js/platform-menu.js?v=20260523-shared"></script><script src="../js/session.js?v=20260517-user"></script><script src="./js/api.js?v=20260523-ticker-modal"></script></body></html>

@@ -1,0 +1,132 @@
+# =========================================================
+# QuantLab AI Capital — GPU Quant Stack (T4 NVIDIA)
+# Python recomendado: 3.11
+# CUDA recomendado: 12.x
+# GPU: NVIDIA Tesla T4
+# =========================================================
+
+# -----------------------------
+# CORE DATA SCIENCE
+# -----------------------------
+numpy<2
+pandas<2.4
+scipy
+statsmodels
+scikit-learn
+
+# -----------------------------
+# GPU / RAPIDS
+# -----------------------------
+--extra-index-url https://pypi.nvidia.com
+
+cudf-cu12==25.8.0
+cuml-cu12==25.8.0
+cugraph-cu12==25.8.0
+cupy-cuda12x==13.6.0
+
+# -----------------------------
+# MACHINE LEARNING GPU
+# -----------------------------
+xgboost
+lightgbm
+catboost
+
+# -----------------------------
+# DEEP LEARNING
+# -----------------------------
+torch==2.10.0
+torchvision==0.25.0
+torchaudio==2.10.0
+tensorflow
+keras
+
+# -----------------------------
+# TIME SERIES / FORECASTING
+# -----------------------------
+prophet
+pytorch-forecasting==1.7.0
+lightning==2.6.1
+pytorch-lightning==2.6.1
+
+# -----------------------------
+# FINANCE / QUANT
+# -----------------------------
+yfinance
+ta
+# pandas-ta no se instala en Python 3.11 desde PyPI; se omite para conservar compatibilidad con NumPy<2
+empyrical
+pyfolio
+quantstats
+arch
+
+# -----------------------------
+# VISUALIZATION
+# -----------------------------
+plotly
+matplotlib
+dash
+streamlit
+
+# -----------------------------
+# NOTEBOOKS
+# -----------------------------
+jupyterlab
+notebook
+ipywidgets
+
+# -----------------------------
+# DATABASES
+# -----------------------------
+sqlalchemy
+pymysql
+psycopg2-binary
+
+# -----------------------------
+# API / BACKEND
+# -----------------------------
+flask
+fastapi
+uvicorn
+requests
+
+# -----------------------------
+# LLM / AI
+# -----------------------------
+transformers
+accelerate
+sentence-transformers
+
+# -----------------------------
+# VECTOR SEARCH
+# -----------------------------
+faiss-cpu
+
+# Para FAISS GPU (opcional)
+# faiss-gpu
+
+# -----------------------------
+# UTILITIES
+# -----------------------------
+python-dotenv
+tqdm
+joblib
+rich
+tabulate
+
+# -----------------------------
+# PARQUET / BIG DATA
+# -----------------------------
+pyarrow
+fastparquet
+
+# -----------------------------
+# WEBSOCKETS
+# -----------------------------
+websockets
+python-socketio
+
+# -----------------------------
+# OPTIONAL TRADING
+# -----------------------------
+ccxt
+alpaca-py

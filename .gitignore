@@ -1,0 +1,56 @@
+# QuantLab local secrets
+.env
+*.env
+!.env.example
+**/.env
+**/*.env
+
+# Runtime data and databases
+data/
+logs/
+models/
+node_modules/
+postgres_auth_data/
+ollama_data/
+redis/
+research/
+services/
+harness/storage/
+**/storage/
+**/artifacts/
+**/conversations/
+*.db
+*.sqlite
+*.sqlite3
+
+# Local notebooks and generated outputs
+*.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Backups, editor metadata, generated notes
+*.bak
+*.bak-*
+*.backup
+._*
+respaldos/
+flask.txt
+info.txt
+jwt.txt
+fin_instalacion.txt
+
+# Keys, certificates and wallets
+*.pem
+*.key
+*.crt
+*.p12
+id_rsa*
+*private*
+*wallet*
+
+# OS/editor
+.DS_Store
+Thumbs.db

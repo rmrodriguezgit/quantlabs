@@ -1,0 +1,2 @@
+name: execution
+steps: [inspect_state, plan_safe_action, execute, verify, summarize]

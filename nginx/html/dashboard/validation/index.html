@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QuantLab Validation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css?v=2">
+  <link rel="stylesheet" href="./css/validation.css?v=20260523-polymarket-closecolors">
+</head>
+<body>
+<header>
+  <a href="/dashboard/" class="logo"><div class="logo-icon">QL</div><span class="logo-name">QuantLabs AI</span><span class="logo-badge">Validation</span></a>
+  <div class="header-right"><div class="session-pill"><div class="session-dot"></div><span>Sesión activa · JWT</span></div><a href="/dashboard/" class="session-pill">⬡ Dashboard</a><a href="/logout" class="btn-logout">⏻ Cerrar sesión</a></div>
+</header>
+<div class="layout">
+  <aside>
+    <div class="nav-label">Plataforma</div>
+    <a href="/dashboard/" class="nav-link"><span class="nav-icon">⬡</span> Dashboard</a>
+    <a href="/jupyter/" class="nav-link" target="_blank"><span class="nav-icon">📓</span> Jupyter Diario</a>
+    <a href="/jupyter-gpu/" class="nav-link" target="_blank"><span class="nav-icon">⚙️</span> Jupyter GPU</a>
+    <a href="/llm/" class="nav-link" target="_blank"><span class="nav-icon">🤖</span> LLM Local</a>
+    <a href="/dashboard/api/" class="nav-link"><span class="nav-icon">⚡</span> API QuantLab</a>
+    <a href="/dashboard/bitaxe/" class="nav-link"><span class="nav-icon">⛏️</span> BitAxe Miner</a>
+    <a href="/dashboard/harness/" class="nav-link"><span class="nav-icon">🧠</span> Agent Harness</a>
+    <a href="/dashboard/validation/" class="nav-link active"><span class="nav-icon">✓</span> Validation</a>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Reportes</div>
+    <a href="/harness-api/v1/agents/report" class="nav-link" target="_blank"><span class="nav-icon">▣</span> HTML Report</a>
+    <a href="/harness-api/v1/agents/status" class="nav-link" target="_blank"><span class="nav-icon">{ }</span> JSON Status</a>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Cuenta</div>
+    <a href="/auth/me" class="nav-link"><span class="nav-icon">👤</span> Mi sesión</a>
+    <a href="/" class="nav-link"><span class="nav-icon">⌂</span> Landing</a>
+    <a href="/logout" class="nav-link danger"><span class="nav-icon">⏻</span> Logout</a>
+  </aside>
+  <main>
+    <section class="validation-head fade">
+      <div><p class="eyebrow">Institutional Observability</p><h1>Validation Control Tower</h1><p>Validación operativa enfocada en Polymarket: señales, exposición paper, confianza y seguimiento por mercado.</p></div>
+      <button id="refreshBtn">Actualizar</button>
+    </section>
+    <section id="kpis" class="kpi-grid"></section>
+    <section class="content-grid">
+      <article class="panel wide"><div class="panel-head"><h2>Agentes y estrategias</h2><span id="generatedAt">—</span></div><div id="agents" class="agent-grid"></div></article>
+      <article class="panel wide">
+        <div class="panel-head">
+          <h2>Polymarket Validation</h2>
+          <div class="filters">
+            <label class="filter-label"><span>Agente</span><select id="agentFilter"><option value="">Todos los agentes</option></select></label>
+            <label class="filter-label"><span>Mode</span><select id="modeFilter"><option value="">Todos los modos</option></select></label>
+            <label class="filter-label"><span>Side</span><select id="sideFilter"><option value="">Todos los sides</option></select></label>
+          </div>
+        </div>
+        <div id="txSummary" class="tx-summary"></div>
+        <div class="tx-table-wrap"><table class="tx-table"><thead id="txHead"><tr><th>Hora ET</th><th>Venue</th><th>Mercado</th><th>Side</th><th>Mode</th><th>Status</th><th>Precio a superar</th><th>Stake</th><th>Confianza</th><th>Acierto / Error</th><th>PnL</th></tr></thead><tbody id="transactions"></tbody></table></div>
+      </article>
+      <article class="panel"><h2>Alertas</h2><ul id="alerts" class="alert-list"></ul></article>
+      <article class="panel"><h2>Infraestructura</h2><div id="infra" class="infra-list"></div></article>
+      <article class="panel wide"><h2>Descubrimiento</h2><div id="discovery" class="discovery-grid"></div></article>
+      <article class="panel wide"><h2>Logs recientes</h2><pre id="logs" class="log-box">Cargando…</pre></article>
+    </section>
+  </main>
+</div>
+<script src="../js/platform-menu.js?v=20260523-shared"></script>
+<script src="../js/session.js?v=20260517-user"></script>
+<script src="./js/validation.js?v=20260523-polymarket-reasons1"></script>
+</body>
+</html>

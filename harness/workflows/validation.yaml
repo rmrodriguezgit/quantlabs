@@ -1,0 +1,2 @@
+name: validation
+steps: [inspect, test, compare_expected, identify_risks, verdict]

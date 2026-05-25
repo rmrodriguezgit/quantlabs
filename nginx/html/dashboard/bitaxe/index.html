@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QuantLab AI — Bitaxe</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <link rel="stylesheet" href="../css/style.css?v=2">
+  <link rel="stylesheet" href="../css/bitaxe.css?v=1">
+
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<header>
+  <a href="/" class="logo">
+    <div class="logo-icon">QL</div>
+    <span class="logo-name">QuantLabs AI</span>
+    <span class="logo-badge">Bitaxe</span>
+  </a>
+  <div class="header-right">
+    <div class="session-pill">
+      <div class="session-dot"></div>
+      <span>Sesión activa · JWT</span>
+    </div>
+    <a href="/auth/me" class="session-pill" style="text-decoration:none;border-color:rgba(0,229,255,.2);color:var(--accent);">
+      👤 Mi cuenta
+    </a>
+    <a href="/logout" class="btn-logout">⏻ Cerrar sesión</a>
+  </div>
+</header>
+
+<div class="layout">
+
+
+  <aside>
+    <div class="nav-label">Plataforma</div>
+    <a href="/dashboard/" class="nav-link active">
+      <span class="nav-icon">⬡</span> Dashboard
+    </a>
+    <a href="/jupyter/" class="nav-link" target="_blank">
+      <span class="nav-icon">📓</span> Jupyter Diario
+    </a>
+    <a href="/jupyter-gpu/" class="nav-link" target="_blank">
+      <span class="nav-icon">⚙️</span> Jupyter GPU
+    </a>
+    <a href="/llm/" class="nav-link" target="_blank">
+      <span class="nav-icon">🤖</span> LLM Local
+    </a>
+    <a href="/dashboard/api/" class="nav-link">
+      <span class="nav-icon">⚡</span> API QuantLab
+    </a>
+    <a href="/dashboard/bitaxe/" class="nav-link">
+      <span class="nav-icon">⛏️</span> BitAxe Miner
+    </a>
+    <a href="/dashboard/harness/" class="nav-link">
+      <span class="nav-icon">🧠</span> Agent Harness
+    </a>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Cuenta</div>
+    <a href="/auth/me" class="nav-link">
+      <span class="nav-icon">👤</span> Mi sesión
+    </a>
+    <a href="/" class="nav-link">
+      <span class="nav-icon">🏠</span> Landing
+    </a>
+    <a href="/logout" class="nav-link" style="margin-top:auto;color:#ff4466;">
+      <span class="nav-icon">⏻</span> Logout
+    </a>
+  </aside>
+
+
+  <main>
+<div class="bitaxe-panel fade" id="bitaxe-panel">
+
+      <div class="bx-panel-header">
+        <div class="bx-live-dot loading" id="bx-live-dot"></div>
+        <span class="bx-panel-title">⛏ BitAxe · <span id="bx-asic-model">BM1370</span> · AxeOS <span id="bx-version">—</span></span>
+        <span class="bx-panel-sub">192.168.88.181 · uptime <span id="bx-uptime">—</span></span>
+        <span class="bx-refresh-btn" id="bx-refresh-btn" title="Actualizar ahora">↻</span>
+      </div>
+
+      <div class="bx-kpi-grid">
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Hashrate Live</div>
+          <div class="bx-kpi-val" id="bx-hr-live">—</div>
+          <div class="bx-kpi-unit">GH/s</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Hashrate 1m</div>
+          <div class="bx-kpi-val" id="bx-hr-1m">—</div>
+          <div class="bx-kpi-unit">GH/s</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Hashrate 10m</div>
+          <div class="bx-kpi-val" id="bx-hr-10m">—</div>
+          <div class="bx-kpi-unit">GH/s</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Hashrate 1h</div>
+          <div class="bx-kpi-val" id="bx-hr-1h">—</div>
+          <div class="bx-kpi-unit">GH/s</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Mejor Diff</div>
+          <div class="bx-kpi-val" id="bx-best-diff">—</div>
+          <div class="bx-kpi-unit">all-time</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Mejor Diff Sesión</div>
+          <div class="bx-kpi-val" id="bx-best-session-diff">—</div>
+          <div class="bx-kpi-unit">esta sesión</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Potencia</div>
+          <div class="bx-kpi-val" id="bx-power">—</div>
+          <div class="bx-kpi-unit">W / 40W máx</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Eficiencia</div>
+          <div class="bx-kpi-val" id="bx-efficiency">—</div>
+          <div class="bx-kpi-unit">J/TH</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Block Height</div>
+          <div class="bx-kpi-val" id="bx-block-height">—</div>
+          <div class="bx-kpi-unit">bloque actual</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Dificultad Red</div>
+          <div class="bx-kpi-val" id="bx-net-diff">—</div>
+          <div class="bx-kpi-unit">network diff</div>
+        </div>
+        <div class="bx-kpi">
+          <div class="bx-kpi-label">Recompensa</div>
+          <div class="bx-kpi-val" id="bx-coinbase-sats">—</div>
+          <div class="bx-kpi-unit">satoshis</div>
+        </div>
+        <div class="bx-kpi bx-kpi-wide">
+          <div class="bx-kpi-label">Tag minero</div>
+          <div class="bx-kpi-val bx-scriptsig-val" id="bx-scriptsig">—</div>
+          <div class="bx-kpi-unit">scriptsig</div>
+        </div>
+      </div>
+
+      <div class="bx-section-label">Rendimiento térmico &amp; eléctrico</div>
+      <div class="bx-bars">
+        <div class="bx-bar-row">
+          <span class="bx-bar-label">Temp ASIC</span>
+          <div class="bx-bar-track"><div class="bx-bar-fill bx-fill-warn" id="bx-bar-temp" style="width:0%"></div></div>
+          <span class="bx-bar-val" id="bx-val-temp">—</span>
+        </div>
+        <div class="bx-bar-row">
+          <span class="bx-bar-label">Temp VR</span>
+          <div class="bx-bar-track"><div class="bx-bar-fill bx-fill-warn" id="bx-bar-vrtemp" style="width:0%"></div></div>
+          <span class="bx-bar-val" id="bx-val-vrtemp">—</span>
+        </div>
+        <div class="bx-bar-row">
+          <span class="bx-bar-label">Fan Speed</span>
+          <div class="bx-bar-track"><div class="bx-bar-fill bx-fill-blue" id="bx-bar-fan" style="width:0%"></div></div>
+          <span class="bx-bar-val" id="bx-val-fan">—</span>
+        </div>
+        <div class="bx-bar-row">
+          <span class="bx-bar-label">Fan RPM</span>
+          <div class="bx-bar-track"><div class="bx-bar-fill bx-fill-blue" id="bx-bar-rpm" style="width:0%"></div></div>
+          <span class="bx-bar-val" id="bx-val-rpm">—</span>
+        </div>
+        <div class="bx-bar-row">
+          <span class="bx-bar-label">Potencia</span>
+          <div class="bx-bar-track"><div class="bx-bar-fill bx-fill-green" id="bx-bar-power" style="width:0%"></div></div>
+          <span class="bx-bar-val" id="bx-val-power2">—</span>
+        </div>
+        <div class="bx-bar-row">
+          <span class="bx-bar-label">Error rate</span>
+          <div class="bx-bar-track"><div class="bx-bar-fill bx-fill-red" id="bx-bar-err" style="width:0%"></div></div>
+          <span class="bx-bar-val" id="bx-val-err">—</span>
+        </div>
+      </div>
+
+      <div class="bx-bottom-grid">
+        <div class="bx-card-inner">
+          <div class="bx-section-label" style="margin-top:0;">Shares &amp; pool</div>
+          <div class="bx-shares-row">
+            <div class="bx-share-pill bx-pill-good">
+              <div class="bx-share-n bx-good" id="bx-shares-acc">—</div>
+              <div class="bx-share-l">Aceptados</div>
+            </div>
+            <div class="bx-share-pill bx-pill-bad">
+              <div class="bx-share-n bx-bad" id="bx-shares-rej">—</div>
+              <div class="bx-share-l">Rechazados</div>
+            </div>
+            <div class="bx-share-pill bx-pill-neu">
+              <div class="bx-share-n" id="bx-shares-rate">—</div>
+              <div class="bx-share-l">Tasa éxito</div>
+            </div>
+          </div>
+          <div class="bx-info-table">
+            <div class="bx-info-row"><span class="bx-ik">Pool (primary)</span><span class="bx-iv" id="bx-pool-url">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Puerto</span><span class="bx-iv" id="bx-pool-port">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Dificultad pool</span><span class="bx-iv" id="bx-pool-diff">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Motivo rechazo</span><span class="bx-iv" id="bx-rej-reason">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Fallback</span><span class="bx-iv" id="bx-fallback">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Usando fallback</span><span class="bx-iv" id="bx-using-fallback">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Response time</span><span class="bx-iv" id="bx-response-time">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Conexión pool</span><span class="bx-iv" id="bx-pool-conn">—</span></div>
+          </div>
+        </div>
+        <div class="bx-card-inner">
+          <div class="bx-section-label" style="margin-top:0;">Sistema &amp; red</div>
+          <div class="bx-info-table">
+            <div class="bx-info-row"><span class="bx-ik">ASIC</span><span class="bx-iv" id="bx-sys-asic">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Frecuencia</span><span class="bx-iv" id="bx-sys-freq">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Small cores</span><span class="bx-iv" id="bx-sys-cores">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Voltaje núcleo</span><span class="bx-iv" id="bx-sys-volt">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Voltaje entrada</span><span class="bx-iv" id="bx-sys-vin">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">WiFi SSID</span><span class="bx-iv" id="bx-sys-ssid">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">RSSI</span><span class="bx-iv" id="bx-sys-rssi">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">IP</span><span class="bx-iv" id="bx-sys-ip">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">PSRAM libre</span><span class="bx-iv" id="bx-sys-ram">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Board</span><span class="bx-iv" id="bx-sys-board">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Hostname</span><span class="bx-iv" id="bx-sys-host">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">MAC</span><span class="bx-iv" id="bx-sys-mac">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">IDF</span><span class="bx-iv" id="bx-sys-idf">—</span></div>
+            <div class="bx-info-row"><span class="bx-ik">Reset reason</span><span class="bx-iv" id="bx-sys-reset">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bx-wallet-box">
+        <span class="bx-section-label" style="margin:0 8px 0 0;white-space:nowrap;">₿ Wallet</span>
+        <span id="bx-wallet" style="font-size:11px;word-break:break-all;color:var(--accent,#00e5ff);font-family:'Space Mono',monospace;">—</span>
+      </div>
+
+      <div class="bx-section-label">Historial hashrate (últimas muestras)</div>
+      <canvas id="bx-spark-canvas" height="60" style="width:100%;display:block;margin-top:4px;"></canvas>
+
+      <div class="bx-footer-row">
+        <span id="bx-last-update">Esperando primera lectura…</span>
+        <span id="bx-countdown"></span>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="../js/platform-menu.js?v=20260523-shared"></script>
+<script src="./js/app.js"></script>
+<script src="./js/bitaxe.js?v=20260515-2115"></script>
+
+</body>
+</html>

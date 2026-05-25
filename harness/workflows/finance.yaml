@@ -1,0 +1,2 @@
+name: finance
+steps: [load_data, analyze, backtest, validate, report]

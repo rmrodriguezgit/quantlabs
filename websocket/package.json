@@ -1,0 +1,13 @@
+{
+  "name": "quantlab-websocket",
+  "version": "1.0.0",
+  "description": "QuantLab WebSocket Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

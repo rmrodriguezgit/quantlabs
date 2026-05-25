@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Agent Harness</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="./css/harness.css?v=20260524-polymrkt-agent">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a href="/" class="brand-block">
+        <div class="logo-icon">QL</div>
+        <div>
+          <strong>QuantLabs AI</strong>
+          <span>Harness</span>
+        </div>
+      </a>
+
+      <nav class="primary-nav">
+        <button id="newConversation" class="nav-item active"><span class="nav-icon">＋</span>Nuevo chat</button>
+        <button id="searchNav" class="nav-item" type="button"><span class="nav-icon">⌕</span>Buscar</button>
+        <button id="pluginsNav" class="nav-item" type="button"><span class="nav-icon">◫</span>Complementos</button>
+        <button id="automationsNav" class="nav-item" type="button"><span class="nav-icon">◌</span>Automatizaciones</button>
+        <button id="artifactsNav" class="nav-item" type="button"><span class="nav-icon">◇</span>Artefactos</button>
+        <button id="projectNav" class="nav-item" type="button"><span class="nav-icon">▣</span>Proyecto</button>
+      </nav>
+
+      <section class="chat-list-wrap">
+        <div class="section-label">Chats</div>
+        <input id="chatSearch" class="chat-search" placeholder="Buscar chats…" hidden>
+        <div id="chatList" class="chat-list"></div>
+      </section>
+
+      <div class="sidebar-footer">
+        <a href="/dashboard/" class="footer-item"><span class="nav-icon">⬡</span>Dashboard</a>
+        <a href="/auth/me" class="footer-item"><span class="nav-icon">⚙️</span>Configuración</a>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-header">
+        <div>
+          <div id="responseStatus" class="response-status idle"><span></span><strong>Idle</strong><small>Listo para recibir prompt</small></div>
+          <h1>Agent <span>Harness</span></h1>
+        </div>
+        <div class="header-right compact-header">
+          <div class="session-pill"><div class="session-dot"></div><span>Sesión activa · JWT</span></div>
+          <a href="/dashboard/" class="session-pill">⬡ Dashboard</a>
+          <a href="/auth/me" class="session-pill">⚙️ Configuración</a>
+        </div>
+      </header>
+
+      <section class="harness-grid chat-only fade">
+        <article class="harness-card chat-card">
+          <div class="card-head">
+            <div class="chat-title-block">
+              <h3 id="activeConversationTitle">Cargando…</h3>
+            </div>
+            <div class="chat-controls">
+              <select id="agent">
+                <option value="finance">📈 Finance</option>
+                <option value="coding">⌘ Coding</option>
+                <option value="planner">🧭 Planner</option>
+                <option value="research">🔎 Research</option>
+                <option value="validation">✓ Validation</option>
+                <option value="execution">⚙ Execution</option>
+              </select>
+            </div>
+          </div>
+          <div id="diagnosticPanel" class="diagnostic-panel">
+            <div><small>Estado</small><strong>Idle</strong></div>
+            <div><small>Última tarea</small><strong>Sin tarea</strong></div>
+            <div><small>Pasos</small><strong>0</strong></div>
+            <div><small>Herramienta</small><strong>—</strong></div>
+          </div>
+          <div id="messages" class="messages"></div>
+          <div id="attachments" class="attachments"></div>
+          <div id="attachmentPreview" class="attachment-preview empty">Selecciona un archivo adjunto para ver qué entendió Hermes.</div>
+          <form id="chatForm">
+            <input id="fileInput" type="file" hidden multiple>
+            <button id="attachBtn" type="button" class="attach-btn" title="Agregar archivos">＋</button>
+            <input id="prompt" placeholder="Pide una tarea al harness...">
+            <button id="stopRunBtn" type="button" class="stop-run-btn" title="Detener ejecución" hidden>■</button>
+            <button id="runBtn" type="submit">Ejecutar</button>
+          </form>
+        </article>
+      </section>
+    </main>
+  </div>
+  <aside id="sidePanel" class="side-panel" aria-hidden="true">
+    <div class="side-panel-head">
+      <div>
+        <p class="eyebrow" id="sidePanelKicker">Panel</p>
+        <h2 id="sidePanelTitle">Buscar</h2>
+      </div>
+      <button id="closeSidePanel" class="panel-close" type="button">×</button>
+    </div>
+    <div id="sidePanelBody" class="side-panel-body"></div>
+  </aside>
+  <div id="panelBackdrop" class="panel-backdrop"></div>
+  <script src="../js/session.js?v=20260517-user"></script>
+  <script src="./js/harness.js?v=20260524-agent-prefix-route"></script>
+</body>
+</html>

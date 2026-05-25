@@ -1,0 +1,250 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+
+  # =========================
+  # NGINX
+  # =========================
+  nginx:
+    logging: *default-logging
+    image: nginx:latest
+    container_name: quantlab_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /home/quantlab/quantlab-ai-capital/nginx/conf:/etc/nginx/conf.d
+      - /home/quantlab/quantlab-ai-capital/nginx/html:/usr/share/nginx/html
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - auth
+      - llm
+      - flask
+      - jupyter_lite
+      - jupyter_gpu
+  # =========================
+  # Websocket
+  # =========================
+  websocket:
+    logging: *default-logging
+    build: ./websocket
+    container_name: quantlab_websocket
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - LLM_URL=http://flask:5000/v1/chat/completions
+      - API_KEY=${WEBSOCKET_API_KEY}
+    expose:
+      - "3000"
+    depends_on:
+      - flask
+
+  # =========================
+  # OLLAMA
+  # =========================
+  ollama:
+    logging: *default-logging
+    image: ollama/ollama:latest
+    container_name: quantlab_ollama
+    restart: unless-stopped
+    volumes:
+      - ${QUANTLAB_RUNTIME_DIR:-/home/quantlab/quantlab-runtime}/ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+  # =========================
+  # POSTGRES AUTH
+  # =========================
+  postgres_auth:
+    logging: *default-logging
+    image: postgres:15
+    container_name: quantlab_postgres_auth
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${QUANTLAB_RUNTIME_DIR:-/home/quantlab/quantlab-runtime}/postgres_auth_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+
+  # =========================
+  # AUTH (JWT)
+  # =========================
+  auth:
+    logging: *default-logging
+    build: /home/quantlab/quantlab-ai-capital/auth
+    container_name: quantlab_auth
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "7000"
+    depends_on:
+      - postgres_auth
+
+  # =========================
+  # LLM (GPU T4)
+  # =========================
+  llm:
+    logging: *default-logging
+    build: /home/quantlab/quantlab-ai-capital/llama
+    container_name: quantlab_llm
+    restart: unless-stopped
+    volumes:
+     - ${QUANTLAB_RUNTIME_DIR:-/home/quantlab/quantlab-runtime}/models:/models
+    expose:
+     - "8080"
+    runtime: nvidia
+    environment:
+     - NVIDIA_VISIBLE_DEVICES=all
+     - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    command:
+     - "-m"
+     - "/models/${LLM_MODEL}"
+     - "--host"
+     - "0.0.0.0"
+     - "--port"
+     - "8080"
+     - "-ngl"
+     - "${LLM_GPU_LAYERS}"
+     - "--threads"
+     - "${LLM_THREADS}"
+     - "--ctx-size"
+     - "${LLM_CTX_SIZE}"
+     - "--chat-template"
+     - "${LLM_CHAT_TEMPLATE}"
+
+  # =========================
+  # API FLASK
+  # =========================
+  flask:
+    logging: *default-logging
+    build: /home/quantlab/quantlab-ai-capital/flask
+    container_name: quantlab_api
+    restart: unless-stopped
+    env_file:
+      - /home/quantlab/quantlab-ai-capital/flask/.env
+    expose:
+      - "5000"
+    volumes:
+      - /home/quantlab/quantlab-ai-capital/flask:/app
+    environment:
+      - GPU_MARKET_URL=http://market_gpu:9000
+    depends_on:
+      - llm
+      - market_gpu
+
+
+  # =========================
+  # MARKET GPU WORKER
+  # =========================
+  market_gpu:
+    logging: *default-logging
+    build: /home/quantlab/quantlab-ai-capital/market-gpu
+    container_name: quantlab_market_gpu
+    restart: unless-stopped
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD", "/opt/conda/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+  # =========================
+  # HARNESS RUNTIME
+  # =========================
+  harness:
+    logging: *default-logging
+    build: /home/quantlab/quantlab-ai-capital/harness
+    container_name: quantlab_harness
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "5000"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    volumes:
+      - ${QUANTLAB_RUNTIME_DIR:-/home/quantlab/quantlab-runtime}/harness/storage:/app/storage
+      - /home/quantlab/notebooks:/app/notebooks
+      - /srv/quantlab-harness/uploads:/app/uploads
+      - /srv/quantlab-harness/conversations:/app/conversations
+    environment:
+      - LLAMA_BASE_URL=http://llm:8080
+      - QUANTLAB_API_BASE_URL=http://flask:5000
+    depends_on:
+      - auth
+      - llm
+      - flask
+
+  # =========================
+  # JUPYTER LITE (uso diario)
+  # =========================
+  jupyter_lite:
+    logging: *default-logging
+    build:
+      context: ./jupyter-lite
+      dockerfile: Dockerfile
+    image: quantlab-ai-capital-jupyter:lite-py311
+    container_name: jupyter_quantlab_lite
+    restart: unless-stopped
+    expose:
+      - "8888"
+    volumes:
+      - /home/quantlab/notebooks:/home/jovyan/work
+    shm_size: "1g"
+    command: >
+      start-notebook.sh
+      --ServerApp.base_url=/jupyter/
+      --ServerApp.token=''
+      --ServerApp.password=''
+      --ServerApp.allow_origin='*'
+      --ServerApp.ip=0.0.0.0
+
+  # =========================
+  # JUPYTER GPU (RAPIDS / entrenamiento)
+  # =========================
+  jupyter_gpu:
+    logging: *default-logging
+    build:
+      context: ./jupyter
+      dockerfile: Dockerfile
+    image: quantlab-ai-capital-jupyter:py311-cuda12
+    container_name: jupyter_quantlab_gpu
+    restart: unless-stopped
+    expose:
+      - "8888"
+    volumes:
+      - /home/quantlab/notebooks:/home/jovyan/work
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    shm_size: "2g"
+    command: >
+      start-notebook.sh
+      --ServerApp.base_url=/jupyter-gpu/
+      --ServerApp.token=''
+      --ServerApp.password=''
+      --ServerApp.allow_origin='*'
+      --ServerApp.ip=0.0.0.0
