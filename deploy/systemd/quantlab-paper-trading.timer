@@ -1,0 +1,11 @@
+[Unit]
+Description=Run QuantLab Paper Trading Cycle Every Minute
+
+[Timer]
+OnCalendar=*:0/1
+AccuracySec=10s
+Persistent=true
+Unit=quantlab-paper-trading.service
+
+[Install]
+WantedBy=timers.target

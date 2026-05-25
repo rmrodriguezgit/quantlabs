@@ -1,0 +1,11 @@
+[Unit]
+Description=QuantLab Harness Paper Trading Cycle
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/quantlab/quantlab-ai-capital
+ExecStart=/usr/bin/docker exec quantlab_harness sh -lc "cd /app && python3 scripts/paper_trading_cron.py"
+StandardOutput=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/paper_trading/systemd.log
+StandardError=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/paper_trading/systemd.err
