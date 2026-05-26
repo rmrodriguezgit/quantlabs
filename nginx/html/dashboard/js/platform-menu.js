@@ -22,8 +22,7 @@
     {href:'/dashboard/api/', icon:'⚡', label:'API QuantLab'},
     {href:'/dashboard/bitaxe/', icon:'⛏️', label:'BitAxe Miner'},
     {href:'/dashboard/harness/', icon:'🧠', label:'Agent Harness'},
-    {href:'/dashboard/validation/', icon:'✓', label:'Validation'},
-    {href:'/dashboard/system/', icon:'🖥️', label:'Infra / UPS'}
+    {href:'/dashboard/validation/', icon:'✓', label:'Validation'}
   ];
   const account = [
     {href:'/auth/me', icon:'👤', label:'Mi cuenta'},
@@ -37,7 +36,10 @@
   fetch('/auth/userinfo', {credentials:'same-origin', cache:'no-store'})
     .then(r => r.ok ? r.json() : null)
     .then(data => {
-      if (data && data.role === 'admin') render([{href:'/admin/users', icon:'⚙️', label:'Usuarios'}]);
+      if (data && data.role === 'admin') render([
+        {href:'/dashboard/system/', icon:'🖥️', label:'Infra / UPS'},
+        {href:'/admin/users', icon:'⚙️', label:'Usuarios'}
+      ]);
     })
     .catch(() => {});
 })();

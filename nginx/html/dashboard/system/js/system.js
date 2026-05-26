@@ -23,6 +23,18 @@ async function loadStatus(){
   return response.json();
 }
 
+async function requireAdmin(){
+  const response = await fetch('/auth/userinfo', {credentials:'same-origin', cache:'no-store'});
+  if(!response.ok) throw new Error('unauthorized');
+  const user = await response.json();
+  if(user.role !== 'admin'){
+    document.body.innerHTML = '<main style="padding:40px"><div class="ops-panel"><h2>Acceso restringido</h2><p class="metric-sub">Este panel está disponible únicamente para el perfil admin.</p><p style="margin-top:18px"><a class="btn-logout" href="/dashboard/" style="display:inline-flex">Volver al dashboard</a></p></div></main>';
+    setTimeout(() => { window.location.href = '/dashboard/'; }, 1200);
+    return false;
+  }
+  return true;
+}
+
 function renderKpis(data){
   const gpu = (data.gpu || [])[0] || {};
   const mem = data.memory || {};
@@ -145,5 +157,10 @@ async function refresh(){
   }
 }
 
-refresh();
-setInterval(refresh, 30000);
+requireAdmin().then(ok => {
+  if(!ok) return;
+  refresh();
+  setInterval(refresh, 30000);
+}).catch(() => {
+  window.location.href = '/login';
+});
