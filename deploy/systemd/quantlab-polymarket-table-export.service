@@ -1,0 +1,11 @@
+[Unit]
+Description=QuantLab Polymarket Table Export 24h Collector
+After=docker.service quantlab-paper-trading.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/quantlab/quantlab-ai-capital
+ExecStart=/usr/local/sbin/quantlab-polymarket-table-export-runner.sh
+StandardOutput=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/paper_trading_table_exports/systemd.log
+StandardError=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/paper_trading_table_exports/systemd.err

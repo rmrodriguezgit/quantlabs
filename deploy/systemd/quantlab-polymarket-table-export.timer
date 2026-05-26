@@ -1,0 +1,11 @@
+[Unit]
+Description=Run QuantLab Polymarket Table Export Every Minute
+
+[Timer]
+OnCalendar=*:0/1
+AccuracySec=10s
+Persistent=true
+Unit=quantlab-polymarket-table-export.service
+
+[Install]
+WantedBy=timers.target
