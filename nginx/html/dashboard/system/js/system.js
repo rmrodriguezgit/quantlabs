@@ -47,7 +47,7 @@ function renderKpis(data){
     kpi('CPU', pct(cpu.utilization_percent), `${cpu.cores || '—'} cores · load ${cpu.load?.['1m'] ?? '—'}`, klass(cpu.utilization_percent || 0)),
     kpi('Disco raíz', pct(disk.used_percent), `${gb(disk.free_gb)} libres en ${disk.mount || '/'}`, disk.status === 'warning' ? 'warn' : 'ok'),
     kpi('bitcoind', btc.status === 'ok' ? 'OK' : 'Revisar', `${btc.info?.blocks || '—'} bloques · ${btc.info?.network || 'network n/d'}`, btc.status === 'ok' ? 'ok' : 'warn'),
-    kpi('UPS Dahua', data.ups?.status === 'detected' ? 'Detectado' : 'No detectado', 'NUT instalado · esperando USB/HID', data.ups?.status === 'detected' ? 'ok' : 'warn'),
+    kpi('UPS Dahua', data.ups?.status === 'detected' ? 'Conectado' : 'No conectado', data.ups?.status === 'detected' ? 'NUT leyendo el respaldo' : 'Sin datos que mostrar', data.ups?.status === 'detected' ? 'ok' : 'warn'),
     kpi('Swap', `${gb(mem.swap_used_gb)}`, `${gb(mem.swap_total_gb)} total`, Number(mem.swap_used_gb) > 2 ? 'warn' : 'ok'),
     kpi('Actualización', '1 min', data.generated_at || '—', 'ok')
   ].join('');
@@ -75,19 +75,35 @@ function renderGpu(data){
 
 function renderUps(data){
   const ups = data.ups || {};
+  if(ups.status !== 'detected'){
+    $('ups-panel').innerHTML = `<h2>No Break UPS ${pill('No conectado', 'warn')}</h2>
+      <div class="detail-list">
+        ${row('Estado', 'Sin UPS detectado')}
+        ${row('Equipo esperado', ups.expected_device?.model || 'Dahua 1500VA 900W')}
+      </div>`;
+    return;
+  }
   const services = ups.services || {};
-  const usb = (ups.usb_devices || []).join('\n') || 'Sin UPS visible en USB';
-  $('ups-panel').innerHTML = `<h2>No Break UPS ${pill(ups.status === 'detected' ? 'Detectado' : 'No detectado', ups.status === 'detected' ? 'ok' : 'warn')}</h2>
+  const deviceRows = (ups.devices || []).map(device => {
+    const raw = Object.fromEntries(String(device.raw || '').split('\n').map(line => line.split(':').map(part => part.trim())).filter(parts => parts.length >= 2));
+    return [
+      row('Dispositivo', device.name || 'UPS'),
+      row('Carga batería', raw['battery.charge'] ? `${raw['battery.charge']}%` : '—'),
+      row('Estado batería', raw['ups.status'] || '—'),
+      row('Voltaje entrada', raw['input.voltage'] ? `${raw['input.voltage']} V` : '—'),
+      row('Carga UPS', raw['ups.load'] ? `${raw['ups.load']}%` : '—'),
+      row('Runtime estimado', raw['battery.runtime'] ? `${Math.round(Number(raw['battery.runtime']) / 60)} min` : '—')
+    ].join('');
+  }).join('');
+  $('ups-panel').innerHTML = `<h2>No Break UPS ${pill('Conectado', 'ok')}</h2>
     <div class="detail-list">
       ${row('Equipo esperado', ups.expected_device?.model || 'Dahua 1500VA 900W')}
       ${row('NUT mode', (ups.nut_mode || '').replace(/\n/g, ' · ') || '—')}
-      ${row('upsc', ups.tools?.upsc ? 'instalado' : 'no disponible')}
-      ${row('nut-scanner', ups.tools?.['nut-scanner'] ? 'instalado' : 'no disponible')}
       ${row('nut-server', `${services['nut-server']?.active || 'n/d'} / ${services['nut-server']?.enabled || 'n/d'}`)}
       ${row('nut-monitor', `${services['nut-monitor']?.active || 'n/d'} / ${services['nut-monitor']?.enabled || 'n/d'}`)}
+      ${deviceRows}
     </div>
-    <div class="metric-sub" style="margin:12px 0 8px">${esc(ups.note || '')}</div>
-    <div class="raw-box">${esc(usb)}</div>`;
+    <div class="metric-sub" style="margin:12px 0 8px">${esc(ups.note || '')}</div>`;
 }
 
 function renderCpu(data){
