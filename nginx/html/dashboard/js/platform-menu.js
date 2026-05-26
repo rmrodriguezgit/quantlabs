@@ -22,7 +22,8 @@
     {href:'/dashboard/api/', icon:'⚡', label:'API QuantLab'},
     {href:'/dashboard/bitaxe/', icon:'⛏️', label:'BitAxe Miner'},
     {href:'/dashboard/harness/', icon:'🧠', label:'Agent Harness'},
-    {href:'/dashboard/validation/', icon:'✓', label:'Validation'}
+    {href:'/dashboard/validation/', icon:'✓', label:'Validation'},
+    {href:'/dashboard/system/', icon:'🖥️', label:'Infra / UPS'}
   ];
   const account = [
     {href:'/auth/me', icon:'👤', label:'Mi cuenta'},

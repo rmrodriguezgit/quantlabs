@@ -19,6 +19,7 @@ harness/storage/
 **/storage/
 **/artifacts/
 **/conversations/
+nginx/html/dashboard/system/status.json
 *.db
 *.sqlite
 *.sqlite3

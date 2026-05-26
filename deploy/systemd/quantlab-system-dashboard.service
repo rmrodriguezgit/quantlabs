@@ -1,0 +1,10 @@
+[Unit]
+Description=QuantLab System Dashboard Status Export
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/quantlab/quantlab-ai-capital/deploy/system/quantlab_system_status_export.py
+StandardOutput=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/system_dashboard/systemd.log
+StandardError=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/system_dashboard/systemd.err

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QuantLab AI — Infra / UPS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/style.css?v=2"/>
+  <link rel="stylesheet" href="./css/system.css?v=20260526-nobreak"/>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<header>
+  <a href="/dashboard/" class="logo">
+    <div class="logo-icon">QL</div>
+    <span class="logo-name">QuantLabs AI</span>
+    <span class="logo-badge">Infra</span>
+  </a>
+  <div class="header-right">
+    <div class="session-pill"><div class="session-dot"></div><span id="system-freshness">Actualizando</span></div>
+    <a href="/logout" class="btn-logout">⏻ Cerrar sesión</a>
+  </div>
+</header>
+
+<div class="layout">
+  <aside></aside>
+  <main>
+    <div class="page-header fade">
+      <h1>Infraestructura / <span>No Break UPS</span></h1>
+      <p>NVIDIA, RAM, CPU, discos, bitcoind y respaldo Dahua 1500VA 900W · <span id="generated-at" class="mono">—</span></p>
+    </div>
+
+    <section class="system-grid fade" id="kpi-grid"></section>
+
+    <section class="ops-grid">
+      <article class="ops-panel fade" id="gpu-panel"></article>
+      <article class="ops-panel fade" id="ups-panel"></article>
+      <article class="ops-panel fade" id="cpu-panel"></article>
+      <article class="ops-panel fade" id="memory-panel"></article>
+      <article class="ops-panel wide fade" id="disk-panel"></article>
+      <article class="ops-panel fade" id="bitcoin-panel"></article>
+      <article class="ops-panel fade" id="docker-panel"></article>
+    </section>
+  </main>
+</div>
+
+<script src="../js/platform-menu.js?v=20260526-system"></script>
+<script src="../js/session.js?v=20260517-user"></script>
+<script src="./js/system.js?v=20260526-nobreak"></script>
+</body>
+</html>
