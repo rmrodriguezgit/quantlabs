@@ -12,6 +12,7 @@ from typing import Any
 
 
 OUTPUT_PATH = Path("/home/quantlab/quantlab-ai-capital/nginx/html/dashboard/system/status.json")
+GPU_IDLE_GOVERNOR_PATH = Path("/home/quantlab/quantlab-runtime/harness/storage/artifacts/system_dashboard/gpu_idle_governor.json")
 EXPECTED_UPS = {
     "brand": "Dahua",
     "model": "No Break UPS Dahua 1500VA 900W Regulador Con Bateria Respaldo",
@@ -251,12 +252,22 @@ def ups_info() -> dict[str, Any]:
     }
 
 
+def gpu_idle_governor_info() -> dict[str, Any]:
+    if not GPU_IDLE_GOVERNOR_PATH.exists():
+        return {"status": "not_configured"}
+    try:
+        return json.loads(GPU_IDLE_GOVERNOR_PATH.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"status": "error", "error": str(exc)}
+
+
 def main() -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "host": {"hostname": platform.node(), "system": platform.platform(), "uptime": read_text("/proc/uptime").split()[0] if read_text("/proc/uptime") else None},
         "gpu": gpu_info(),
+        "gpu_idle_governor": gpu_idle_governor_info(),
         "memory": memory_info(),
         "cpu": cpu_info(),
         "disks": disk_info(),

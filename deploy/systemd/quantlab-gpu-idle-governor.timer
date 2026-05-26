@@ -1,0 +1,11 @@
+[Unit]
+Description=Run QuantLab NVIDIA T4 Idle Governor Every Minute
+
+[Timer]
+OnCalendar=*:0/1
+AccuracySec=10s
+Persistent=true
+Unit=quantlab-gpu-idle-governor.service
+
+[Install]
+WantedBy=timers.target

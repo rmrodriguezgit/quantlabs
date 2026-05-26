@@ -55,6 +55,8 @@ function renderKpis(data){
 
 function renderGpu(data){
   const gpu = (data.gpu || [])[0] || {};
+  const governor = data.gpu_idle_governor || {};
+  const governorState = governor.status === 'ok' ? governor.mode : governor.status || 'n/d';
   $('gpu-panel').innerHTML = `<h2>NVIDIA GPU ${pill(gpu.status === 'ok' ? 'Online' : 'N/D', gpu.status === 'ok' ? 'ok' : 'warn')}</h2>
     ${bar(gpu.memory_used_percent || 0)}
     <div class="detail-list">
@@ -64,6 +66,10 @@ function renderGpu(data){
       ${row('Uso GPU', pct(gpu.utilization_percent))}
       ${row('Memoria', `${mb(gpu.memory_used_mb)} / ${mb(gpu.memory_total_mb)}`)}
       ${row('Potencia', `${fmt(gpu.power_draw_w)} W / ${fmt(gpu.power_limit_w)} W`)}
+      ${row('Modo idle automático', governorState)}
+      ${row('Límite idle / activo', governor.status === 'ok' ? `${fmt(governor.idle_power_limit_w)} W / ${fmt(governor.active_power_limit_w)} W` : '—')}
+      ${row('Ciclos ociosos', governor.status === 'ok' ? `${governor.idle_cycles}/${governor.idle_after_cycles}` : '—')}
+      ${row('Última acción', governor.last_action || '—')}
     </div>`;
 }
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=QuantLab NVIDIA T4 Idle Governor
+After=nvidia-persistenced.service docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/quantlab/quantlab-ai-capital/deploy/system/quantlab_gpu_idle_governor.py
+StandardOutput=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/system_dashboard/gpu_idle_governor.log
+StandardError=append:/home/quantlab/quantlab-runtime/harness/storage/artifacts/system_dashboard/gpu_idle_governor.err

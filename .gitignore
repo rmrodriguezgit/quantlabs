@@ -55,3 +55,5 @@ id_rsa*
 # OS/editor
 .DS_Store
 Thumbs.db
+
+nginx/html/dashboard/system/gpu_idle_governor.json
