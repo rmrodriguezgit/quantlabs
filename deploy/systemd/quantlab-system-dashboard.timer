@@ -2,7 +2,7 @@
 Description=Run QuantLab System Dashboard Status Export Every Minute
 
 [Timer]
-OnCalendar=*:0/1
+OnCalendar=*-*-* *:*:25
 AccuracySec=10s
 Persistent=true
 Unit=quantlab-system-dashboard.service
