@@ -759,7 +759,7 @@ def _markowitz_payload(close, tickers, benchmark, mode="cpu", engine="pandas"):
     frontier, w_min = _frontier_exact(mu, cov)
     w_max = _solve_long_only(mu, cov, objective="max_sharpe")
     rng = np.random.default_rng(42)
-    sample_w = rng.dirichlet(np.ones(len(tickers)), size=3000)
+    sample_w = rng.dirichlet(np.ones(len(tickers)), size=10000)
     sample_ret = sample_w @ mu
     sample_vol = np.sqrt(np.einsum("ij,jk,ik->i", sample_w, cov, sample_w))
     sample_sh = np.divide(sample_ret, sample_vol, out=np.full_like(sample_ret, np.nan), where=sample_vol>0)
