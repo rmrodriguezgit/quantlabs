@@ -187,7 +187,7 @@ def test_paper_trading_rejects_live_mode():
     try:
         tool.run(action="run_cycle", role="trader", mode="live")
     except PermissionError as exc:
-        assert "MODE=paper" in str(exc)
+        assert "POLYMARKET_LIVE_TRADING_ENABLED" in str(exc)
     else:
         raise AssertionError("live mode should be rejected")
 
@@ -241,3 +241,57 @@ def test_paper_trading_allows_only_one_polymarket_trade_per_window(tmp_path, mon
     assert second["orders_count"] == 0
     assert second["transactions_count"] == 0
     assert second["observations"][0]["reason"] == "duplicate_window_trade"
+
+
+
+def test_live_polymarket_uses_quarter_kelly_and_executor(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    monkeypatch.setattr(settings, "polymarket_live_trading_enabled", True)
+
+    def fake_poly_run(self, **kwargs):
+        return {
+            "strategy": "BTC Up/Down coordinated 5m/15m live signal",
+            "filters": {"min_edge": 0.03},
+            "candidates": [{
+                "interval": "5m",
+                "preferred_side": "Up",
+                "confidence": 0.9,
+                "probability": 0.9,
+                "edge": 0.3,
+                "microstructure": {"ask": 0.60, "spread": 0.01, "ask_size": 10, "token_id": "up-token"},
+                "passes_filters": True,
+                "countdown": "03:00",
+                "window_et": "2026-05-20 12:00:00 EDT - 2026-05-20 12:05:00 EDT",
+            }],
+            "reasons": [],
+        }
+
+    executions = []
+
+    def fake_execute(self, result, order, base):
+        executions.append(order.copy())
+        order["execution"] = "live_order_sent"
+        order["transaction_status"] = "accepted"
+        order["execution_result"] = {"order_id": "abc", "secret_exposed": False}
+
+    monkeypatch.setattr("tools.paper_trading.PolymarketTool.run", fake_poly_run)
+    monkeypatch.setattr("tools.paper_trading.PaperTradingTool._execute_polymarket_live_if_needed", fake_execute)
+
+    result = PaperTradingTool().run(
+        action="run_cycle",
+        role="trader",
+        mode="live",
+        venues=["polymarket", "mexc"],
+        live_execution_enabled=True,
+        bankroll_usdt=1000,
+        polymarket_stake_usdt=100,
+        kelly_fraction=0.25,
+    )
+
+    assert result["mode"] == "live"
+    assert result["kelly_fraction"] == 0.25
+    assert result["orders_count"] == 1
+    assert result["orders"][0]["stake_usdt"] == 50
+    assert result["orders"][0]["execution"] == "live_order_sent"
+    assert result["orders"][0]["token_id"] == "up-token"
+    assert executions

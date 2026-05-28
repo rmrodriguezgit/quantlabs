@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -21,12 +22,12 @@ class PaperTradingTool(BaseTool):
         },
         'polymarket_btc_updown': {
             'trade': ['confidence>=threshold', 'Kelly>0', 'order_book_available', 'seconds_to_close>=45', 'Chainlink/Polymarket price sync', 'one_trade_per_event_window'],
-            'risk': ['bankroll=10000 USDT', 'polymarket_test_stake=1 USDT per event', 'fractional_kelly=25% as risk filter', 'ET window alignment', 'price_to_beat=Chainlink candle open'],
+            'risk': ['bankroll=10000 USDT', 'stake=Kelly 1/4 con limites de exposicion', 'fractional_kelly=25%', 'ET window alignment', 'price_to_beat=Chainlink candle open'],
         },
         'modes': {
             'observe': 'analiza señales y registra transacciones observadas sin simular orden',
             'paper': 'simula órdenes y registra auditoría; no toca exchanges reales',
-            'live': 'requiere habilitación explícita; bloqueado por defecto',
+            'live': 'requiere habilitación explícita, SDK CLOB y credenciales Polymarket',
         },
     }
 
@@ -37,7 +38,7 @@ class PaperTradingTool(BaseTool):
         if action == 'status':
             return self._status()
         if action == 'rules':
-            return {'rules': self.default_rules, 'live_execution_enabled': settings.mexc_live_trading_enabled}
+            return {'rules': self.default_rules, 'live_execution_enabled': settings.polymarket_live_trading_enabled}
         if action == 'run_cycle':
             return self._run_cycle(role=role, **kwargs)
         raise ValueError('unsupported paper_trading action')
@@ -46,14 +47,17 @@ class PaperTradingTool(BaseTool):
         mode = str(kwargs.get('mode') or 'paper').lower()
         if mode not in {'observe', 'paper', 'live'}:
             raise ValueError('mode must be observe, paper or live')
-        if mode == 'live' and not (settings.mexc_live_trading_enabled and kwargs.get('live_execution_enabled') is True):
-            raise PermissionError('MODE=live is blocked; use MODE=paper unless mexc_live_trading_enabled and live_execution_enabled=True')
+        if mode == 'live' and not (settings.polymarket_live_trading_enabled and kwargs.get('live_execution_enabled') is True):
+            raise PermissionError('MODE=live is blocked; set POLYMARKET_LIVE_TRADING_ENABLED=true and live_execution_enabled=True')
         venues = kwargs.get('venues') or ['polymarket', 'mexc']
         if isinstance(venues, str):
             venues = [x.strip().lower() for x in venues.split(',') if x.strip()]
         bankroll = float(kwargs.get('bankroll_usdt') or 10000)
         polymarket_stake_usdt = max(0, float(kwargs.get('polymarket_stake_usdt') or 1))
         max_stake_pct = min(max(float(kwargs.get('max_stake_pct') or 0.05), 0), 0.05)
+        kelly_fraction = min(max(float(kwargs.get('kelly_fraction') or 0.25), 0), 0.25)
+        if mode == 'live' and 'mexc' in venues:
+            venues = [venue for venue in venues if venue != 'mexc']
         threshold = float(kwargs.get('threshold') or 0.8)
         result = {
             'mode': mode,
@@ -62,6 +66,7 @@ class PaperTradingTool(BaseTool):
             'bankroll_usdt': bankroll,
             'max_stake_pct': max_stake_pct,
             'polymarket_stake_usdt': polymarket_stake_usdt,
+            'kelly_fraction': kelly_fraction,
             'rules': kwargs.get('rules') or self.default_rules,
             'transactions': [],
             'orders': [],
@@ -129,7 +134,7 @@ class PaperTradingTool(BaseTool):
             if self._polymarket_trade_exists(result, signal.get('interval'), base.get('window_et')):
                 result['observations'].append({**base, 'signal': 'NO TRADE', 'reason': 'duplicate_window_trade'})
                 continue
-            result['orders'].append({
+            order = {
                 **base,
                 'paper': result['mode'] == 'paper',
                 'mode': result['mode'],
@@ -140,14 +145,17 @@ class PaperTradingTool(BaseTool):
                 'stake_usdt': round(stake, 2),
                 'max_loss_usdt': round(stake, 2),
                 'execution': self._execution_label(result['mode']),
-            })
+                'token_id': trade.get('token_id'),
+            }
+            self._execute_polymarket_live_if_needed(result, order, base)
+            result['orders'].append(order)
             result['transactions'].append(self._transaction(
                 result,
                 venue='polymarket',
                 market='BTC Up/Down',
                 symbol='BTC',
                 side=trade['side'],
-                status='observed' if result['mode'] == 'observe' else 'accepted',
+                status='observed' if result['mode'] == 'observe' else order.get('transaction_status', 'accepted'),
                 price=trade['ask'],
                 stake_usdt=stake if result['mode'] != 'observe' else 0,
                 confidence=base.get('probability'),
@@ -186,12 +194,13 @@ class PaperTradingTool(BaseTool):
             ))
             return
         per_window_budget = min(polymarket_stake_usdt, bankroll * max_stake_pct)
+        kelly_fraction_setting = result.get('kelly_fraction', 0.25)
         for candidate in tradable:
             side = 'UP' if candidate.get('preferred_side') == 'Up' else ('DOWN' if candidate.get('preferred_side') == 'Down' else 'NONE')
             ask = self._float((candidate.get('microstructure') or {}).get('ask'))
             probability = self._float(candidate.get('probability') or candidate.get('confidence'))
             full_kelly = self._kelly_fraction(probability, ask)
-            fractional_kelly = max(0, min(max_stake_pct, full_kelly * 0.25))
+            fractional_kelly = max(0, min(max_stake_pct, full_kelly * kelly_fraction_setting))
             stake = min(per_window_budget, bankroll * fractional_kelly)
             base = {
                 'venue': 'polymarket',
@@ -218,7 +227,7 @@ class PaperTradingTool(BaseTool):
             if self._polymarket_trade_exists(result, candidate.get('interval'), candidate.get('window_et')):
                 result['observations'].append({**base, 'signal': 'NO TRADE', 'reason': 'duplicate_window_trade'})
                 continue
-            result['orders'].append({
+            order = {
                 **base,
                 'paper': result['mode'] == 'paper',
                 'mode': result['mode'],
@@ -230,7 +239,10 @@ class PaperTradingTool(BaseTool):
                 'stake_usdt': round(stake, 2),
                 'max_loss_usdt': round(stake, 2),
                 'execution': self._execution_label(result['mode']),
-            })
+                'token_id': (candidate.get('microstructure') or {}).get('token_id'),
+            }
+            self._execute_polymarket_live_if_needed(result, order, base)
+            result['orders'].append(order)
             result['transactions'].append(self._transaction(
                 result,
                 strategy=strategy,
@@ -238,7 +250,7 @@ class PaperTradingTool(BaseTool):
                 market='BTC Up/Down',
                 symbol='BTC',
                 side=side,
-                status='observed' if result['mode'] == 'observe' else 'accepted',
+                status='observed' if result['mode'] == 'observe' else order.get('transaction_status', 'accepted'),
                 price=ask,
                 stake_usdt=stake if result['mode'] != 'observe' else 0,
                 confidence=probability,
@@ -255,6 +267,75 @@ class PaperTradingTool(BaseTool):
                     'full_kelly': round(full_kelly, 6),
                 },
             ))
+
+
+    def _execute_polymarket_live_if_needed(self, result: dict, order: dict, base: dict) -> None:
+        if result.get('mode') != 'live':
+            return
+        token_id = order.get('token_id')
+        if not token_id:
+            order['execution'] = 'live_rejected_missing_token_id'
+            order['transaction_status'] = 'rejected'
+            result['errors'].append({'venue': 'polymarket', 'error': 'missing token_id for live execution'})
+            return
+        try:
+            execution = self._place_polymarket_market_buy(
+                token_id=str(token_id),
+                amount_usdt=float(order.get('stake_usdt') or 0),
+                worst_price=float(order.get('price') or 0),
+            )
+        except Exception as exc:
+            order['execution'] = 'live_order_failed'
+            order['transaction_status'] = 'rejected'
+            order['execution_error'] = str(exc)[:300]
+            result['errors'].append({'venue': 'polymarket', 'error': str(exc)[:300], 'interval': base.get('interval')})
+            return
+        order['execution'] = 'live_order_sent'
+        order['transaction_status'] = 'accepted'
+        order['execution_result'] = execution
+
+    def _place_polymarket_market_buy(self, token_id: str, amount_usdt: float, worst_price: float) -> dict:
+        if amount_usdt <= 0:
+            raise ValueError('amount_usdt must be positive')
+        if not settings.polymarket_live_trading_enabled:
+            raise PermissionError('POLYMARKET_LIVE_TRADING_ENABLED is false')
+        private_key = settings.polymarket_private_key or os.getenv('PRIVATE_KEY', '')
+        funder = settings.polymarket_funder_address or os.getenv('FUNDER_ADDRESS', '')
+        if not private_key or not funder:
+            raise PermissionError('Polymarket private key/funder address are not configured')
+        try:
+            from py_clob_client_v2 import ClobClient, OrderType, Side
+        except Exception as exc:
+            raise RuntimeError('py-clob-client-v2 is required for Polymarket live orders') from exc
+        host = (settings.clob_api or os.getenv('CLOB_API') or 'https://clob.polymarket.com').strip().strip('"').rstrip('/')
+        client = ClobClient(
+            host=host,
+            chain_id=settings.polymarket_chain_id,
+            key=private_key,
+            signature_type=settings.polymarket_signature_type,
+            funder=funder,
+        )
+        client.set_api_creds(client.create_or_derive_api_creds())
+        tick_size = client.get_tick_size(token_id)
+        neg_risk = client.get_neg_risk(token_id)
+        signed_order = client.create_market_order(
+            {
+                'tokenID': token_id,
+                'side': Side.BUY,
+                'amount': round(amount_usdt, 2),
+                'price': round(worst_price, 2),
+            },
+            {'tickSize': tick_size, 'negRisk': bool(neg_risk)},
+        )
+        response = client.post_order(signed_order, OrderType.FOK)
+        return {
+            'order_id': response.get('orderID') or response.get('order_id'),
+            'status': response.get('status'),
+            'success': response.get('success'),
+            'amount_usdt': round(amount_usdt, 2),
+            'worst_price': round(worst_price, 2),
+            'secret_exposed': False,
+        }
 
     def _mexc_cycle(self, result, role, kwargs):
         tickers = kwargs.get('mexc_tickers') or kwargs.get('tickers') or []
@@ -461,6 +542,7 @@ class PaperTradingTool(BaseTool):
         return {
             'side': 'UP' if side == 'Up' else 'DOWN',
             'ask': ask,
+            'token_id': self._token_id_for_side(market, side),
             'full_kelly': full_kelly,
             'fractional_kelly': full_kelly * 0.25,
             'reason': 'probabilidad y Kelly positivos',
@@ -472,6 +554,12 @@ class PaperTradingTool(BaseTool):
         if probability is None or ask is None or ask <= 0 or ask >= 1:
             return 0
         return max(0, (probability - ask) / (1 - ask))
+
+    def _token_id_for_side(self, market: dict, side: str):
+        for token in market.get('tokens') or []:
+            if token.get('outcome') == side:
+                return token.get('token_id')
+        return None
 
     def _ask_for_side(self, market: dict, side: str):
         for token in market.get('tokens') or []:

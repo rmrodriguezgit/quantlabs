@@ -18,13 +18,15 @@ DEFAULT_CONFIG = {
     "bankroll_usdt": 10000,
     "max_stake_pct": 0.05,
     "polymarket_stake_usdt": 1,
+    "kelly_fraction": 0.25,
+    "live_execution_enabled": False,
     "threshold": 0.8,
     "trading_rules": {
         "mexc_spot": {
             "buy": ["RSI<=30", "MACD histogram<0", "price<VWAP"],
             "sell": ["RSI>=70", "MACD histogram>0", "price>VWAP"],
             "modes": ["observe", "paper", "live"],
-            "paper_stake": "1 USDT por evento 5m/15m",
+            "live_stake": "Kelly 1/4, limitado por bankroll/max_stake_pct/polymarket_stake_usdt",
         },
         "polymarket_btc_updown": {
             "trade": ["confidence>=threshold", "Kelly>0", "order_book_available", "seconds_to_close>=45", "Chainlink/Polymarket price sync", "one_trade_per_event_window"],

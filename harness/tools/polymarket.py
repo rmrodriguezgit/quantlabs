@@ -586,6 +586,7 @@ class PolymarketTool(BaseTool):
                 'ask': ask_price,
                 'ask_size': ask_size,
                 'spread': round(spread, 4) if spread is not None else None,
+                'token_id': token.get('token_id'),
             }
         return {'bid': None, 'ask': None, 'ask_size': None, 'spread': None}
 

@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     gamma_api: str = ""
     data_api: str = ""
     clob_api: str = ""
+    polymarket_live_trading_enabled: bool = False
+    polymarket_private_key: str = ""
+    polymarket_funder_address: str = ""
+    polymarket_signature_type: int = 1
+    polymarket_chain_id: int = 137
 
 
 
