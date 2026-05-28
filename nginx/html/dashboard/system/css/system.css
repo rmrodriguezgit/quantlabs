@@ -26,5 +26,6 @@
 .ops-table th{color:var(--muted);font-family:'Space Mono',monospace;text-transform:uppercase;font-size:10px;letter-spacing:.08em}
 .ops-table td{color:#dce8f8}.ops-table tr:last-child td{border-bottom:0}
 .raw-box{max-height:160px;overflow:auto;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;font-family:'Space Mono',monospace;font-size:11px;color:#dce8f8;white-space:pre-wrap}
+.gpu-control{margin-top:16px;border-top:1px solid rgba(255,255,255,.07);padding-top:14px}.gpu-control-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.gpu-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.gpu-action{border:1px solid rgba(0,255,153,.35);background:rgba(0,255,153,.1);color:var(--primary);border-radius:8px;padding:10px 14px;font-family:'Space Mono',monospace;font-size:11px;font-weight:800;cursor:pointer}.gpu-action.danger{border-color:rgba(255,68,102,.35);background:rgba(255,68,102,.1);color:#ff6d88}.gpu-action:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:1100px){.system-grid{grid-template-columns:repeat(2,1fr)}.ops-grid{grid-template-columns:1fr}}
 @media(max-width:720px){.system-grid{grid-template-columns:1fr}.ops-panel{padding:16px}.metric-value{font-size:22px}}

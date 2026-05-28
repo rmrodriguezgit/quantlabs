@@ -1,0 +1,22 @@
+[Unit]
+Description=QuantLab GPU control endpoint
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=quantlab
+Group=docker
+RuntimeDirectory=quantlab
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/python3 /home/quantlab/quantlab-ai-capital/deploy/system/quantlab_gpu_control_server.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/run/quantlab
+
+[Install]
+WantedBy=multi-user.target

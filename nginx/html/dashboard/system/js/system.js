@@ -8,6 +8,8 @@ const klass = value => Number(value) >= 90 ? 'bad' : Number(value) >= 75 ? 'warn
 const pill = (label, state='ok') => `<span class="pill ${state}">${esc(label)}</span>`;
 const bar = value => `<div class="bar ${klass(value)}"><span style="width:${Math.max(0, Math.min(100, Number(value)||0))}%"></span></div>`;
 const row = (k,v) => `<div class="detail-row"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`;
+let gpuControlState = null;
+let gpuControlBusy = false;
 
 function kpi(label, value, sub, state='ok'){
   return `<article class="metric-card ${state === 'ok' ? '' : state}">
@@ -21,6 +23,62 @@ async function loadStatus(){
   const response = await fetch('./status.json?ts=' + Date.now(), {cache:'no-store', credentials:'same-origin'});
   if(!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
+}
+
+async function loadGpuControl(){
+  const response = await fetch('/admin/gpu?ts=' + Date.now(), {cache:'no-store', credentials:'same-origin'});
+  if(!response.ok) throw new Error(`GPU control HTTP ${response.status}`);
+  return response.json();
+}
+
+function gpuContainerSummary(){
+  const containers = gpuControlState?.containers || [];
+  if(!containers.length) return 'Estado no disponible';
+  return containers.map(c => `${c.name}: ${c.status || 'n/d'}`).join(' · ');
+}
+
+function renderGpuControl(){
+  const el = $('gpu-control');
+  if(!el) return;
+  const enabled = Boolean(gpuControlState?.gpu_enabled);
+  const available = Boolean(gpuControlState?.available);
+  const state = available ? (enabled ? 'GPU activa' : 'GPU detenida') : 'Control no disponible';
+  const stateClass = available ? (enabled ? 'ok' : 'warn') : 'bad';
+  el.innerHTML = `<div class="gpu-control-head">
+      <span>${pill(state, stateClass)}</span>
+      <span class="metric-sub">${esc(gpuContainerSummary())}</span>
+    </div>
+    <div class="gpu-actions">
+      <button class="gpu-action" id="gpu-start" ${gpuControlBusy || !available || enabled ? 'disabled' : ''}>Start GPU</button>
+      <button class="gpu-action danger" id="gpu-stop" ${gpuControlBusy || !available || !enabled ? 'disabled' : ''}>Stop GPU</button>
+    </div>
+    <div class="metric-sub" id="gpu-action-status">${gpuControlBusy ? 'Aplicando cambio...' : 'Start ejecuta quantlab_market_gpu y quantlab_llm.'}</div>`;
+  $('gpu-start')?.addEventListener('click', () => setGpuPower('start'));
+  $('gpu-stop')?.addEventListener('click', () => setGpuPower('stop'));
+}
+
+async function setGpuPower(action){
+  if(gpuControlBusy) return;
+  gpuControlBusy = true;
+  renderGpuControl();
+  try {
+    const response = await fetch('/admin/gpu', {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action})
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    gpuControlState = data;
+    await refresh();
+  } catch (error) {
+    const status = $('gpu-action-status');
+    if(status) status.textContent = `No se pudo cambiar GPU: ${error.message}`;
+  } finally {
+    gpuControlBusy = false;
+    renderGpuControl();
+  }
 }
 
 async function requireAdmin(){
@@ -70,7 +128,9 @@ function renderGpu(data){
       ${row('Límite idle / activo', governor.status === 'ok' ? `${fmt(governor.idle_power_limit_w)} W / ${fmt(governor.active_power_limit_w)} W` : '—')}
       ${row('Ciclos ociosos', governor.status === 'ok' ? `${governor.idle_cycles}/${governor.idle_after_cycles}` : '—')}
       ${row('Última acción', governor.last_action || '—')}
-    </div>`;
+    </div>
+    <div id="gpu-control" class="gpu-control"></div>`;
+  renderGpuControl();
 }
 
 function renderUps(data){
@@ -172,7 +232,12 @@ function render(data){
 
 async function refresh(){
   try {
-    render(await loadStatus());
+    const [status, gpuControl] = await Promise.all([
+      loadStatus(),
+      loadGpuControl().catch(() => null)
+    ]);
+    gpuControlState = gpuControl;
+    render(status);
   } catch (error) {
     $('system-freshness').textContent = 'Sin datos';
     $('kpi-grid').innerHTML = kpi('Estado', 'Sin datos', error.message, 'bad');

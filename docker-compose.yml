@@ -21,6 +21,7 @@ services:
       - /home/quantlab/quantlab-ai-capital/nginx/conf:/etc/nginx/conf.d
       - /home/quantlab/quantlab-ai-capital/nginx/html:/usr/share/nginx/html
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /run/quantlab:/run/quantlab
     depends_on:
       - auth
       - llm
