@@ -1,13 +1,21 @@
-// Clock
-function tick() {
-  const now = new Date();
-
-  document.getElementById('clock').textContent =
-    now.toLocaleTimeString('es-MX', {
-      hour12: false
-    });
-}
-
-tick();
-
-setInterval(tick, 1000);
+const apiBase='/harness-api/v1';
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
+const money=v=>num(v).toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
+async function get(path){const r=await fetch(`${apiBase}${path}`,{credentials:'same-origin',cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}
+function tick(){const el=$('clock');if(el)el.textContent=new Date().toLocaleTimeString('es-MX',{hour12:false});}
+function statusClass(status){status=String(status||'').toLowerCase();if(['ok','running','accepted','won','live'].includes(status))return'ok';if(['rejected','lost','error','stale'].includes(status))return'bad';return'warn';}
+function intervalOf(tx){const raw=String(tx?.interval||tx?.indicators?.candidate?.interval||'').toLowerCase();return raw.includes('15')?'15m':raw.includes('5')?'5m':raw||'--';}
+function sideOf(tx){return String(tx?.side||tx?.signal||'NONE').toUpperCase();}
+function txStatus(tx){return String(tx?.status||'pending').toLowerCase();}
+function confidence(tx){let v=num(tx?.confidence||tx?.probability,0);return Math.max(0,Math.min(100,v));}
+function candidateRows(auto){const items=[...(auto?.orders||[]),...(auto?.observations||[])];const rows=[];for(const item of items){if(item?.candidate)rows.push({...item.candidate,_order:item});for(const c of (item?.candidates||item?.indicators?.candidates||[])){if(c)rows.push({...c,_order:item});}}return rows;}
+function latestWindow(auto,txs,key){const cand=candidateRows(auto).findLast?candidateRows(auto).findLast(c=>intervalOf(c)===key):candidateRows(auto).reverse().find(c=>intervalOf(c)===key);if(cand)return cand;return txs.find(tx=>intervalOf(tx)===key)||{interval:key,side:'NONE',status:'waiting',confidence:0,risk:'Esperando siguiente ciclo'};}
+function renderKpis(status,auto,txPayload){const summary=status.summary||{}, txs=txPayload.transactions||[], txSummary=txPayload.summary||{};const rejected=txs.filter(tx=>txStatus(tx)==='rejected').length;const pnl=txSummary.pnl ?? summary.total_pnl ?? 0;const cards=[['Health',summary.health_score??'--','validation','primary'],['Modo trading',String(auto.mode||'--').toUpperCase(),'paper/live',''],['Ordenes',auto.orders?.length??0,'ultimo ciclo',''],['PnL',money(pnl),'auditoria',''],['Rechazos',rejected,'CLOB/API','']];$('opsKpis').innerHTML=cards.map(([a,b,c,k])=>`<article class="ops-kpi ${k}"><small>${esc(a)}</small><strong>${esc(b)}</strong><span>${esc(c)}</span></article>`).join('');$('systemPill').textContent=`Health ${summary.health_score??'--'} · ${auto.status||'sync'}`;}
+function renderPolymarket(auto,txs){$('polyStatus').textContent=String(auto.mode||'live').toUpperCase();const rows=['5m','15m'].map(key=>latestWindow(auto,txs,key));$('polyWindows').innerHTML=rows.map(row=>{const order=row._order||row;const st=txStatus(order);const cls=sideOf(order)!=='NONE'?'trade':(st==='rejected'?'reject':'');const conf=confidence(row)||confidence(order);const reason=(row.reasons&&row.reasons.join(', '))||order.risk||order.reason||'Sin trade activo';return `<div class="dash-window ${cls}"><div><strong>${esc(intervalOf(row))}</strong><small>${esc(sideOf(order))} · ${esc(st)}</small></div><div class="meter"><span style="width:${Math.max(6,conf)}%"></span></div><small>${esc(reason)}</small></div>`;}).join('');}
+function renderValidation(status,txPayload){const s=status.summary||{}, alerts=status.alerts||[], by=txPayload.summary?.by_status||{};$('validationStatus').textContent=s.agents_error?'ATTENTION':'OK';$('validationBrief').innerHTML=[['Agentes activos',s.agents_active??0,'ok'],['Alertas',alerts.length,alerts.length?'warn':'ok'],['No trade',by.no_trade||0,'warn'],['Won / Lost',`${by.won||0} / ${by.lost||0}`,(by.lost||0)?'bad':'ok']].map(([a,b,k])=>`<div class="brief-item"><div><strong>${esc(a)}</strong><small>estado actual</small></div><span class="badge-home ${k}">${esc(b)}</span></div>`).join('');}
+function renderFeed(txs){$('feedStatus').textContent=`${txs.length} eventos`;$('activityFeed').innerHTML=txs.slice(0,9).map(tx=>{const st=txStatus(tx);const label=`${intervalOf(tx)} · ${sideOf(tx)} · ${tx.market||'BTC Up/Down'}`;return `<div class="feed-item"><div><b>${esc(label)}</b><small>${esc(tx.risk||tx.window||tx.timestamp||'')}</small></div><div class="right"><span class="badge-home ${statusClass(st)}">${esc(st)}</span><small>${money(tx.stake_usdt||0)}</small></div></div>`;}).join('')||'<div class="empty-home">Sin actividad reciente.</div>';}
+function renderInfra(status){const infra=status.infrastructure||{}, gpu=(infra.gpu||[])[0]||{};$('infraStatus').textContent=`${infra.api_latency_ms??'--'} ms`;$('infraList').innerHTML=[['CPU',`${infra.cpu_percent||0}%`],['RAM',`${infra.ram_percent||0}%`],['GPU',gpu.name?`${gpu.memory_percent}% VRAM`:'N/D'],['Docker',`${(infra.docker||[]).length} contenedores`],['CRON',`${(status.discovery?.crons||[]).length} detectados`]].map(([a,b])=>`<div class="infra-home-row"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('');}
+async function refreshHome(){try{const [statusPayload,autoPayload,txPayload]=await Promise.all([get('/agents/status'),get('/automations/paper-trading'),get('/agents/transactions?limit=80')]);const status=statusPayload||{},auto=autoPayload.automation||{},txs=(txPayload.transactions||[]).filter(tx=>String(tx.venue||'').toLowerCase()==='polymarket');renderKpis(status,auto,txPayload);renderPolymarket(auto,txs);renderValidation(status,txPayload);renderFeed(txs);renderInfra(status);}catch(e){$('systemPill').textContent=`Dashboard sin datos · ${e.message}`;['polyWindows','validationBrief','activityFeed','infraList'].forEach(id=>{const el=$(id);if(el)el.innerHTML=`<div class="empty-home">No fue posible cargar datos: ${esc(e.message)}</div>`;});}}
+tick();setInterval(tick,1000);refreshHome();setInterval(refreshHome,10000);

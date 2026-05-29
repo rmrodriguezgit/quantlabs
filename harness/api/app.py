@@ -211,6 +211,8 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
     orders = latest.get("orders") or []
     observations = latest.get("observations") or []
     errors = latest.get("errors") or []
+    position_actions = latest.get("position_actions") or []
+    claim_actions = latest.get("claim_actions") or []
     mode = str(latest.get("mode") or config.get("mode") or "paper").lower()
     enabled = bool(config.get("enabled", True))
     created_at = latest.get("created_at")
@@ -251,6 +253,8 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
             "orders_count": len(record.get("orders") or []),
             "observations_count": len(record.get("observations") or []),
             "errors_count": len(record.get("errors") or []),
+            "position_actions_count": len(record.get("position_actions") or []),
+            "claim_actions_count": len(record.get("claim_actions") or []),
         }
         for record in records[-8:]
     ]
@@ -267,7 +271,12 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "bankroll_usdt": latest.get("bankroll_usdt") or config.get("bankroll_usdt"),
         "max_stake_pct": latest.get("max_stake_pct") or config.get("max_stake_pct"),
         "orders": orders,
+        "observations": observations,
+        "position_actions": position_actions,
+        "claim_actions": claim_actions,
         "observations_count": len(observations),
+        "position_actions_count": len(position_actions),
+        "claim_actions_count": len(claim_actions),
         "errors": errors,
         "recent_cycles": recent_cycles,
         "logs": {

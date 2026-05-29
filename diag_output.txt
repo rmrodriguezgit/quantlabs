@@ -1,0 +1,84 @@
+====== DIAGNÓSTICO POLYMARKET BOT ======
+
+--- 1. Estado del contenedor harness ---
+NAME               IMAGE                         COMMAND                  SERVICE   CREATED       STATUS       PORTS
+quantlab_harness   quantlab-ai-capital-harness   "/opt/nvidia/nvidia_…"   harness   2 hours ago   Up 2 hours   5000/tcp
+
+--- 2. Variables de entorno clave ---
+FUNDER_ADDRESS=0xEF2106Ff562716d42739D16159BB9bE226DD9DBa
+PRIVATE_KEY=0x7a9f0061c49eb73ba8cdaece35f2c89b228409105724c67834a3659f17a13cb1
+DATA_API=https://data-api.polymarket.com
+GAMMA_API=https://gamma-api.polymarket.com
+WEBSOCKET_API_KEY=322cbd24d69e4a8f9975ad332c56130fe832aeb673c72685fd15c85111aec97c
+MEXC_API_KEY=mx0vglD61bPL0n0Z4F
+POLYMARKET_LIVE_TRADING_ENABLED=true
+CLOB_API=https://clob.polymarket.com
+LLM_MODEL=Qwen2.5-14B-Instruct-Q4_K_M.gguf
+
+--- 3. Últimas 50 líneas de logs ---
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.6.3
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+WARNING: The NVIDIA Driver was not detected.  GPU functionality will not be available.
+   Use the NVIDIA Container Toolkit to start this container with GPU support; see
+   https://docs.nvidia.com/datacenter/cloud-native/ .
+
+[2026-05-28 15:13:18 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-05-28 15:13:18 +0000] [1] [INFO] Listening at: http://0.0.0.0:5000 (1)
+[2026-05-28 15:13:18 +0000] [1] [INFO] Using worker: gevent
+[2026-05-28 15:13:18 +0000] [27] [INFO] Booting worker with pid: 27
+[2026-05-28 15:13:18 +0000] [28] [INFO] Booting worker with pid: 28
+
+--- 4. Crontab activo ---
+OCI runtime exec failed: exec failed: unable to start container process: exec: "crontab": executable file not found in $PATH
+Sin crontab
+
+--- 5. Procesos activos ---
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0  39092 30276 ?        Ss   15:13   0:01 /usr/bin/python3 /usr/local/bin/gunicorn -k gevent -w 2 -b 0.0.0.0:5000 api.app:app
+root          27  0.9  0.4 854044 146696 ?       S    15:13   1:05 /usr/bin/python3 /usr/local/bin/gunicorn -k gevent -w 2 -b 0.0.0.0:5000 api.app:app
+root          28  0.8  0.4 852968 145764 ?       S    15:13   1:03 /usr/bin/python3 /usr/local/bin/gunicorn -k gevent -w 2 -b 0.0.0.0:5000 api.app:app
+root        3934 43.7  0.0   7896  4044 ?        Rs   17:12   0:00 ps aux
+
+--- 6. Archivos del agente polymarket ---
+/app/conversations/debug/debug-polymarket.json
+/app/conversations/debug/debug-proxy-polymarket.json
+/app/conversations/debug/debug-proxy-polymarket-final.json
+/app/storage/scripts/export_polymarket_table.py
+/app/storage/artifacts/research/polymrkt-smoke
+/app/storage/artifacts/polymrkt
+/app/storage/artifacts/polymrkt/polymrkt-smoke
+/app/storage/artifacts/models/polymarket_btc_updown_5m_lstm_gate_dataset.csv
+/app/storage/artifacts/models/polymarket_btc_updown_5m_lstm_gate_metadata.json
+/app/storage/artifacts/models/polymarket_btc_updown_5m_lstm_gate.joblib
+/app/storage/artifacts/paper_trading_table_exports/polymarket_table_24h.json
+/app/storage/artifacts/paper_trading_table_exports/polymarket_table_24h.jsonl
+/app/tests/test_polymarket_tool.py.bak-price-to-beat-20260523-102518
+/app/tests/test_paper_trading_tool.py.bak-cron-chainlink-20260523-131503
+/app/tests/test_polymarket_tool.py.bak-chainlink-sync-20260523-130809
+/app/tests/test_polymarket_tool.py
+/app/tests/test_polymarket_tool.py.bak-chainlink-sync-20260523-130717
+/app/scripts/paper_trading_cron.py
+/app/scripts/paper_trading_cron.py.bak-cron-chainlink-20260523-131503
+/app/scripts/export_polymarket_table.py
+/app/skills/polymarket_btc_updown
+/app/tools/paper_trading.py.bak-cron-chainlink-20260523-131503
+/app/tools/polymarket.py.bak-chainlink-sync-20260523-130809
+/app/tools/polymarket.py.bak-price-to-beat-20260523-102518
+/app/tools/polymarket.py.bak-chainlink-sync-20260523-130717
+/app/tools/polymarket.py.bak-deep-btc-20260523-220350
+/app/tools/polymarket.py
+/app/agents/specialists.py.bak-validation-polymarket-20260523-133125
+====== FIN DEL DIAGNÓSTICO ======

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,6 +26,7 @@ class PaperTradingTool(BaseTool):
         'polymarket_btc_updown': {
             'trade': ['confidence>=threshold', 'Kelly>0', 'order_book_available', 'seconds_to_close>=45', 'Chainlink/Polymarket price sync', 'one_trade_per_event_window'],
             'risk': ['bankroll=10000 USDT', 'stake=Kelly 1/4 con limites de exposicion', 'fractional_kelly=25%', 'ET window alignment', 'price_to_beat=Chainlink candle open'],
+            'exit': ['liquidate_open_position_when_percentPnl>=100', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
         },
         'modes': {
             'observe': 'analiza señales y registra transacciones observadas sin simular orden',
@@ -70,16 +74,22 @@ class PaperTradingTool(BaseTool):
             'rules': kwargs.get('rules') or self.default_rules,
             'transactions': [],
             'orders': [],
+            'position_actions': [],
+            'claim_actions': [],
             'observations': [],
             'errors': [],
             'secret_exposed': False,
         }
         result['_existing_polymarket_trade_keys'] = self._existing_polymarket_trade_keys()
         if 'polymarket' in venues:
+            if mode == 'live':
+                self._manage_polymarket_live_positions(result, kwargs)
             self._polymarket_cycle(result, role, bankroll, max_stake_pct, threshold, polymarket_stake_usdt, kwargs)
         if 'mexc' in venues:
             self._mexc_cycle(result, role, kwargs)
         result['orders_count'] = len(result['orders'])
+        result['position_actions_count'] = len(result['position_actions'])
+        result['claim_actions_count'] = len(result['claim_actions'])
         result['observations_count'] = len(result['observations'])
         result['transactions_count'] = len(result['transactions'])
         result.pop('_existing_polymarket_trade_keys', None)
@@ -167,8 +177,13 @@ class PaperTradingTool(BaseTool):
 
     def _polymarket_coordinated_cycle(self, result, payload, bankroll, max_stake_pct, polymarket_stake_usdt):
         candidates = payload.get('candidates') or []
-        strategy = payload.get('strategy') or 'BTC Up/Down independent 5m/15m paper signal'
-        tradable = [c for c in candidates if c.get('passes_filters')]
+        strategy = payload.get('strategy') or 'BTC Up/Down independent 5m/15m live signal'
+        tradable_by_interval = {}
+        for candidate in candidates:
+            interval = str(candidate.get('interval') or '').lower()
+            if interval in {'5m', '15m'} and candidate.get('passes_filters') and interval not in tradable_by_interval:
+                tradable_by_interval[interval] = candidate
+        tradable = [tradable_by_interval[key] for key in ('5m', '15m') if key in tradable_by_interval]
         if not tradable:
             result['observations'].append({
                 'venue': 'polymarket',
@@ -294,6 +309,191 @@ class PaperTradingTool(BaseTool):
         order['transaction_status'] = 'accepted'
         order['execution_result'] = execution
 
+
+    def _manage_polymarket_live_positions(self, result: dict, kwargs: dict) -> None:
+        if not settings.polymarket_live_trading_enabled:
+            return
+        auto_liquidate = self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True)
+        auto_claim = self._bool_setting(kwargs.get('polymarket_auto_claim_enabled'), True)
+        take_profit_pct = float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100)
+        try:
+            positions = self._fetch_polymarket_positions()
+        except Exception as exc:
+            result['errors'].append({'venue': 'polymarket', 'error': f'position scan failed: {str(exc)[:240]}'})
+            return
+        for position in positions:
+            if not self._is_managed_polymarket_position(position):
+                continue
+            summary = self._polymarket_position_summary(position)
+            percent_pnl = self._float(position.get('percentPnl'))
+            cash_pnl = self._float(position.get('cashPnl'))
+            redeemable = bool(position.get('redeemable'))
+            if redeemable and auto_claim and cash_pnl > 0:
+                action = {**summary, 'action': 'claim_profit', 'cash_pnl': round(cash_pnl, 4)}
+                action.update(self._claim_polymarket_position_if_configured(position))
+                result['claim_actions'].append(action)
+                continue
+            if not auto_liquidate or redeemable or percent_pnl < take_profit_pct:
+                continue
+            shares = self._float(position.get('size'))
+            current_price = self._float(position.get('curPrice'))
+            if shares <= 0 or current_price <= 0:
+                result['position_actions'].append({
+                    **summary,
+                    'action': 'liquidate_take_profit',
+                    'status': 'skipped_invalid_position_size_or_price',
+                    'percent_pnl': round(percent_pnl, 4),
+                })
+                continue
+            try:
+                execution = self._place_polymarket_market_sell(
+                    token_id=str(position.get('asset') or ''),
+                    shares=shares,
+                    current_price=current_price,
+                )
+                result['position_actions'].append({
+                    **summary,
+                    'action': 'liquidate_take_profit',
+                    'status': 'take_profit_order_sent',
+                    'percent_pnl': round(percent_pnl, 4),
+                    'cash_pnl': round(cash_pnl, 4),
+                    'execution_result': execution,
+                })
+            except Exception as exc:
+                result['position_actions'].append({
+                    **summary,
+                    'action': 'liquidate_take_profit',
+                    'status': 'take_profit_order_failed',
+                    'percent_pnl': round(percent_pnl, 4),
+                    'cash_pnl': round(cash_pnl, 4),
+                    'error': str(exc)[:300],
+                })
+                result['errors'].append({'venue': 'polymarket', 'error': f'take profit failed: {str(exc)[:240]}'})
+
+    def _fetch_polymarket_positions(self) -> list[dict]:
+        user = settings.polymarket_funder_address or os.getenv('FUNDER_ADDRESS', '')
+        if not user:
+            raise PermissionError('Polymarket funder address is not configured')
+        params = urllib.parse.urlencode({
+            'user': user,
+            'limit': 250,
+            'sizeThreshold': 0,
+        })
+        url = f'https://data-api.polymarket.com/positions?{params}'
+        req = urllib.request.Request(url, headers={'accept': 'application/json', 'user-agent': 'quantlabs-paper-trading/1.0'})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            payload = json.loads(resp.read().decode('utf-8'))
+        if isinstance(payload, list):
+            return [row for row in payload if isinstance(row, dict)]
+        if isinstance(payload, dict):
+            data = payload.get('data') or payload.get('positions') or []
+            return [row for row in data if isinstance(row, dict)]
+        return []
+
+    def _is_managed_polymarket_position(self, position: dict) -> bool:
+        text = ' '.join(str(position.get(key) or '') for key in ('title', 'slug', 'eventSlug', 'marketSlug')).lower()
+        if not text.strip():
+            return False
+        return ('bitcoin' in text or 'btc' in text) and ('up' in text or 'down' in text)
+
+    def _polymarket_position_summary(self, position: dict) -> dict:
+        return {
+            'venue': 'polymarket',
+            'market': position.get('title') or position.get('slug'),
+            'outcome': position.get('outcome'),
+            'asset': position.get('asset'),
+            'condition_id': position.get('conditionId'),
+            'size': round(self._float(position.get('size')), 6),
+            'avg_price': round(self._float(position.get('avgPrice')), 4),
+            'current_price': round(self._float(position.get('curPrice')), 4),
+            'current_value': round(self._float(position.get('currentValue')), 4),
+            'redeemable': bool(position.get('redeemable')),
+            'secret_exposed': False,
+        }
+
+    def _claim_polymarket_position_if_configured(self, position: dict) -> dict:
+        claim_url = (os.getenv('POLYMARKET_CLAIM_HTTP_URL') or '').strip().rstrip('/')
+        if not claim_url:
+            return {
+                'status': 'claim_ready_relayer_not_configured',
+                'note': 'CLOB SDK has no redeem/claim method; configure POLYMARKET_CLAIM_HTTP_URL to enable automatic claiming.',
+                'secret_exposed': False,
+            }
+        body = json.dumps({
+            'user': settings.polymarket_funder_address or os.getenv('FUNDER_ADDRESS', ''),
+            'asset': position.get('asset'),
+            'conditionId': position.get('conditionId'),
+            'size': position.get('size'),
+        }).encode('utf-8')
+        req = urllib.request.Request(
+            claim_url,
+            data=body,
+            headers={'content-type': 'application/json', 'accept': 'application/json'},
+            method='POST',
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                payload = json.loads(resp.read().decode('utf-8') or '{}')
+            return {'status': 'claim_request_sent', 'claim_result': payload, 'secret_exposed': False}
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode('utf-8', errors='replace')[:240]
+            return {'status': 'claim_request_failed', 'error': f'HTTP {exc.code}: {detail}', 'secret_exposed': False}
+        except Exception as exc:
+            return {'status': 'claim_request_failed', 'error': str(exc)[:240], 'secret_exposed': False}
+
+    def _place_polymarket_market_sell(self, token_id: str, shares: float, current_price: float) -> dict:
+        if not token_id:
+            raise ValueError('token_id is required')
+        if shares <= 0:
+            raise ValueError('shares must be positive')
+        if current_price <= 0:
+            raise ValueError('current_price must be positive')
+        if not settings.polymarket_live_trading_enabled:
+            raise PermissionError('POLYMARKET_LIVE_TRADING_ENABLED is false')
+        private_key = settings.polymarket_private_key or os.getenv('PRIVATE_KEY', '')
+        funder = settings.polymarket_funder_address or os.getenv('FUNDER_ADDRESS', '')
+        if not private_key or not funder:
+            raise PermissionError('Polymarket private key/funder address are not configured')
+        try:
+            from py_clob_client_v2 import ClobClient, MarketOrderArgsV2, OrderType, PartialCreateOrderOptions, Side
+        except Exception as exc:
+            raise RuntimeError('py-clob-client-v2 is required for Polymarket live orders') from exc
+        host = (settings.clob_api or os.getenv('CLOB_API') or 'https://clob.polymarket.com').strip().strip('"').rstrip('/')
+        client = ClobClient(
+            host=host,
+            chain_id=settings.polymarket_chain_id,
+            key=private_key,
+            signature_type=settings.polymarket_signature_type,
+            funder=funder,
+            use_server_time=True,
+            retry_on_error=True,
+        )
+        client.set_api_creds(client.derive_api_key())
+        tick_size = client.get_tick_size(token_id)
+        neg_risk = client.get_neg_risk(token_id)
+        slippage = max(0, float(os.getenv('POLYMARKET_MARKET_SELL_SLIPPAGE', '0.05') or 0.05))
+        limit_price = max(0.01, min(0.99, current_price - slippage))
+        response = client.create_and_post_market_order(
+            MarketOrderArgsV2(
+                token_id=token_id,
+                side=Side.SELL,
+                amount=round(shares, 6),
+                price=round(limit_price, 2),
+                order_type=OrderType.FAK,
+            ),
+            PartialCreateOrderOptions(tick_size=tick_size, neg_risk=bool(neg_risk)),
+            OrderType.FAK,
+        )
+        return {
+            'order_id': response.get('orderID') or response.get('order_id'),
+            'status': response.get('status'),
+            'success': response.get('success'),
+            'shares': round(shares, 6),
+            'current_price': round(current_price, 4),
+            'limit_price': round(limit_price, 2),
+            'secret_exposed': False,
+        }
+
     def _place_polymarket_market_buy(self, token_id: str, amount_usdt: float, worst_price: float) -> dict:
         if amount_usdt <= 0:
             raise ValueError('amount_usdt must be positive')
@@ -304,7 +504,7 @@ class PaperTradingTool(BaseTool):
         if not private_key or not funder:
             raise PermissionError('Polymarket private key/funder address are not configured')
         try:
-            from py_clob_client_v2 import ClobClient, OrderType, Side
+            from py_clob_client_v2 import ClobClient, MarketOrderArgsV2, OrderType, PartialCreateOrderOptions, Side
         except Exception as exc:
             raise RuntimeError('py-clob-client-v2 is required for Polymarket live orders') from exc
         host = (settings.clob_api or os.getenv('CLOB_API') or 'https://clob.polymarket.com').strip().strip('"').rstrip('/')
@@ -314,26 +514,32 @@ class PaperTradingTool(BaseTool):
             key=private_key,
             signature_type=settings.polymarket_signature_type,
             funder=funder,
+            use_server_time=True,
+            retry_on_error=True,
         )
-        client.set_api_creds(client.create_or_derive_api_creds())
+        client.set_api_creds(client.derive_api_key())
         tick_size = client.get_tick_size(token_id)
         neg_risk = client.get_neg_risk(token_id)
-        signed_order = client.create_market_order(
-            {
-                'tokenID': token_id,
-                'side': Side.BUY,
-                'amount': round(amount_usdt, 2),
-                'price': round(worst_price, 2),
-            },
-            {'tickSize': tick_size, 'negRisk': bool(neg_risk)},
+        slippage = max(0, float(os.getenv('POLYMARKET_MARKET_BUY_SLIPPAGE', '0.05') or 0.05))
+        limit_price = min(0.99, max(0.01, worst_price + slippage))
+        response = client.create_and_post_market_order(
+            MarketOrderArgsV2(
+                token_id=token_id,
+                side=Side.BUY,
+                amount=round(amount_usdt, 2),
+                price=round(limit_price, 2),
+                order_type=OrderType.FAK,
+            ),
+            PartialCreateOrderOptions(tick_size=tick_size, neg_risk=bool(neg_risk)),
+            OrderType.FAK,
         )
-        response = client.post_order(signed_order, OrderType.FOK)
         return {
             'order_id': response.get('orderID') or response.get('order_id'),
             'status': response.get('status'),
             'success': response.get('success'),
             'amount_usdt': round(amount_usdt, 2),
-            'worst_price': round(worst_price, 2),
+            'signal_ask_price': round(worst_price, 2),
+            'limit_price': round(limit_price, 2),
             'secret_exposed': False,
         }
 
@@ -415,6 +621,13 @@ class PaperTradingTool(BaseTool):
                     rule_evaluation=record['rule_evaluation'],
                 ))
 
+    def _bool_setting(self, value, default: bool) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
     def _polymarket_trade_key(self, interval, window) -> str | None:
         interval = str(interval or '').lower().strip()
         window = str(window or '').strip()
@@ -452,6 +665,8 @@ class PaperTradingTool(BaseTool):
                     if str(tx.get('venue') or '').lower() != 'polymarket':
                         continue
                     if str(tx.get('side') or '').upper() not in {'UP', 'DOWN'}:
+                        continue
+                    if str(tx.get('status') or '').lower() in {'rejected', 'error', 'no_trade'}:
                         continue
                     if float(tx.get('stake_usdt') or 0) <= 0:
                         continue

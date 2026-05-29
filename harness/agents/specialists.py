@@ -104,14 +104,14 @@ Por seguridad NO firmas órdenes ni ejecutas live trading; produces decisión, e
         ).model_dump()
         events.append({'step': 1, 'decision': {'action': 'tool', 'tool': 'polymarket', 'arguments': {'action': 'btc_updown_5m15m_coordinated_signal', 'asset': 'btc'}}, 'result': signal_result})
         research_result = ctx.tools.execute(
-            'deep_research',
+            'dexter_research',
             role=ctx.role,
             objective=f'Polymarket BTC Up/Down macro context: {objective}',
             tickers=['BTC-USD'],
             horizon='6mo',
             session_id=ctx.state.session_id,
         ).model_dump()
-        events.append({'step': 2, 'decision': {'action': 'tool', 'tool': 'deep_research', 'arguments': {'tickers': ['BTC-USD'], 'horizon': '6mo'}}, 'result': research_result})
+        events.append({'step': 2, 'decision': {'action': 'tool', 'tool': 'dexter_research', 'arguments': {'tickers': ['BTC-USD'], 'horizon': '6mo'}}, 'result': research_result})
         try:
             snapshot = ValidationCollector().snapshot()
         except Exception as exc:
@@ -158,7 +158,7 @@ Por seguridad NO firmas órdenes ni ejecutas live trading; produces decisión, e
             '|---|---|---|',
             f"| World event | Observado | {self._cell('Objetivo del usuario como evento inicial')} |",
             f"| Polyscope + Polywhaler | Pendiente | {self._cell('Conectar whale/order-flow cuando tengamos fuente on-chain/CLOB agregada')} |",
-            f"| OpenBB + Dexter + fredapi | Activo parcial | {self._cell(research.get('thesis') or 'Contexto macro vía deep_research')} |",
+            f"| Dexter research + macro context | Activo parcial | {self._cell(research.get('thesis') or (research.get('report') or {}).get('thesis') or 'Contexto macro vía Dexter research')} |",
             f"| Binance Collector + fair value | Activo | {self._cell(signal.get('strategy') or 'BTC Up/Down coordinated signal')} |",
             f"| Crucix Polygon on-chain | Pendiente | {self._cell('No conectado todavía; marcado como filtro futuro')} |",
             f"| Claude Squad / debate | Activo parcial | {self._cell(self._debate_line(signal))} |",
@@ -185,7 +185,7 @@ Por seguridad NO firmas órdenes ni ejecutas live trading; produces decisión, e
             f"Razones coordinador: {', '.join(reasons) if reasons else 'sin bloqueos coordinados'}",
             f"Artefacto: {artifact}",
             '',
-            'Nota: este agente replica el flujo del post como análisis y auditoría. La ejecución live/CLOB sigue bloqueada por defecto.',
+            'Nota: Dexter aporta investigación; Polymrkt/Execution conservan la frontera de riesgo y CLOB.',
         ])
         return '\n'.join(lines)
 
@@ -220,12 +220,104 @@ Por seguridad NO firmas órdenes ni ejecutas live trading; produces decisión, e
         except (TypeError, ValueError):
             return '—'
 
+
+class DexterAgent(BaseAgent):
+    name='dexter'
+    workflow='research'
+    instructions="""Rol: DEXTER RESEARCH.
+Eres el agente de investigación financiera profunda. Tu tarea es producir tesis, evidencia, riesgos, confianza, artefactos y handoff hacia Polymrkt/Execution.
+No ejecutas órdenes, no firmas CLOB, no modificas live trading y no tocas credenciales. Tu salida debe ayudar a decidir qué investigar o validar, no operar directamente."""
+
+    def act(self, objective: str, ctx) -> dict:
+        tickers = self._extract_tickers(objective)
+        result = ctx.tools.execute(
+            'dexter_research',
+            role=ctx.role,
+            objective=objective,
+            tickers=tickers,
+            horizon='6mo',
+            session_id=ctx.state.session_id,
+        ).model_dump()
+        output = result.get('output') or {}
+        for artifact in (output.get('artifacts') or {}).values():
+            if artifact and artifact not in ctx.state.artifacts:
+                ctx.state.artifacts.append(artifact)
+        final = self._format_response(output)
+        return {
+            'agent': self.name,
+            'objective': objective,
+            'result': final,
+            'events': [{
+                'step': 1,
+                'decision': {'action': 'tool', 'tool': 'dexter_research', 'arguments': {'tickers': tickers, 'horizon': '6mo'}},
+                'result': result,
+            }],
+            'usage': {},
+            'last_usage': {},
+        }
+
+    def _extract_tickers(self, objective: str) -> list[str]:
+        text = str(objective or '').upper()
+        symbols = []
+        if re.search(r'\bBTC|BITCOIN\b', text):
+            symbols.append('BTC-USD')
+        if re.search(r'\bETH|ETHEREUM\b', text):
+            symbols.append('ETH-USD')
+        for token in re.findall(r'\b[A-Z]{1,6}(?:[/\-]?USDT|[-/]USD)?\b', text):
+            normalized = token.replace('/', '').replace('USDT', '-USD')
+            if normalized in {'BTC', 'ETH', 'SOL'}:
+                normalized = f'{normalized}-USD'
+            if normalized in {'DEXTER','RESEARCH','TESIS','RIESGO','RIESGOS','ANALISIS','ANÁLISIS','PARA','CON','LIVE','TRADE','Y','O','DE','DEL','LA','EL','LOS','LAS','UN','UNA','EN'}:
+                continue
+            if normalized not in symbols:
+                symbols.append(normalized)
+        return symbols[:8]
+
+    def _format_response(self, output: dict) -> str:
+        report = output.get('report') if isinstance(output.get('report'), dict) else output
+        thesis = report.get('thesis') or output.get('thesis') or 'Sin tesis suficiente.'
+        recommendation = report.get('recommendation') or output.get('recommendation') or 'OBSERVE'
+        confidence = report.get('confidence') or output.get('confidence') or 0
+        risks = report.get('risks') or output.get('risks') or []
+        evidence = report.get('evidence') or output.get('evidence') or []
+        artifacts = output.get('artifacts') or report.get('artifacts') or {}
+        lines = [
+            'Dexter Research:',
+            f'- Recomendación: {recommendation}',
+            f'- Confianza: {confidence}',
+            f'- Tesis: {thesis}',
+            '',
+            'Evidencia clave:',
+        ]
+        for item in evidence[:5]:
+            if isinstance(item, dict):
+                lines.append(f"- {item.get('ticker') or 'Dato'}: {item.get('finding') or item.get('summary') or item}")
+            else:
+                lines.append(f'- {item}')
+        if not evidence:
+            lines.append('- Sin evidencia cuantitativa suficiente; usar como investigación preliminar.')
+        lines.extend(['', 'Riesgos:'])
+        for risk in risks[:5]:
+            lines.append(f'- {risk}')
+        if not risks:
+            lines.append('- No se registraron riesgos específicos.')
+        lines.extend([
+            '',
+            'Handoff:',
+            '- Dexter queda en modo research_only.',
+            '- Polymrkt/Execution deben validar cualquier señal antes de CLOB.',
+        ])
+        if artifacts:
+            lines.append(f"- Artefactos: {', '.join(str(v) for v in artifacts.values() if v)}")
+        return '\n'.join(lines)
+
+
 class FinanceAgent(BaseAgent):
     name='finance'
     workflow='finance'
     instructions='''Rol: FINANCE 📈.
 Eres el especialista cuantitativo. Enmarca cualquier respuesta con datos, supuestos, métricas, riesgo y decisión.
-Para investigación financiera profunda estilo Dexter usa la herramienta deep_research con action implícita sobre tesis, evidencia, riesgos, confianza y artefactos.
+Para investigación financiera profunda estilo Dexter usa la herramienta dexter_research con action implícita sobre tesis, evidencia, riesgos, confianza y artefactos.
 Para análisis SPOT de MEXC puedes usar la herramienta mexc_spot con action=scan_spot_long_candidates.
 Regla operativa: candidato LONG si RSI<30, MACD histograma<0 y precio<VWAP; salida si RSI>70, MACD histograma>0 y precio>VWAP.
 Finance NO debe ejecutar órdenes: solo señales, riesgos e invalidación.
@@ -245,7 +337,7 @@ Para otros mercados de Polymarket usa search_markets, toma un clob_token_id del 
         if self._should_use_deep_research(objective):
             tickers = self._extract_research_tickers(objective)
             result = ctx.tools.execute(
-                'deep_research',
+                'dexter_research',
                 role=ctx.role,
                 objective=objective,
                 tickers=tickers,
@@ -263,7 +355,7 @@ Para otros mercados de Polymarket usa search_markets, toma un clob_token_id del 
                 'result': final,
                 'events': [{
                     'step': 1,
-                    'decision': {'action': 'tool', 'tool': 'deep_research', 'arguments': {'tickers': tickers, 'horizon': '6mo'}},
+                    'decision': {'action': 'tool', 'tool': 'dexter_research', 'arguments': {'tickers': tickers, 'horizon': '6mo'}},
                     'result': result,
                 }],
                 'usage': {},

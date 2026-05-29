@@ -395,6 +395,11 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
     def _transactions_from_paper_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rows = []
         for record in records:
+            order_by_tx_id = {
+                f"{record.get('cycle_id', record.get('created_at'))}-{idx}": order
+                for idx, order in enumerate(record.get("orders") or [])
+                if isinstance(order, dict)
+            }
             defaults = {
                 "agent": "paper_trading",
                 "mode": record.get("mode", "paper"),
@@ -404,6 +409,18 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
             for tx in record.get("transactions") or []:
                 if not isinstance(tx, dict):
                     continue
+                linked_order = order_by_tx_id.get(str(tx.get("id") or ""))
+                if linked_order:
+                    merged_indicators = dict(tx.get("indicators") or {})
+                    if linked_order.get("execution_error"):
+                        merged_indicators["execution_error"] = linked_order.get("execution_error")
+                    tx = {
+                        **tx,
+                        "status": linked_order.get("transaction_status") or tx.get("status"),
+                        "execution": linked_order.get("execution") or tx.get("execution"),
+                        "execution_error": linked_order.get("execution_error") or tx.get("execution_error"),
+                        "indicators": merged_indicators,
+                    }
                 if str(tx.get("venue") or "").lower() == "polymarket" and str(tx.get("side") or "").upper() == "NONE":
                     candidates = (tx.get("indicators") or {}).get("candidates") or []
                     expanded = False
@@ -530,6 +547,7 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
             "kelly": self._number(tx.get("kelly"), 0),
             "pnl": self._number(tx.get("pnl"), 0),
             "execution": tx.get("execution") or ("simulated_only" if str(tx.get("mode") or defaults.get("mode")) == "paper" else "unknown"),
+            "execution_error": tx.get("execution_error") or (tx.get("indicators") or {}).get("execution_error"),
             "risk": tx.get("risk") or tx.get("reason") or "",
             "interval": tx.get("interval") or tx.get("timeframe") or "",
             "window": tx.get("window") or tx.get("window_et") or "",
@@ -545,7 +563,7 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
         if side not in {"UP", "DOWN", "NONE"}:
             return tx
         status = str(tx.get("status") or "").lower()
-        if status in {"won", "lost", "error"}:
+        if status in {"won", "lost", "error", "rejected"}:
             return tx
         bounds = self._polymarket_window_bounds(tx.get("window"))
         if not bounds:

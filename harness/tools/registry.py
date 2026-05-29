@@ -8,15 +8,16 @@ from .mexc_spot import MexcSpotTool
 from .paper_trading import PaperTradingTool
 from .polymarket import PolymarketTool
 from .deep_research import DeepResearchTool
+from .dexter_research import DexterResearchTool
 from .jupyter_gpu import JupyterGPUTool
 
 
 class ToolRegistry:
     allowed_by_role = {
-        'guest': {'financial', 'web_api', 'polymarket', 'deep_research'},
-        'admin': {'shell', 'python', 'file', 'docker', 'financial', 'web_api', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'jupyter_gpu'},
-        'teacher': {'python', 'file', 'financial', 'web_api', 'docker', 'polymarket', 'deep_research', 'jupyter_gpu'},
-        'trader': {'python', 'file', 'financial', 'web_api', 'docker', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'jupyter_gpu'},
+        'guest': {'financial', 'web_api', 'polymarket', 'deep_research', 'dexter_research'},
+        'admin': {'shell', 'python', 'file', 'docker', 'financial', 'web_api', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'dexter_research', 'jupyter_gpu'},
+        'teacher': {'python', 'file', 'financial', 'web_api', 'docker', 'polymarket', 'deep_research', 'dexter_research', 'jupyter_gpu'},
+        'trader': {'python', 'file', 'financial', 'web_api', 'docker', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'dexter_research', 'jupyter_gpu'},
     }
 
     def __init__(self):
@@ -33,6 +34,7 @@ class ToolRegistry:
                 PolymarketTool(),
                 PaperTradingTool(),
                 DeepResearchTool(),
+                DexterResearchTool(),
                 JupyterGPUTool(),
             ]
         }

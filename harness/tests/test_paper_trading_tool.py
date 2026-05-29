@@ -295,3 +295,86 @@ def test_live_polymarket_uses_quarter_kelly_and_executor(tmp_path, monkeypatch):
     assert result["orders"][0]["execution"] == "live_order_sent"
     assert result["orders"][0]["token_id"] == "up-token"
     assert executions
+
+
+
+def test_live_polymarket_liquidates_position_at_100_percent_profit(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    monkeypatch.setattr(settings, "polymarket_live_trading_enabled", True)
+
+    def fake_poly_run(self, **kwargs):
+        return {"strategy": "BTC Up/Down coordinated 5m/15m live signal", "candidates": [], "reasons": ["no_event"]}
+
+    positions = [{
+        "title": "Bitcoin Up or Down - May 28, 2:50PM-2:55PM ET",
+        "asset": "token-profit",
+        "conditionId": "cond-profit",
+        "outcome": "Up",
+        "size": 4.25,
+        "avgPrice": 0.34,
+        "curPrice": 0.80,
+        "currentValue": 3.4,
+        "cashPnl": 1.95,
+        "percentPnl": 135.0,
+        "redeemable": False,
+    }]
+    sells = []
+
+    def fake_sell(self, token_id, shares, current_price):
+        sells.append((token_id, shares, current_price))
+        return {"order_id": "sell-1", "status": "matched", "success": True, "secret_exposed": False}
+
+    monkeypatch.setattr("tools.paper_trading.PolymarketTool.run", fake_poly_run)
+    monkeypatch.setattr("tools.paper_trading.PaperTradingTool._fetch_polymarket_positions", lambda self: positions)
+    monkeypatch.setattr("tools.paper_trading.PaperTradingTool._place_polymarket_market_sell", fake_sell)
+
+    result = PaperTradingTool().run(
+        action="run_cycle",
+        role="trader",
+        mode="live",
+        venues=["polymarket"],
+        live_execution_enabled=True,
+    )
+
+    assert sells == [("token-profit", 4.25, 0.80)]
+    assert result["position_actions_count"] == 1
+    assert result["position_actions"][0]["status"] == "take_profit_order_sent"
+    assert result["position_actions"][0]["execution_result"]["order_id"] == "sell-1"
+
+
+def test_live_polymarket_records_redeemable_profit_for_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    monkeypatch.setattr(settings, "polymarket_live_trading_enabled", True)
+
+    def fake_poly_run(self, **kwargs):
+        return {"strategy": "BTC Up/Down coordinated 5m/15m live signal", "candidates": [], "reasons": ["no_event"]}
+
+    positions = [{
+        "title": "Bitcoin Up or Down - May 28, 2:50PM-2:55PM ET",
+        "asset": "token-redeem",
+        "conditionId": "cond-redeem",
+        "outcome": "Down",
+        "size": 5,
+        "avgPrice": 0.40,
+        "curPrice": 1,
+        "currentValue": 5,
+        "cashPnl": 3,
+        "percentPnl": 150,
+        "redeemable": True,
+    }]
+
+    monkeypatch.delenv("POLYMARKET_CLAIM_HTTP_URL", raising=False)
+    monkeypatch.setattr("tools.paper_trading.PolymarketTool.run", fake_poly_run)
+    monkeypatch.setattr("tools.paper_trading.PaperTradingTool._fetch_polymarket_positions", lambda self: positions)
+
+    result = PaperTradingTool().run(
+        action="run_cycle",
+        role="trader",
+        mode="live",
+        venues=["polymarket"],
+        live_execution_enabled=True,
+    )
+
+    assert result["claim_actions_count"] == 1
+    assert result["claim_actions"][0]["status"] == "claim_ready_relayer_not_configured"
+    assert result["claim_actions"][0]["cash_pnl"] == 3

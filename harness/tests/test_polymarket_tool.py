@@ -293,7 +293,7 @@ def test_coordinated_signal_requires_both_windows_and_microstructure(monkeypatch
     assert result["candidates"][0]["edge"] == 0.06
 
 
-def test_coordinated_signal_blocks_direction_conflict(monkeypatch):
+def test_independent_signal_allows_direction_conflict(monkeypatch):
     tool = PolymarketTool()
 
     monkeypatch.setattr(tool, "_base_urls", lambda: ("https://gamma", "https://data", "https://clob"))
@@ -314,8 +314,10 @@ def test_coordinated_signal_blocks_direction_conflict(monkeypatch):
 
     result = tool.run(action="btc_updown_5m15m_coordinated_signal", role="trader")
 
-    assert result["action"] == "NO_TRADE"
-    assert "5m_15m_direction_conflict" in result["reasons"]
+    assert result["action"] == "TRADE"
+    assert result["side"] == "MIXED"
+    assert result["reasons"] == []
+    assert [c["passes_filters"] for c in result["candidates"]] == [True, True]
 
 
 def test_short_window_prediction_is_anchored_to_latest_price():

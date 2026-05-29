@@ -245,21 +245,19 @@ class PolymarketTool(BaseTool):
                 'passes_filters': not reasons,
                 'reasons': reasons,
             })
-        trade_side = None
-        coordinator_reasons = []
         passing = [c for c in candidates if c['passes_filters']]
-        sides = {c.get('preferred_side') for c in candidates if c.get('preferred_side') in {'Up', 'Down'}}
-        if len(passing) < 2:
-            coordinator_reasons.append('both_windows_must_pass_filters')
-        if len(sides) > 1:
-            coordinator_reasons.append('5m_15m_direction_conflict')
-        if len(passing) == 2 and len(sides) == 1:
-            trade_side = passing[0]['preferred_side']
-        action = 'TRADE' if trade_side else 'NO_TRADE'
+        passing_sides = {c.get('preferred_side') for c in passing if c.get('preferred_side') in {'Up', 'Down'}}
+        action = 'TRADE' if passing else 'NO_TRADE'
+        if len(passing_sides) == 1:
+            side = 'UP' if next(iter(passing_sides)) == 'Up' else 'DOWN'
+        elif len(passing_sides) > 1:
+            side = 'MIXED'
+        else:
+            side = 'NONE'
         return {
             'action': action,
-            'side': 'UP' if trade_side == 'Up' else ('DOWN' if trade_side == 'Down' else 'NONE'),
-            'strategy': 'BTC Up/Down coordinated 5m/15m paper signal',
+            'side': side,
+            'strategy': 'BTC Up/Down independent 5m/15m live signal',
             'threshold': threshold,
             'filters': {
                 'min_edge': min_edge,
@@ -268,7 +266,7 @@ class PolymarketTool(BaseTool):
                 'min_seconds_to_close': min_seconds_to_close,
             },
             'candidates': candidates,
-            'reasons': coordinator_reasons,
+            'reasons': [] if passing else ['no_event_passed_filters'],
             'signals': payload.get('signals') or [],
             'markets': payload.get('markets') or [],
             'urls_exposed': False,

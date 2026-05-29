@@ -16,11 +16,12 @@ const AGENTS={
   coding:{icon:'⌘',label:'Coding',className:'agent-coding'},
   finance:{icon:'📈',label:'Finance',className:'agent-finance'},
   polymrkt:{icon:'◇',label:'Polymrkt',className:'agent-polymrkt'},
+  dexter:{icon:'DX',label:'Dexter Research',className:'agent-dexter'},
   research:{icon:'🔎',label:'Research',className:'agent-research'},
   validation:{icon:'✓',label:'Validation',className:'agent-validation'},
   execution:{icon:'⚙',label:'Execution',className:'agent-execution'}
 };
-const DEFAULT_AGENT_ORDER=['finance','polymrkt','coding','planner','research','validation','execution'];
+const DEFAULT_AGENT_ORDER=['finance','polymrkt','dexter','coding','planner','research','validation','execution'];
 let tokenSnapshot={last_prompt_tokens:0,last_completion_tokens:0,tokens_generated_total:0};
 let agentTouched=false;
 function orderedAgents(agentNames=DEFAULT_AGENT_ORDER){
@@ -524,7 +525,7 @@ el.messages.onclick=async e=>{
   if(e.target.closest('.retry-message')){await sendPrompt(raw);return}
 };
 function routeAgentFromPrompt(message=''){
-  const match=String(message||'').match(/^\s*(finance|polymrkt|coding|planner|research|validation|execution)\s*:\s*(.+)$/is);
+  const match=String(message||'').match(/^\s*(finance|polymrkt|dexter|coding|planner|research|validation|execution)\s*:\s*(.+)$/is);
   if(!match)return {agent:el.agent.value||'finance',message};
   const agent=match[1].toLowerCase();
   const routedMessage=match[2].trim();
