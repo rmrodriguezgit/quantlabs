@@ -213,8 +213,10 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
     errors = latest.get("errors") or []
     position_actions = latest.get("position_actions") or []
     claim_actions = latest.get("claim_actions") or []
-    mode = str(latest.get("mode") or config.get("mode") or "paper").lower()
-    enabled = bool(config.get("enabled", True))
+    enabled = bool(config.get("enabled", False))
+    mode = str(config.get("mode") or latest.get("mode") or "observe").lower()
+    if not enabled:
+        mode = "observe"
     created_at = latest.get("created_at")
     last_age_seconds = None
     if created_at:
