@@ -237,7 +237,7 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
     ]
     status = "ok"
     if not enabled:
-        status = "paused"
+        status = "stopped"
     elif errors:
         status = "error"
     elif not latest:
@@ -270,6 +270,10 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "success": bool(latest) and not errors,
         "bankroll_usdt": latest.get("bankroll_usdt") or config.get("bankroll_usdt"),
         "max_stake_pct": latest.get("max_stake_pct") or config.get("max_stake_pct"),
+        "polymarket_stake_usdt": config.get("polymarket_stake_usdt", latest.get("polymarket_stake_usdt", 1)),
+        "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", latest.get("polymarket_auto_liquidate_enabled", True)),
+        "polymarket_stop_loss_pct": config.get("polymarket_stop_loss_pct", latest.get("polymarket_stop_loss_pct", -8.34)),
+        "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", latest.get("polymarket_take_profit_pct", 100)),
         "orders": orders,
         "observations": observations,
         "position_actions": position_actions,
@@ -295,22 +299,88 @@ def _paper_trading_config_path() -> Path:
     return _paper_trading_dir() / "config.json"
 
 
+POLYMARKET_STAKE_CHOICES = {1.0, 2.0, 3.0}
+
+
+def _load_paper_trading_config() -> dict[str, Any]:
+    config_path = _paper_trading_config_path()
+    if not config_path.exists():
+        return {}
+    try:
+        return json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_paper_trading_config(config: dict[str, Any]) -> None:
+    config_path = _paper_trading_config_path()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _default_polymarket_rules() -> dict[str, Any]:
+    return {
+        "polymarket_btc_updown": {
+            "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
+            "stake": ["manual fixed stake only: 1, 2 or 3 USDT", "no martingale", "no averaging down"],
+            "exit": ["SL: liquidate when position value is down 8.34% or more, e.g. 3.00 -> 2.75 USDT", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade"],
+        }
+    }
+
+
+def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
+    config = _load_paper_trading_config()
+    if "enabled" in data:
+        config["enabled"] = bool(data.get("enabled"))
+    mode = data.get("mode")
+    if mode in {"observe", "paper"}:
+        config["mode"] = mode
+    elif mode == "live":
+        if not settings.polymarket_live_trading_enabled:
+            raise PermissionError("live_mode_requires_server_enablement")
+        config["mode"] = "live"
+    if "polymarket_stake_usdt" in data or "stake" in data:
+        raw_stake = float(data.get("polymarket_stake_usdt", data.get("stake")))
+        if raw_stake not in POLYMARKET_STAKE_CHOICES:
+            raise ValueError("stake_must_be_1_2_or_3_usdt")
+        config["polymarket_stake_usdt"] = raw_stake
+    if "polymarket_auto_liquidate_enabled" in data or "auto_liquidate" in data:
+        config["polymarket_auto_liquidate_enabled"] = bool(data.get("polymarket_auto_liquidate_enabled", data.get("auto_liquidate")))
+    if "polymarket_stop_loss_pct" in data:
+        config["polymarket_stop_loss_pct"] = max(-100.0, min(0.0, float(data["polymarket_stop_loss_pct"])))
+    if "polymarket_take_profit_pct" in data:
+        config["polymarket_take_profit_pct"] = max(1.0, min(500.0, float(data["polymarket_take_profit_pct"])))
+    if isinstance(data.get("trading_rules"), dict):
+        config["trading_rules"] = data["trading_rules"]
+    else:
+        config.setdefault("trading_rules", _default_polymarket_rules())
+    config.setdefault("enabled", False)
+    config.setdefault("mode", "observe")
+    config.setdefault("venues", ["polymarket"])
+    config.setdefault("polymarket_stake_usdt", 1)
+    config.setdefault("polymarket_auto_liquidate_enabled", True)
+    config.setdefault("polymarket_stop_loss_pct", -8.34)
+    config.setdefault("polymarket_take_profit_pct", 100)
+    return config
+
+
 def paper_trading_rules_payload() -> dict[str, Any]:
     config_path = _paper_trading_config_path()
-    config = {}
-    if config_path.exists():
-        try:
-            config = json.loads(config_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            config = {}
+    config = _load_paper_trading_config()
     rules = config.get("trading_rules") or getattr(tools.tools.get("paper_trading"), "default_rules", {})
     return {
         "agent": "paper_trading",
-        "mode": config.get("mode", "paper"),
+        "enabled": bool(config.get("enabled", False)),
+        "mode": config.get("mode", "observe"),
+        "polymarket_stake_usdt": config.get("polymarket_stake_usdt", 1),
+        "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", True),
+        "polymarket_stop_loss_pct": config.get("polymarket_stop_loss_pct", -8.34),
+        "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", 100),
         "rules": rules,
         "config_path": str(config_path),
-        "live_execution_enabled": settings.mexc_live_trading_enabled,
+        "live_execution_enabled": settings.polymarket_live_trading_enabled,
         "allowed_modes": ["observe", "paper", "live"],
+        "allowed_stakes": sorted(POLYMARKET_STAKE_CHOICES),
     }
 
 
@@ -444,6 +514,37 @@ def user_usage():
 def paper_trading_automation():
     return jsonify({"automation": build_paper_trading_snapshot()})
 
+@app.patch('/v1/automations/paper-trading')
+@require_auth({'admin', 'trader'})
+def update_paper_trading_automation():
+    data = request.get_json(force=True)
+    try:
+        config = _sanitize_paper_trading_update(data)
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    _write_paper_trading_config(config)
+    return jsonify({"ok": True, "automation": build_paper_trading_snapshot(), "rules": paper_trading_rules_payload()})
+
+
+@app.post('/v1/automations/paper-trading/liquidate')
+@require_auth({'admin', 'trader'})
+def liquidate_polymarket_trade():
+    data = request.get_json(force=True)
+    if not settings.polymarket_live_trading_enabled:
+        return jsonify({"error": "live_liquidation_requires_server_enablement"}), 403
+    token_id = str(data.get("token_id") or data.get("asset") or "").strip()
+    shares = float(data.get("shares") or data.get("size") or 0)
+    current_price = float(data.get("current_price") or data.get("price") or 0)
+    if not token_id or shares <= 0 or current_price <= 0:
+        return jsonify({"error": "token_id_shares_current_price_required"}), 400
+    try:
+        result = tools.tools["paper_trading"]._place_polymarket_market_sell(token_id, shares, current_price)
+    except Exception as exc:
+        return jsonify({"error": str(exc)[:300]}), 500
+    return jsonify({"ok": True, "liquidation": result})
+
 
 @app.get('/v1/agents/status')
 @require_auth({'admin', 'teacher', 'trader'})
@@ -487,21 +588,15 @@ def agents_rules():
 @require_auth({'admin', 'trader'})
 def update_agents_rules():
     data = request.get_json(force=True)
-    config_path = _paper_trading_config_path()
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config = {}
-    if config_path.exists():
-        try:
-            config = json.loads(config_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            config = {}
-    if data.get("mode") in {"observe", "paper"}:
-        config["mode"] = data["mode"]
-    elif data.get("mode") == "live":
-        return jsonify({"error": "live_mode_requires_server_enablement"}), 403
-    if isinstance(data.get("rules"), dict):
-        config["trading_rules"] = data["rules"]
-    config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+    if isinstance(data.get("rules"), dict) and "trading_rules" not in data:
+        data["trading_rules"] = data["rules"]
+    try:
+        config = _sanitize_paper_trading_update(data)
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    _write_paper_trading_config(config)
     return jsonify(paper_trading_rules_payload())
 
 

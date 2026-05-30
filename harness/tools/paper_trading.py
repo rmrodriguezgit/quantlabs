@@ -24,9 +24,9 @@ class PaperTradingTool(BaseTool):
             'filters': ['volume_ratio', 'EMA50', 'Bollinger bands', 'ATR/risk'],
         },
         'polymarket_btc_updown': {
-            'trade': ['confidence>=threshold', 'Kelly>0', 'order_book_available', 'seconds_to_close>=45', 'Chainlink/Polymarket price sync', 'one_trade_per_event_window'],
-            'risk': ['bankroll=10000 USDT', 'stake=Kelly 1/4 con limites de exposicion', 'fractional_kelly=25%', 'ET window alignment', 'price_to_beat=Chainlink candle open'],
-            'exit': ['liquidate_open_position_when_percentPnl>=100', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
+            'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'confidence>=0.80', 'edge>=0.03', 'spread<=0.08', 'ask_size>=1', 'seconds_to_close>=60', 'one_trade_per_event_window'],
+            'risk': ['stake fixed manually at 1/2/3 USDT', 'max one trade per 5m/15m window', 'live requires server flag plus UI enablement', 'price_to_beat=Chainlink candle open'],
+            'exit': ['stop_loss_when_position_value_drawdown<=-8.34pct (3.00 -> 2.75 USDT)', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
         },
         'modes': {
             'observe': 'analiza señales y registra transacciones observadas sin simular orden',
@@ -58,6 +58,8 @@ class PaperTradingTool(BaseTool):
             venues = [x.strip().lower() for x in venues.split(',') if x.strip()]
         bankroll = float(kwargs.get('bankroll_usdt') or 10000)
         polymarket_stake_usdt = max(0, float(kwargs.get('polymarket_stake_usdt') or 1))
+        if polymarket_stake_usdt not in {1.0, 2.0, 3.0}:
+            polymarket_stake_usdt = min({1.0, 2.0, 3.0}, key=lambda value: abs(value - polymarket_stake_usdt))
         max_stake_pct = min(max(float(kwargs.get('max_stake_pct') or 0.05), 0), 0.05)
         kelly_fraction = min(max(float(kwargs.get('kelly_fraction') or 0.25), 0), 0.25)
         if mode == 'live' and 'mexc' in venues:
@@ -71,6 +73,9 @@ class PaperTradingTool(BaseTool):
             'max_stake_pct': max_stake_pct,
             'polymarket_stake_usdt': polymarket_stake_usdt,
             'kelly_fraction': kelly_fraction,
+            'polymarket_auto_liquidate_enabled': self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True),
+            'polymarket_stop_loss_pct': float(kwargs.get('polymarket_stop_loss_pct') or os.getenv('POLYMARKET_STOP_LOSS_PCT', '-8.34') or -8.34),
+            'polymarket_take_profit_pct': float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100),
             'rules': kwargs.get('rules') or self.default_rules,
             'transactions': [],
             'orders': [],
@@ -316,6 +321,7 @@ class PaperTradingTool(BaseTool):
         auto_liquidate = self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True)
         auto_claim = self._bool_setting(kwargs.get('polymarket_auto_claim_enabled'), True)
         take_profit_pct = float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100)
+        stop_loss_pct = float(kwargs.get('polymarket_stop_loss_pct') or os.getenv('POLYMARKET_STOP_LOSS_PCT', '-8.34') or -8.34)
         try:
             positions = self._fetch_polymarket_positions()
         except Exception as exc:
@@ -333,16 +339,22 @@ class PaperTradingTool(BaseTool):
                 action.update(self._claim_polymarket_position_if_configured(position))
                 result['claim_actions'].append(action)
                 continue
-            if not auto_liquidate or redeemable or percent_pnl < take_profit_pct:
+            exit_reason = None
+            if percent_pnl >= take_profit_pct:
+                exit_reason = 'take_profit'
+            elif percent_pnl <= stop_loss_pct:
+                exit_reason = 'stop_loss'
+            if not auto_liquidate or redeemable or exit_reason is None:
                 continue
             shares = self._float(position.get('size'))
             current_price = self._float(position.get('curPrice'))
             if shares <= 0 or current_price <= 0:
                 result['position_actions'].append({
                     **summary,
-                    'action': 'liquidate_take_profit',
+                    'action': f'liquidate_{exit_reason}',
                     'status': 'skipped_invalid_position_size_or_price',
                     'percent_pnl': round(percent_pnl, 4),
+                    'threshold_pct': round(take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct, 4),
                 })
                 continue
             try:
@@ -353,22 +365,24 @@ class PaperTradingTool(BaseTool):
                 )
                 result['position_actions'].append({
                     **summary,
-                    'action': 'liquidate_take_profit',
-                    'status': 'take_profit_order_sent',
+                    'action': f'liquidate_{exit_reason}',
+                    'status': f'{exit_reason}_order_sent',
                     'percent_pnl': round(percent_pnl, 4),
+                    'threshold_pct': round(take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct, 4),
                     'cash_pnl': round(cash_pnl, 4),
                     'execution_result': execution,
                 })
             except Exception as exc:
                 result['position_actions'].append({
                     **summary,
-                    'action': 'liquidate_take_profit',
-                    'status': 'take_profit_order_failed',
+                    'action': f'liquidate_{exit_reason}',
+                    'status': f'{exit_reason}_order_failed',
                     'percent_pnl': round(percent_pnl, 4),
+                    'threshold_pct': round(take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct, 4),
                     'cash_pnl': round(cash_pnl, 4),
                     'error': str(exc)[:300],
                 })
-                result['errors'].append({'venue': 'polymarket', 'error': f'take profit failed: {str(exc)[:240]}'})
+                result['errors'].append({'venue': 'polymarket', 'error': f'{exit_reason} failed: {str(exc)[:240]}'})
 
     def _fetch_polymarket_positions(self) -> list[dict]:
         user = settings.polymarket_funder_address or os.getenv('FUNDER_ADDRESS', '')
@@ -804,10 +818,10 @@ class PaperTradingTool(BaseTool):
         files = sorted(root.glob('*.jsonl')) if root.exists() else []
         last = files[-1] if files else None
         return {
-            'mode': 'paper',
+            'mode': 'observe',
             'audit_dir': str(root),
             'latest_audit_file': str(last) if last else None,
-            'live_execution_enabled': False,
+            'live_execution_enabled': settings.polymarket_live_trading_enabled,
             'secret_exposed': False,
         }
 

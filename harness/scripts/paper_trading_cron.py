@@ -11,15 +11,18 @@ from observability.collector import ValidationCollector
 
 
 DEFAULT_CONFIG = {
-    "enabled": True,
-    "mode": "paper",
-    "venues": ["polymarket", "mexc"],
+    "enabled": False,
+    "mode": "observe",
+    "venues": ["polymarket"],
     "mexc_tickers": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
     "bankroll_usdt": 10000,
     "max_stake_pct": 0.05,
     "polymarket_stake_usdt": 1,
     "kelly_fraction": 0.25,
     "live_execution_enabled": False,
+    "polymarket_auto_liquidate_enabled": True,
+    "polymarket_stop_loss_pct": -8.34,
+    "polymarket_take_profit_pct": 100,
     "threshold": 0.8,
     "trading_rules": {
         "mexc_spot": {
@@ -29,7 +32,9 @@ DEFAULT_CONFIG = {
             "live_stake": "Kelly 1/4, limitado por bankroll/max_stake_pct/polymarket_stake_usdt",
         },
         "polymarket_btc_updown": {
-            "trade": ["confidence>=threshold", "Kelly>0", "order_book_available", "seconds_to_close>=45", "Chainlink/Polymarket price sync", "one_trade_per_event_window"],
+            "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
+            "stake": ["manual fixed stake only: 1, 2 or 3 USDT"],
+            "exit": ["SL at -8.34% position value (3.00 -> 2.75 USDT)", "TP at +100% position value (3.00 -> 6.00 USDT)", "manual liquidation button per trade"],
             "modes": ["observe", "paper", "live"],
         },
     },
@@ -73,10 +78,10 @@ def run_cycle(config: dict) -> dict:
 def main() -> None:
     config = load_config()
     if not config.get("enabled"):
-        print(json.dumps({"mode": "paper", "status": "disabled"}))
+        print(json.dumps({"mode": config.get("mode", "observe"), "status": "stopped"}))
         ValidationCollector().write_status({
             "agent": "paper_trading",
-            "mode": "paper",
+            "mode": config.get("mode", "observe"),
             "status": "stopped",
             "strategy": "Universal Paper Trading Runner",
             "market": "Polymarket/MEXC",

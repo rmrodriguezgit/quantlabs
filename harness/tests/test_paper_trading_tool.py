@@ -284,14 +284,14 @@ def test_live_polymarket_uses_quarter_kelly_and_executor(tmp_path, monkeypatch):
         venues=["polymarket", "mexc"],
         live_execution_enabled=True,
         bankroll_usdt=1000,
-        polymarket_stake_usdt=100,
+        polymarket_stake_usdt=3,
         kelly_fraction=0.25,
     )
 
     assert result["mode"] == "live"
     assert result["kelly_fraction"] == 0.25
     assert result["orders_count"] == 1
-    assert result["orders"][0]["stake_usdt"] == 50
+    assert result["orders"][0]["stake_usdt"] == 3
     assert result["orders"][0]["execution"] == "live_order_sent"
     assert result["orders"][0]["token_id"] == "up-token"
     assert executions
@@ -378,3 +378,49 @@ def test_live_polymarket_records_redeemable_profit_for_claim(tmp_path, monkeypat
     assert result["claim_actions_count"] == 1
     assert result["claim_actions"][0]["status"] == "claim_ready_relayer_not_configured"
     assert result["claim_actions"][0]["cash_pnl"] == 3
+
+
+def test_live_polymarket_liquidates_position_at_stop_loss(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    monkeypatch.setattr(settings, "polymarket_live_trading_enabled", True)
+
+    def fake_poly_run(self, **kwargs):
+        return {"strategy": "BTC Up/Down coordinated 5m/15m live signal", "candidates": [], "reasons": ["no_event"]}
+
+    positions = [{
+        "title": "Bitcoin Up or Down - May 28, 2:50PM-2:55PM ET",
+        "asset": "token-loss",
+        "conditionId": "cond-loss",
+        "outcome": "Down",
+        "size": 3,
+        "avgPrice": 1.00,
+        "curPrice": 0.91,
+        "currentValue": 2.73,
+        "cashPnl": -0.27,
+        "percentPnl": -9.0,
+        "redeemable": False,
+    }]
+    sells = []
+
+    def fake_sell(self, token_id, shares, current_price):
+        sells.append((token_id, shares, current_price))
+        return {"order_id": "sl-1", "status": "matched", "success": True, "secret_exposed": False}
+
+    monkeypatch.setattr("tools.paper_trading.PolymarketTool.run", fake_poly_run)
+    monkeypatch.setattr("tools.paper_trading.PaperTradingTool._fetch_polymarket_positions", lambda self: positions)
+    monkeypatch.setattr("tools.paper_trading.PaperTradingTool._place_polymarket_market_sell", fake_sell)
+
+    result = PaperTradingTool().run(
+        action="run_cycle",
+        role="trader",
+        mode="live",
+        venues=["polymarket"],
+        live_execution_enabled=True,
+        polymarket_stop_loss_pct=-8.34,
+    )
+
+    assert sells == [("token-loss", 3, 0.91)]
+    assert result["position_actions_count"] == 1
+    assert result["position_actions"][0]["action"] == "liquidate_stop_loss"
+    assert result["position_actions"][0]["status"] == "stop_loss_order_sent"
+    assert result["position_actions"][0]["threshold_pct"] == -8.34
