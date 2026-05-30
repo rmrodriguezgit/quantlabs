@@ -348,17 +348,19 @@ async function autoTitleFromFirstPrompt(message){
   }catch(e){}
 }
 function renderAttachments(){
+  if(!el.attachments)return;
   el.attachments.innerHTML=attachedFiles.map(f=>`<span class="attachment-chip ${f.id===selectedFileId?'active':''} ${activeFileIds.has(f.id)?'in-context':''}" data-preview-id="${f.id}"><label><input type="checkbox" data-context-id="${f.id}" ${activeFileIds.has(f.id)?'checked':''}> contexto</label>📎 ${esc(f.name)}<button data-id="${f.id}" title="Borrar archivo">✕</button></span>`).join('');
   renderAttachmentPreview(selectedFileId?attachedFiles.find(f=>f.id===selectedFileId):attachedFiles[0]);
 }
 function renderAttachmentPreview(file){
+  if(!el.attachmentPreview)return;
   if(!file){el.attachmentPreview.className='attachment-preview empty';el.attachmentPreview.textContent='Selecciona un archivo adjunto para ver qué entendió Hermes.';return}
   selectedFileId=file.id;
   el.attachmentPreview.className='attachment-preview';
   el.attachmentPreview.innerHTML=`<div class="preview-head"><strong>📎 ${esc(file.name)}</strong><span>${esc(file.ext||'archivo')} · ${(file.size||0).toLocaleString()} bytes · ${activeFileIds.has(file.id)?'en contexto':'fuera de contexto'}</span></div><pre>${esc(file.summary||'Sin vista previa disponible todavía.')}</pre>`;
   [...el.attachments.children].forEach(ch=>ch.classList.toggle('active',ch.dataset.previewId===file.id));
 }
-function renderContext(meta={}){const used=meta.last_prompt_tokens||0, windowSize=meta.context_window||16384, generated=meta.last_completion_tokens||0, total=meta.tokens_generated_total||0, pct=Math.min(100,Math.round((used/windowSize)*100));el.contextStats.innerHTML=`<div class="context-kpi"><small>Ventana de contexto</small><strong>${used.toLocaleString()} / ${windowSize.toLocaleString()}</strong><div class="context-bar"><span style="width:${pct}%"></span></div></div><div class="context-kpi"><small>Tokens generados · última respuesta</small><strong>${generated.toLocaleString()}</strong></div><div class="context-kpi"><small>Tokens generados · sesión</small><strong>${total.toLocaleString()}</strong></div>`}
+function renderContext(meta={}){if(!el.contextStats)return;const used=meta.last_prompt_tokens||0, windowSize=meta.context_window||16384, generated=meta.last_completion_tokens||0, total=meta.tokens_generated_total||0, pct=Math.min(100,Math.round((used/windowSize)*100));el.contextStats.innerHTML=`<div class="context-kpi"><small>Ventana de contexto</small><strong>${used.toLocaleString()} / ${windowSize.toLocaleString()}</strong><div class="context-bar"><span style="width:${pct}%"></span></div></div><div class="context-kpi"><small>Tokens generados · última respuesta</small><strong>${generated.toLocaleString()}</strong></div><div class="context-kpi"><small>Tokens generados · sesión</small><strong>${total.toLocaleString()}</strong></div>`}
 async function loadConversations(preferred){const data=await get('/conversations');let items=data.conversations||[];if(!items.length){const created=await api('/conversations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Nueva conversación'})});items=[created.conversation]}conversations=items;currentSessionId=preferred&&items.some(c=>c.id===preferred)?preferred:items[0].id;renderConversationList()}
 function sessionRenderKey(memory={}){
   const meta=memory.metadata||{};

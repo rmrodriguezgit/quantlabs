@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="../css/style.css">
-  <link rel="stylesheet" href="./css/harness.css?v=20260524-polymrkt-agent">
+  <link rel="stylesheet" href="./css/harness.css?v=20260530-harness-health-1">
 </head>
 <body>
   <div class="app-shell">
@@ -65,6 +65,7 @@
             <div class="chat-controls">
               <select id="agent">
                 <option value="finance">📈 Finance</option>
+                <option value="polymrkt">◇ Polymrkt</option>
                 <option value="dexter">DX Dexter Research</option>
                 <option value="coding">⌘ Coding</option>
                 <option value="planner">🧭 Planner</option>
@@ -74,6 +75,8 @@
               </select>
             </div>
           </div>
+          <div id="tokenUsage" class="token-usage">prompt 0 · respuesta 0 · sesión 0</div>
+          <div id="contextStats" class="context-stats compact" hidden></div>
           <div id="diagnosticPanel" class="diagnostic-panel">
             <div><small>Estado</small><strong>Idle</strong></div>
             <div><small>Última tarea</small><strong>Sin tarea</strong></div>
@@ -106,6 +109,6 @@
   </aside>
   <div id="panelBackdrop" class="panel-backdrop"></div>
   <script src="../js/session.js?v=20260517-user"></script>
-  <script src="./js/harness.js?v=20260524-agent-prefix-route"></script>
+  <script src="./js/harness.js?v=20260530-harness-health-1"></script>
 </body>
 </html>
