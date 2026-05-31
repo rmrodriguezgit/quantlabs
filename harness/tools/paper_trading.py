@@ -51,8 +51,8 @@ class PaperTradingTool(BaseTool):
         mode = str(kwargs.get('mode') or 'paper').lower()
         if mode not in {'observe', 'paper', 'live'}:
             raise ValueError('mode must be observe, paper or live')
-        if mode == 'live' and not (settings.polymarket_live_trading_enabled and kwargs.get('live_execution_enabled') is True):
-            raise PermissionError('MODE=live is blocked; set POLYMARKET_LIVE_TRADING_ENABLED=true and live_execution_enabled=True')
+        live_execution_enabled = bool(settings.polymarket_live_trading_enabled and kwargs.get('live_execution_enabled') is True)
+        live_blocked = mode == 'live' and not live_execution_enabled
         venues = kwargs.get('venues') or ['polymarket', 'mexc']
         if isinstance(venues, str):
             venues = [x.strip().lower() for x in venues.split(',') if x.strip()]
@@ -67,6 +67,9 @@ class PaperTradingTool(BaseTool):
         threshold = float(kwargs.get('threshold') or 0.8)
         result = {
             'mode': mode,
+            'requested_mode': mode,
+            'live_execution_enabled': live_execution_enabled,
+            'live_blocked': live_blocked,
             'cycle_id': datetime.now(UTC).strftime('%Y%m%dT%H%M%S.%fZ'),
             'created_at': datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
             'bankroll_usdt': bankroll,
@@ -86,8 +89,13 @@ class PaperTradingTool(BaseTool):
             'secret_exposed': False,
         }
         result['_existing_polymarket_trade_keys'] = self._existing_polymarket_trade_keys()
+        if live_blocked:
+            result['errors'].append({
+                'venue': 'polymarket',
+                'error': 'live_execution_blocked: POLYMARKET_LIVE_TRADING_ENABLED and live_execution_enabled must both be true',
+            })
         if 'polymarket' in venues:
-            if mode == 'live':
+            if mode == 'live' and not live_blocked:
                 self._manage_polymarket_live_positions(result, kwargs)
             self._polymarket_cycle(result, role, bankroll, max_stake_pct, threshold, polymarket_stake_usdt, kwargs)
         if 'mexc' in venues:
@@ -171,6 +179,7 @@ class PaperTradingTool(BaseTool):
                 symbol='BTC',
                 side=trade['side'],
                 status='observed' if result['mode'] == 'observe' else order.get('transaction_status', 'accepted'),
+                execution=order.get('execution'),
                 price=trade['ask'],
                 stake_usdt=stake if result['mode'] != 'observe' else 0,
                 confidence=base.get('probability'),
@@ -271,6 +280,7 @@ class PaperTradingTool(BaseTool):
                 symbol='BTC',
                 side=side,
                 status='observed' if result['mode'] == 'observe' else order.get('transaction_status', 'accepted'),
+                execution=order.get('execution'),
                 price=ask,
                 stake_usdt=stake if result['mode'] != 'observe' else 0,
                 confidence=probability,
@@ -291,6 +301,11 @@ class PaperTradingTool(BaseTool):
 
     def _execute_polymarket_live_if_needed(self, result: dict, order: dict, base: dict) -> None:
         if result.get('mode') != 'live':
+            return
+        if result.get('live_blocked'):
+            order['execution'] = 'live_blocked'
+            order['transaction_status'] = 'rejected'
+            order['execution_error'] = 'live_execution_enabled is false in runtime config'
             return
         token_id = order.get('token_id')
         if not token_id:
@@ -706,7 +721,7 @@ class PaperTradingTool(BaseTool):
             'confidence': self._confidence_percent(kwargs.get('confidence')),
             'kelly': self._float(kwargs.get('kelly')) or 0,
             'pnl': 0,
-            'execution': self._execution_label(result.get('mode', 'paper')),
+            'execution': kwargs.get('execution') or self._execution_label(result.get('mode', 'paper')),
             'risk': kwargs.get('risk'),
             'interval': kwargs.get('interval'),
             'window': kwargs.get('window'),

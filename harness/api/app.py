@@ -285,8 +285,12 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
     claim_actions = latest.get("claim_actions") or []
     enabled = bool(config.get("enabled", False))
     mode = str(config.get("mode") or latest.get("mode") or "observe").lower()
+    server_live_trading_enabled = bool(settings.polymarket_live_trading_enabled)
+    runtime_live_execution_enabled = bool(config.get("live_execution_enabled", False))
+    live_blocked = enabled and mode == "live" and not (server_live_trading_enabled and runtime_live_execution_enabled)
     if not enabled:
         mode = "observe"
+        live_blocked = False
     created_at = latest.get("created_at")
     last_age_seconds = None
     if created_at:
@@ -310,6 +314,8 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
     status = "ok"
     if not enabled:
         status = "stopped"
+    elif live_blocked:
+        status = "blocked"
     elif errors:
         status = "error"
     elif not latest:
@@ -336,6 +342,9 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "status": status,
         "enabled": enabled,
         "mode": mode,
+        "live_execution_enabled": runtime_live_execution_enabled,
+        "server_live_trading_enabled": server_live_trading_enabled,
+        "live_blocked": live_blocked,
         "cycle_id": latest.get("cycle_id"),
         "last_run_at": created_at,
         "last_age_seconds": last_age_seconds,
@@ -422,6 +431,8 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
         config["polymarket_stop_loss_pct"] = max(-100.0, min(0.0, float(data["polymarket_stop_loss_pct"])))
     if "polymarket_take_profit_pct" in data:
         config["polymarket_take_profit_pct"] = max(1.0, min(500.0, float(data["polymarket_take_profit_pct"])))
+    if "live_execution_enabled" in data:
+        config["live_execution_enabled"] = bool(data.get("live_execution_enabled")) and bool(settings.polymarket_live_trading_enabled)
     if isinstance(data.get("trading_rules"), dict):
         config["trading_rules"] = data["trading_rules"]
     else:
@@ -433,6 +444,7 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
     config.setdefault("polymarket_auto_liquidate_enabled", True)
     config.setdefault("polymarket_stop_loss_pct", -8.34)
     config.setdefault("polymarket_take_profit_pct", 100)
+    config.setdefault("live_execution_enabled", False)
     return config
 
 
@@ -450,7 +462,9 @@ def paper_trading_rules_payload() -> dict[str, Any]:
         "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", 100),
         "rules": rules,
         "config_path": str(config_path),
-        "live_execution_enabled": settings.polymarket_live_trading_enabled,
+        "live_execution_enabled": bool(config.get("live_execution_enabled", False)),
+        "server_live_trading_enabled": bool(settings.polymarket_live_trading_enabled),
+        "live_ready": bool(settings.polymarket_live_trading_enabled and config.get("live_execution_enabled", False)),
         "allowed_modes": ["observe", "paper", "live"],
         "allowed_stakes": sorted(POLYMARKET_STAKE_CHOICES),
     }

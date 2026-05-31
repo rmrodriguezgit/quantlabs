@@ -95,10 +95,11 @@ def main() -> None:
     transactions = result.get("transactions") or []
     confidence_values = [float(item.get("confidence") or item.get("probability") or 0) for item in transactions + orders]
     exposure = sum(float(item.get("stake_usdt") or 0) for item in transactions)
+    blocked = bool(result.get("live_blocked"))
     ValidationCollector().write_status({
         "agent": "paper_trading",
         "mode": result.get("mode", "paper"),
-        "status": "running" if not result.get("errors") else "error",
+        "status": "blocked" if blocked else ("running" if not result.get("errors") else "error"),
         "strategy": "Universal Paper Trading Runner",
         "market": "Polymarket/MEXC",
         "symbol": "multi",
@@ -113,7 +114,7 @@ def main() -> None:
         "exposure": exposure,
         "gpu": True,
         "model": "Chainlink/Polymarket BTC candles + Kelly + technical filters",
-        "health": "OK" if not result.get("errors") else "ERROR",
+        "health": "BLOCKED" if blocked else ("OK" if not result.get("errors") else "ERROR"),
         "rules": result.get("rules") or config.get("trading_rules") or {},
         "events": [
             f"cycle {result.get('cycle_id')} | trades {result.get('orders_count')} | transactions {result.get('transactions_count', len(transactions))} | observations {result.get('observations_count')} | errors {len(result.get('errors') or [])}"
