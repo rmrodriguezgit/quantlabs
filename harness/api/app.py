@@ -99,6 +99,26 @@ def _latest_tool_event(events: list[dict[str, Any]]) -> dict[str, Any]:
     return {}
 
 
+def _tool_context(events: list[dict[str, Any]], agent: str | None = None) -> dict[str, Any]:
+    tools = []
+    for event in events:
+        result = event.get("result") or {}
+        name = result.get("name")
+        if name:
+            tools.append({
+                "name": name,
+                "ok": result.get("ok"),
+                "error": result.get("error"),
+            })
+    if not tools:
+        return {"primary_tool": None, "context_tools": []}
+    if agent == "polymrkt":
+        primary = next((tool for tool in tools if tool["name"] == "polymarket"), tools[0])
+        context = [tool for tool in tools if tool["name"] != primary["name"]]
+        return {"primary_tool": primary, "context_tools": context}
+    return {"primary_tool": tools[-1], "context_tools": tools[:-1]}
+
+
 def _duration_ms(started_at: str | None, finished_at: str | None) -> int | None:
     if not started_at or not finished_at:
         return None
@@ -119,6 +139,7 @@ def summarize_latest_task(state) -> dict[str, Any] | None:
     events = metadata.get("events") or []
     tool_events = [event for event in events if (event.get("result") or {}).get("name")]
     latest_tool = _latest_tool_event(events)
+    tool_context = _tool_context(events, task.agent)
     last_error = metadata.get("error") or latest_tool.get("error")
 
     return {
@@ -134,6 +155,10 @@ def summarize_latest_task(state) -> dict[str, Any] | None:
         "last_tool": latest_tool.get("name"),
         "last_tool_ok": latest_tool.get("ok"),
         "last_tool_error": latest_tool.get("error"),
+        "primary_tool": (tool_context.get("primary_tool") or {}).get("name"),
+        "primary_tool_ok": (tool_context.get("primary_tool") or {}).get("ok"),
+        "primary_tool_error": (tool_context.get("primary_tool") or {}).get("error"),
+        "context_tools": tool_context.get("context_tools") or [],
         "last_error": last_error,
         "trajectory_path": metadata.get("trajectory_path"),
     }

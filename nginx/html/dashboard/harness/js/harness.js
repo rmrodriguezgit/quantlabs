@@ -93,14 +93,16 @@ function renderOperationalStatus(status={}){
   updateTokenUsage(tokens);
   if(!el.diagnosticPanel)return;
   const stateClass=taskStatus==='failed'?'diag-error':(taskStatus==='running'?'diag-warn':(taskStatus==='completed'?'diag-ok':''));
-  const lastTool=task.last_tool?`${task.last_tool}${task.last_tool_ok===false?' · error':''}`:'—';
+  const primaryTool=task.primary_tool?`${task.primary_tool}${task.primary_tool_ok===false?' · error':''}`:(task.last_tool?`${task.last_tool}${task.last_tool_ok===false?' · error':''}`:'—');
+  const contextTools=(task.context_tools||[]).map(tool=>`${tool.name}${tool.ok===false?' · error':''}`).join(' · ')||'—';
   const detail=task.last_error||task.objective||'Sin tarea registrada';
   const duration=task.duration_ms?formatDuration(task.duration_ms):taskDuration(task);
   el.diagnosticPanel.innerHTML=[
     `<div><small>Estado</small><strong class="${stateClass}">${esc(taskStatus)}</strong></div>`,
     `<div title="${esc(detail)}"><small>Última tarea</small><strong>${esc(task.agent||'Sin tarea')}</strong></div>`,
     `<div><small>Pasos</small><strong>${Number(task.steps_count||0).toLocaleString()} · ${duration}</strong></div>`,
-    `<div title="${esc(task.last_tool_error||'')}"><small>Herramienta</small><strong>${esc(lastTool)}</strong></div>`
+    `<div title="${esc(task.primary_tool_error||task.last_tool_error||'')}"><small>Herramienta principal</small><strong>${esc(primaryTool)}</strong></div>`,
+    `<div title="${esc(contextTools)}"><small>Contexto</small><strong>${esc(contextTools)}</strong></div>`
   ].join('');
 }
 function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
