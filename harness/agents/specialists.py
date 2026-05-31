@@ -354,7 +354,7 @@ class FinanceAgent(BaseAgent):
     instructions='''Rol: FINANCE.
 Eres el analista cuantitativo de mercados. Evalua oportunidades con datos, probabilidad, edge, liquidez, riesgo temporal y sizing.
 
-Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, spread <= 8%, profundidad ask >= 1, al menos 60s al cierre, stake manual fijo de 1/2/3 USDT, SL -8.34% y TP +100%. Nunca ejecutes dinero real; entrega recomendacion y razon de bloqueo cuando no haya trade.'''
+Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, spread <= 8%, profundidad ask >= 1, al menos 60s al cierre, stake manual fijo de 1/2/3 USDT, SL por 75% de ventana con PnL negativo y TP +100%. Nunca ejecutes dinero real; entrega recomendacion y razon de bloqueo cuando no haya trade.'''
 
     def act(self, objective: str, ctx) -> dict:
         if self._should_use_deep_research(objective):

@@ -53,28 +53,44 @@ def rag_enabled_for_agent(agent: str) -> bool:
     return (agent or "").strip() not in {"polymrkt"}
 
 
-def rag_context(user_id: str, session_id: str, prompt: str) -> str:
+def normalize_rag_text(text: str) -> str:
+    return " ".join(str(text or "").strip().lower().split())
+
+
+def rag_context(user_id: str, session_id: str, agent: str, prompt: str) -> str:
     try:
-        hits = vector_memory.search(vector_memory.embed(prompt), top_k=4)
+        hits = vector_memory.search(vector_memory.embed(prompt), top_k=24)
     except Exception:
         return ""
     lines = []
+    seen = set()
     for item in hits:
         meta = item.get("metadata") or {}
         if meta.get("user_id") != user_id:
             continue
+        if meta.get("agent") != agent:
+            continue
         text = str(item.get("text") or "").strip()
-        if text:
-            lines.append(f"- {text[:900]}")
+        fingerprint = meta.get("text_hash") or normalize_rag_text(text)
+        if not text or fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        lines.append(f"- {text[:900]}")
+        if len(lines) >= 4:
+            break
     return "\n".join(lines)
 
 
 def remember_exchange(user_id: str, session_id: str, agent: str, prompt: str, response: str):
     try:
+        text = f"Usuario: {prompt}\nRespuesta: {response}"
+        text_hash = vector_memory._hash(text)
+        if vector_memory.exists_duplicate(text_hash, {"user_id": user_id, "agent": agent}):
+            return
         vector_memory.add(
-            f"Usuario: {prompt}\nRespuesta: {response}",
+            text,
             vector_memory.embed(f"{prompt}\n{response}"),
-            {"user_id": user_id, "session_id": session_id, "agent": agent, "model": active_llm_model()},
+            {"user_id": user_id, "session_id": session_id, "agent": agent, "model": active_llm_model(), "text_hash": text_hash},
         )
     except Exception:
         pass
@@ -353,7 +369,7 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "max_stake_pct": latest.get("max_stake_pct") or config.get("max_stake_pct"),
         "polymarket_stake_usdt": config.get("polymarket_stake_usdt", latest.get("polymarket_stake_usdt", 1)),
         "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", latest.get("polymarket_auto_liquidate_enabled", True)),
-        "polymarket_stop_loss_pct": config.get("polymarket_stop_loss_pct", latest.get("polymarket_stop_loss_pct", -8.34)),
+        "polymarket_time_stop_pct": 75,
         "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", latest.get("polymarket_take_profit_pct", 100)),
         "orders": orders,
         "observations": observations,
@@ -404,7 +420,7 @@ def _default_polymarket_rules() -> dict[str, Any]:
         "polymarket_btc_updown": {
             "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
             "stake": ["manual fixed stake only: 1, 2 or 3 USDT", "no martingale", "no averaging down"],
-            "exit": ["SL: liquidate when position value is down 8.34% or more, e.g. 3.00 -> 2.75 USDT", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop: after 75% of the window, liquidate if PnL remains negative"],
+            "exit": ["SL: liquidate after 75% of the window if PnL remains negative", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop: after 75% of the window, liquidate if PnL remains negative"],
         }
     }
 
@@ -427,8 +443,6 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
         config["polymarket_stake_usdt"] = raw_stake
     if "polymarket_auto_liquidate_enabled" in data or "auto_liquidate" in data:
         config["polymarket_auto_liquidate_enabled"] = bool(data.get("polymarket_auto_liquidate_enabled", data.get("auto_liquidate")))
-    if "polymarket_stop_loss_pct" in data:
-        config["polymarket_stop_loss_pct"] = max(-100.0, min(0.0, float(data["polymarket_stop_loss_pct"])))
     if "polymarket_take_profit_pct" in data:
         config["polymarket_take_profit_pct"] = max(1.0, min(500.0, float(data["polymarket_take_profit_pct"])))
     if "live_execution_enabled" in data:
@@ -442,7 +456,7 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
     config.setdefault("venues", ["polymarket"])
     config.setdefault("polymarket_stake_usdt", 1)
     config.setdefault("polymarket_auto_liquidate_enabled", True)
-    config.setdefault("polymarket_stop_loss_pct", -8.34)
+    config.setdefault("polymarket_time_stop_pct", 75)
     config.setdefault("polymarket_take_profit_pct", 100)
     config.setdefault("live_execution_enabled", False)
     return config
@@ -458,7 +472,7 @@ def paper_trading_rules_payload() -> dict[str, Any]:
         "mode": config.get("mode", "observe"),
         "polymarket_stake_usdt": config.get("polymarket_stake_usdt", 1),
         "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", True),
-        "polymarket_stop_loss_pct": config.get("polymarket_stop_loss_pct", -8.34),
+        "polymarket_time_stop_pct": 75,
         "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", 100),
         "rules": rules,
         "config_path": str(config_path),
@@ -484,6 +498,8 @@ def chat():
         prompt = (data.get('message') or '').strip()
         if not prompt:
             return jsonify({'error': 'message_required'}), 400
+        original_prompt = prompt
+        show_rag = bool(data.get('show_rag'))
         file_ids = data.get('file_ids') or []
         session_id = data.get('session_id', 'default')
         agent = route_agent_for_model(data.get('agent', 'planner'))
@@ -491,7 +507,7 @@ def chat():
         if context:
             prompt = f"{prompt}\n\n[Archivos adjuntos disponibles]\n{context}"
         use_rag = rag_enabled_for_agent(agent)
-        memory_context = rag_context(request.identity['user_id'], session_id, prompt) if use_rag else ""
+        memory_context = rag_context(request.identity['user_id'], session_id, agent, prompt) if use_rag else ""
         if use_rag and memory_context:
             prompt = f"{prompt}\n\n[Memoria RAG relevante]\n{memory_context}"
         result = engine.chat(
@@ -504,7 +520,11 @@ def chat():
         result.setdefault("metadata", {})["active_model"] = active_llm_model()
         result["metadata"]["effective_agent"] = agent
         result["metadata"]["rag_enabled"] = use_rag
-        remember_exchange(request.identity['user_id'], session_id, agent, prompt, result.get("response", ""))
+        result["metadata"]["rag_available"] = bool(memory_context)
+        result["metadata"]["rag_visible"] = bool(show_rag and memory_context)
+        if show_rag and memory_context:
+            result["metadata"]["rag_context"] = memory_context
+        remember_exchange(request.identity['user_id'], session_id, agent, original_prompt, result.get("response", ""))
         return jsonify(result)
     except PermissionError as exc:
         return jsonify({'error': str(exc)}), 403
@@ -534,7 +554,8 @@ def tasks():
 @app.get('/v1/models')
 @require_auth({'admin', 'teacher', 'trader'})
 def models():
-    return jsonify({'models': [active_llm_model()], 'active_model': active_llm_model(), 'rag_enabled': True})
+    model = active_llm_model()
+    return jsonify({'models': [model], 'active_model': model, 'model_status': 'activo' if model else 'sin modelo', 'rag_enabled': True})
 
 
 @app.get('/v1/memory')

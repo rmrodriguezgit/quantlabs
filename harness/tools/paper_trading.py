@@ -26,7 +26,7 @@ class PaperTradingTool(BaseTool):
         'polymarket_btc_updown': {
             'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'confidence>=0.80', 'edge>=0.03', 'spread<=0.08', 'ask_size>=1', 'seconds_to_close>=60', 'one_trade_per_event_window'],
             'risk': ['stake fixed manually at 1/2/3 USDT', 'max one trade per 5m/15m window', 'live requires server flag plus UI enablement', 'price_to_beat=Chainlink candle open'],
-            'exit': ['stop_loss_when_position_value_drawdown<=-8.34pct (3.00 -> 2.75 USDT)', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'time stop: after 75% of the window, liquidate if PnL remains negative', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
+            'exit': ['stop_loss_time_75_when_window_elapsed_and_pnl_negative', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'time stop: after 75% of the window, liquidate if PnL remains negative', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
         },
         'modes': {
             'observe': 'analiza señales y registra transacciones observadas sin simular orden',
@@ -77,7 +77,7 @@ class PaperTradingTool(BaseTool):
             'polymarket_stake_usdt': polymarket_stake_usdt,
             'kelly_fraction': kelly_fraction,
             'polymarket_auto_liquidate_enabled': self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True),
-            'polymarket_stop_loss_pct': float(kwargs.get('polymarket_stop_loss_pct') or os.getenv('POLYMARKET_STOP_LOSS_PCT', '-8.34') or -8.34),
+            'polymarket_time_stop_pct': 75,
             'polymarket_take_profit_pct': float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100),
             'rules': kwargs.get('rules') or self.default_rules,
             'transactions': [],
@@ -336,7 +336,7 @@ class PaperTradingTool(BaseTool):
         auto_liquidate = self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True)
         auto_claim = self._bool_setting(kwargs.get('polymarket_auto_claim_enabled'), True)
         take_profit_pct = float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100)
-        stop_loss_pct = float(kwargs.get('polymarket_stop_loss_pct') or os.getenv('POLYMARKET_STOP_LOSS_PCT', '-8.34') or -8.34)
+        time_stop_pct = 75
         try:
             positions = self._fetch_polymarket_positions()
         except Exception as exc:
@@ -357,8 +357,6 @@ class PaperTradingTool(BaseTool):
             exit_reason = None
             if percent_pnl >= take_profit_pct:
                 exit_reason = 'take_profit'
-            elif percent_pnl <= stop_loss_pct:
-                exit_reason = 'stop_loss'
             elif self._polymarket_time_stop_loss(position, percent_pnl):
                 exit_reason = 'stop_loss_time_75'
             if not auto_liquidate or redeemable or exit_reason is None:
@@ -371,7 +369,7 @@ class PaperTradingTool(BaseTool):
                     'action': f'liquidate_{exit_reason}',
                     'status': 'skipped_invalid_position_size_or_price',
                     'percent_pnl': round(percent_pnl, 4),
-                    'threshold_pct': round(75 if exit_reason == 'stop_loss_time_75' else (take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct), 4),
+                    'threshold_pct': round(time_stop_pct if exit_reason == 'stop_loss_time_75' else take_profit_pct, 4),
                 })
                 continue
             try:
@@ -385,7 +383,7 @@ class PaperTradingTool(BaseTool):
                     'action': f'liquidate_{exit_reason}',
                     'status': f'{exit_reason}_order_sent',
                     'percent_pnl': round(percent_pnl, 4),
-                    'threshold_pct': round(75 if exit_reason == 'stop_loss_time_75' else (take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct), 4),
+                    'threshold_pct': round(time_stop_pct if exit_reason == 'stop_loss_time_75' else take_profit_pct, 4),
                     'cash_pnl': round(cash_pnl, 4),
                     'execution_result': execution,
                 })
@@ -395,7 +393,7 @@ class PaperTradingTool(BaseTool):
                     'action': f'liquidate_{exit_reason}',
                     'status': f'{exit_reason}_order_failed',
                     'percent_pnl': round(percent_pnl, 4),
-                    'threshold_pct': round(75 if exit_reason == 'stop_loss_time_75' else (take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct), 4),
+                    'threshold_pct': round(time_stop_pct if exit_reason == 'stop_loss_time_75' else take_profit_pct, 4),
                     'cash_pnl': round(cash_pnl, 4),
                     'error': str(exc)[:300],
                 })

@@ -327,7 +327,7 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
                     "event": "Runtime config",
                     "detail": (
                         f"enabled={enabled} mode={mode} stake={config.get('polymarket_stake_usdt', '--')} "
-                        f"SL={config.get('polymarket_stop_loss_pct', '--')} TP={config.get('polymarket_take_profit_pct', '--')}"
+                        f"SL=75% ventana TP={config.get('polymarket_take_profit_pct', '--')}"
                     ),
                 },
             )

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/style.css?v=20260531-logo">
-  <link rel="stylesheet" href="./css/polymarket.css?v=20260531-control-2row-1">
+  <link rel="stylesheet" href="./css/polymarket.css?v=20260531-time-sl-1">
 </head>
 <body class="poly-page">
 <header>
@@ -54,7 +54,7 @@
           <div class="control-field stake-field"><small>Stake manual</small><div class="stake-group" id="stakeGroup"><button data-stake="1">$1</button><button data-stake="2">$2</button><button data-stake="3">$3</button></div></div>
           <label class="toggle-line auto-field"><input id="autoLiquidate" type="checkbox"><span></span><strong>Liquidacion automatica SL / TP</strong></label>
           <div class="rule-grid">
-            <label><small>SL %</small><input id="stopLossPct" type="number" step="0.01" min="-100" max="0"></label>
+            <label class="time-sl-field"><small>SL ventana</small><strong>75%</strong></label>
             <label><small>TP %</small><input id="takeProfitPct" type="number" step="1" min="1" max="500"></label>
           </div>
           <button id="saveControls" class="primary-action" type="button">Guardar cambios</button>
@@ -91,6 +91,6 @@
 </div>
 <script src="../js/platform-menu.js?v=20260531-logo-self"></script>
 <script src="../js/session.js?v=20260517-user"></script>
-<script src="./js/polymarket.js?v=20260531-control-2row-1"></script>
+<script src="./js/polymarket.js?v=20260531-time-sl-1"></script>
 </body>
 </html>

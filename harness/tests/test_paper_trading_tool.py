@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from config import settings
@@ -181,15 +182,15 @@ def test_paper_trading_trades_each_polymarket_event_independently(tmp_path, monk
     assert result["transactions"][0]["side"] == "DOWN"
 
 
-def test_paper_trading_rejects_live_mode():
+def test_paper_trading_blocks_live_mode_without_execution_gate(monkeypatch):
+    monkeypatch.setattr(settings, "polymarket_live_trading_enabled", False)
     tool = PaperTradingTool()
 
-    try:
-        tool.run(action="run_cycle", role="trader", mode="live")
-    except PermissionError as exc:
-        assert "POLYMARKET_LIVE_TRADING_ENABLED" in str(exc)
-    else:
-        raise AssertionError("live mode should be rejected")
+    result = tool.run(action="run_cycle", role="trader", mode="live")
+
+    assert result["live_blocked"] is True
+    assert result["live_execution_enabled"] is False
+    assert any("LIVE bloqueado" in item.get("error", "") for item in result["errors"])
 
 
 def test_paper_trading_allows_only_one_polymarket_trade_per_window(tmp_path, monkeypatch):
@@ -387,8 +388,10 @@ def test_live_polymarket_liquidates_position_at_stop_loss(tmp_path, monkeypatch)
     def fake_poly_run(self, **kwargs):
         return {"strategy": "BTC Up/Down coordinated 5m/15m live signal", "candidates": [], "reasons": ["no_event"]}
 
+    start_ts = int(datetime.now(UTC).timestamp()) - 240
     positions = [{
-        "title": "Bitcoin Up or Down - May 28, 2:50PM-2:55PM ET",
+        "title": "Bitcoin Up or Down - current 5m window",
+        "slug": f"btc-updown-5m-{start_ts}",
         "asset": "token-loss",
         "conditionId": "cond-loss",
         "outcome": "Down",
@@ -416,11 +419,10 @@ def test_live_polymarket_liquidates_position_at_stop_loss(tmp_path, monkeypatch)
         mode="live",
         venues=["polymarket"],
         live_execution_enabled=True,
-        polymarket_stop_loss_pct=-8.34,
     )
 
     assert sells == [("token-loss", 3, 0.91)]
     assert result["position_actions_count"] == 1
-    assert result["position_actions"][0]["action"] == "liquidate_stop_loss"
-    assert result["position_actions"][0]["status"] == "stop_loss_order_sent"
-    assert result["position_actions"][0]["threshold_pct"] == -8.34
+    assert result["position_actions"][0]["action"] == "liquidate_stop_loss_time_75"
+    assert result["position_actions"][0]["status"] == "stop_loss_time_75_order_sent"
+    assert result["position_actions"][0]["threshold_pct"] == 75

@@ -9,7 +9,8 @@ const el={
   newConversation:document.getElementById('newConversation'), activeConversationTitle:document.getElementById('activeConversationTitle'), attachmentPreview:document.getElementById('attachmentPreview'),
   responseStatus:document.getElementById('responseStatus'), tokenUsage:document.getElementById('tokenUsage'), diagnosticPanel:document.getElementById('diagnosticPanel'),
   searchNav:document.getElementById('searchNav'), pluginsNav:document.getElementById('pluginsNav'), automationsNav:document.getElementById('automationsNav'), artifactsNav:document.getElementById('artifactsNav'), projectNav:document.getElementById('projectNav'),
-  chatSearch:document.getElementById('chatSearch'), sidePanel:document.getElementById('sidePanel'), sidePanelTitle:document.getElementById('sidePanelTitle'), sidePanelKicker:document.getElementById('sidePanelKicker'), sidePanelBody:document.getElementById('sidePanelBody'), closeSidePanel:document.getElementById('closeSidePanel'), panelBackdrop:document.getElementById('panelBackdrop')
+  chatSearch:document.getElementById('chatSearch'), sidePanel:document.getElementById('sidePanel'), sidePanelTitle:document.getElementById('sidePanelTitle'), sidePanelKicker:document.getElementById('sidePanelKicker'), sidePanelBody:document.getElementById('sidePanelBody'), closeSidePanel:document.getElementById('closeSidePanel'), panelBackdrop:document.getElementById('panelBackdrop'),
+  showRag:document.getElementById('showRag'), modelStatusPill:document.getElementById('modelStatusPill')
 };
 const AGENTS={
   planner:{icon:'🧭',label:'Planner',className:'agent-planner'},
@@ -17,11 +18,12 @@ const AGENTS={
   finance:{icon:'📈',label:'Finance',className:'agent-finance'},
   polymrkt:{icon:'◇',label:'Polymrkt',className:'agent-polymrkt'},
   dexter:{icon:'DX',label:'Dexter Research',className:'agent-dexter'},
+  codex4u:{icon:'⌘',label:'Codex4U',className:'agent-coding'},
   research:{icon:'🔎',label:'Research',className:'agent-research'},
   validation:{icon:'✓',label:'Validation',className:'agent-validation'},
   execution:{icon:'⚙',label:'Execution',className:'agent-execution'}
 };
-const DEFAULT_AGENT_ORDER=['finance','polymrkt','dexter','coding','planner','research','validation','execution'];
+const DEFAULT_AGENT_ORDER=['finance','polymrkt','dexter','codex4u','coding','planner','research','validation','execution'];
 let tokenSnapshot={last_prompt_tokens:0,last_completion_tokens:0,tokens_generated_total:0};
 let agentTouched=false;
 function orderedAgents(agentNames=DEFAULT_AGENT_ORDER){
@@ -268,7 +270,7 @@ function messageActions(role){
   }
   return '<div class="msg-actions"><button class="msg-action copy-message" title="Copiar respuesta" aria-label="Copiar respuesta">⧉</button></div>';
 }
-function addMessage(role,body,{autoScroll=true,duration=''}={}){
+function addMessage(role,body,{autoScroll=true,duration='',ragContext=''}={}){
   const item=document.createElement('div');
   const agentName=role==='user'?'user':detectAgent(body);
   const meta=AGENTS[agentName]||{icon:'✦',label:'Agent',className:'agent-generic'};
@@ -276,7 +278,8 @@ function addMessage(role,body,{autoScroll=true,duration=''}={}){
   item.dataset.raw=body;
   item.dataset.role=role;
   const label=role==='user'?'Tu petición':`${meta.icon} ${meta.label}${duration?` · ${duration}`:''}`;
-  item.innerHTML=`<div class="msg-top"><span class="msg-label">${label}</span>${messageActions(role)}</div><div class="msg-body">${renderMessageBody(body)}</div>`;
+  const ragHtml=role==='assistant'&&ragContext?`<details class="rag-context"><summary>Memoria RAG usada</summary><pre>${esc(ragContext)}</pre></details>`:'';
+  item.innerHTML=`<div class="msg-top"><span class="msg-label">${label}</span>${messageActions(role)}</div><div class="msg-body">${renderMessageBody(body)}${ragHtml}</div>`;
   el.messages.appendChild(item);
   if(autoScroll)scrollMessagesToBottom();
 }
@@ -363,6 +366,13 @@ function renderAttachmentPreview(file){
   [...el.attachments.children].forEach(ch=>ch.classList.toggle('active',ch.dataset.previewId===file.id));
 }
 function renderContext(meta={}){if(!el.contextStats)return;const used=meta.last_prompt_tokens||0, windowSize=meta.context_window||16384, generated=meta.last_completion_tokens||0, total=meta.tokens_generated_total||0, pct=Math.min(100,Math.round((used/windowSize)*100));el.contextStats.innerHTML=`<div class="context-kpi"><small>Ventana de contexto</small><strong>${used.toLocaleString()} / ${windowSize.toLocaleString()}</strong><div class="context-bar"><span style="width:${pct}%"></span></div></div><div class="context-kpi"><small>Tokens generados · última respuesta</small><strong>${generated.toLocaleString()}</strong></div><div class="context-kpi"><small>Tokens generados · sesión</small><strong>${total.toLocaleString()}</strong></div>`}
+function renderModelStatus(data={}){
+  if(!el.modelStatusPill)return;
+  const model=data.active_model||'sin modelo';
+  const status=data.model_status||'desconocido';
+  el.modelStatusPill.className=`session-pill model-status-pill ${status==='activo'?'model-ok':'model-warn'}`;
+  el.modelStatusPill.innerHTML=`<span>Modelo: ${esc(model)} · ${esc(status)}</span>`;
+}
 async function loadConversations(preferred){const data=await get('/conversations');let items=data.conversations||[];if(!items.length){const created=await api('/conversations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Nueva conversación'})});items=[created.conversation]}conversations=items;currentSessionId=preferred&&items.some(c=>c.id===preferred)?preferred:items[0].id;renderConversationList()}
 function sessionRenderKey(memory={}){
   const meta=memory.metadata||{};
@@ -400,7 +410,7 @@ async function loadSession(sessionId,{preserveScroll=true,force=false}={}){
   const latest=(m.tasks||[]).at(-1);
   if(latest?.status==='running')setResponseStatus('request','Request','Procesando respuesta del agente');
 }
-async function refresh(){try{const status=await get(`/status?session_id=${encodeURIComponent(currentSessionId||'default')}`);renderOperationalStatus(status);lastTools=status.tools||[];lastSystem=status.system||{};if(el.tools)el.tools.innerHTML=lastTools.map(x=>`<li>${esc(x)}</li>`).join('');if(el.system)el.system.textContent=JSON.stringify(lastSystem,null,2);const a=await get('/agents');lastAgents=orderedAgents(a.agents||DEFAULT_AGENT_ORDER);renderAgentSelect(lastAgents);if(el.agents)el.agents.innerHTML=lastAgents.map(x=>{const m=AGENTS[x]||{icon:'✦',label:x};return `<li class="agent-item ${m.className||'agent-generic'}"><span>${m.icon}</span>${m.label}</li>`}).join('');if(currentSessionId&&!isRunning)await loadSession(currentSessionId,{preserveScroll:true});renderOperationalStatus(status)}catch(e){renderAgentSelect(DEFAULT_AGENT_ORDER);setResponseStatus('error','Error','No fue posible consultar el harness');if(el.system)el.system.textContent='No fue posible consultar el harness.'}}
+async function refresh(){try{const status=await get(`/status?session_id=${encodeURIComponent(currentSessionId||'default')}`);renderOperationalStatus(status);lastTools=status.tools||[];lastSystem=status.system||{};if(el.tools)el.tools.innerHTML=lastTools.map(x=>`<li>${esc(x)}</li>`).join('');if(el.system)el.system.textContent=JSON.stringify(lastSystem,null,2);const a=await get('/agents');lastAgents=orderedAgents(a.agents||DEFAULT_AGENT_ORDER);renderAgentSelect(lastAgents);if(el.agents)el.agents.innerHTML=lastAgents.map(x=>{const m=AGENTS[x]||{icon:'✦',label:x};return `<li class="agent-item ${m.className||'agent-generic'}"><span>${m.icon}</span>${m.label}</li>`}).join('');try{renderModelStatus(await get('/models'))}catch(e){}if(currentSessionId&&!isRunning)await loadSession(currentSessionId,{preserveScroll:true});renderOperationalStatus(status)}catch(e){renderAgentSelect(DEFAULT_AGENT_ORDER);setResponseStatus('error','Error','No fue posible consultar el harness');if(el.system)el.system.textContent='No fue posible consultar el harness.'}}
 el.attachBtn.onclick=()=>el.fileInput.click();
 el.agent.onchange=()=>{agentTouched=true};
 el.fileInput.onchange=async()=>{for(const file of el.fileInput.files){const fd=new FormData();fd.append('file',file);try{const data=await api('/files',{method:'POST',body:fd});attachedFiles.unshift(data.file);selectedFileId=data.file.id;activeFileIds.add(data.file.id)}catch(e){alert(e.message||'No fue posible subir el archivo')}}el.fileInput.value='';renderAttachments()};
@@ -529,7 +539,7 @@ el.messages.onclick=async e=>{
   if(e.target.closest('.retry-message')){await sendPrompt(raw);return}
 };
 function routeAgentFromPrompt(message=''){
-  const match=String(message||'').match(/^\s*(finance|polymrkt|dexter|coding|planner|research|validation|execution)\s*:\s*(.+)$/is);
+  const match=String(message||'').match(/^\s*(finance|polymrkt|dexter|codex4u|coding|planner|research|validation|execution)\s*:\s*(.+)$/is);
   if(!match)return {agent:el.agent.value||'finance',message};
   const agent=match[1].toLowerCase();
   const routedMessage=match[2].trim();
@@ -548,9 +558,9 @@ async function sendPrompt(message){
   setRunningState(true);
   setResponseStatus('request','Request','Prompt recibido, esperando al LLM');
   try{
-    const data=await api('/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:currentChatController.signal,body:JSON.stringify({session_id:currentSessionId,message:outboundMessage,agent:selectedAgent,file_ids:[...activeFileIds]})});
+    const data=await api('/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:currentChatController.signal,body:JSON.stringify({session_id:currentSessionId,message:outboundMessage,agent:selectedAgent,file_ids:[...activeFileIds],show_rag:Boolean(el.showRag?.checked)})});
     const latestTask=(data.tasks||[]).at(-1)||{};
-    addMessage('assistant',data.response||data.final||JSON.stringify(data),{autoScroll:true,duration:taskDuration(latestTask)});
+    addMessage('assistant',data.response||data.final||JSON.stringify(data),{autoScroll:true,duration:taskDuration(latestTask),ragContext:data.metadata?.rag_context||''});
     renderContext(data.metadata||{});
     updateTokenUsage(data.metadata||{});
     setResponseStatus('response','Response','Respuesta recibida correctamente');
