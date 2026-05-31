@@ -25,7 +25,7 @@
     {href:'/dashboard/', icon:'⬡', label:'Dashboard'},
     {href:'/jupyter/', icon:'📓', label:'Jupyter Diario', target:'_blank'},
     {href:'/jupyter-gpu/', icon:'⚙️', label:'Jupyter GPU', target:'_blank'},
-    {href:'/llm/', icon:'🤖', label:'LLM Local', target:'_blank'},
+    {href:'/llm/', icon:'🤖', label:'LLM Local'},
     {href:'/dashboard/api/', icon:'⚡', label:'API QuantLab'},
     {href:'/dashboard/bitaxe/', icon:'⛏️', label:'BitAxe Miner'},
     {href:'/dashboard/harness/', icon:'🧠', label:'Agent Harness'},

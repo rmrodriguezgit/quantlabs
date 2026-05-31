@@ -274,11 +274,9 @@ body::before {
     width:42px;
     height:42px;
     border-radius:11px;
-    display:grid;
-    place-items:center;
-    background:linear-gradient(135deg, var(--primary), var(--accent));
-    color:var(--bg);
-    font:700 12px 'Space Mono', monospace;
+    display:block;
+    object-fit:contain;
+    box-shadow:0 10px 24px rgba(0,0,0,.18);
 }
 .brand-copy strong {
     display:block;
@@ -418,7 +416,7 @@ button[type="submit"]:hover {
 <div class="shell">
     <div class="brand">
         <div class="brand-main">
-            <div class="logo-icon">QL</div>
+            <img class="logo-icon" src="/assets/quantlabs-logo.svg" alt="QuantLabs">
             <div class="brand-copy">
                 <strong>QuantLabs AI</strong>
                 <span>Capital dashboard</span>
