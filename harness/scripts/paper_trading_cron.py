@@ -23,6 +23,7 @@ DEFAULT_CONFIG = {
     "polymarket_auto_liquidate_enabled": True,
     "polymarket_time_stop_pct": 75,
     "polymarket_take_profit_pct": 100,
+    "polymarket_invert_prediction_enabled": False,
     "threshold": 0.8,
     "trading_rules": {
         "mexc_spot": {
@@ -34,7 +35,8 @@ DEFAULT_CONFIG = {
         "polymarket_btc_updown": {
             "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
             "stake": ["manual fixed stake only: 1, 2 or 3 USDT"],
-            "exit": ["SL at 75% of window when PnL remains negative", "TP at +100% position value (3.00 -> 6.00 USDT)", "manual liquidation button per trade", "time stop at 75% of window when PnL remains negative"],
+            "exit": ["SL at configured window percent when PnL remains negative", "TP at +100% position value (3.00 -> 6.00 USDT)", "manual liquidation button per trade", "time stop defaults to 75% of window when PnL remains negative"],
+            "prediction": ["optional invert switch flips UP/DOWN before order sizing"],
             "modes": ["observe", "paper", "live"],
         },
     },

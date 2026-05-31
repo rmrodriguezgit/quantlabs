@@ -26,6 +26,7 @@ class PaperTradingTool(BaseTool):
         'polymarket_btc_updown': {
             'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'confidence>=0.80', 'edge>=0.03', 'spread<=0.08', 'ask_size>=1', 'seconds_to_close>=60', 'one_trade_per_event_window'],
             'risk': ['stake fixed manually at 1/2/3 USDT', 'max one trade per 5m/15m window', 'live requires server flag plus UI enablement', 'price_to_beat=Chainlink candle open'],
+            'prediction': ['optional invert switch flips UP/DOWN before order sizing'],
             'exit': ['stop_loss_time_75_when_window_elapsed_and_pnl_negative', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'time stop: after 75% of the window, liquidate if PnL remains negative', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
         },
         'modes': {
@@ -77,8 +78,9 @@ class PaperTradingTool(BaseTool):
             'polymarket_stake_usdt': polymarket_stake_usdt,
             'kelly_fraction': kelly_fraction,
             'polymarket_auto_liquidate_enabled': self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True),
-            'polymarket_time_stop_pct': 75,
+            'polymarket_time_stop_pct': float(kwargs.get('polymarket_time_stop_pct') or os.getenv('POLYMARKET_TIME_STOP_PCT', '75') or 75),
             'polymarket_take_profit_pct': float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100),
+            'polymarket_invert_prediction_enabled': self._bool_setting(kwargs.get('polymarket_invert_prediction_enabled'), False),
             'rules': kwargs.get('rules') or self.default_rules,
             'transactions': [],
             'orders': [],
@@ -130,12 +132,12 @@ class PaperTradingTool(BaseTool):
             result['errors'].append({'venue': 'polymarket', 'error': str(exc)[:300]})
             return
         if 'candidates' in payload:
-            self._polymarket_coordinated_cycle(result, payload, bankroll, max_stake_pct, polymarket_stake_usdt)
+            self._polymarket_coordinated_cycle(result, payload, bankroll, max_stake_pct, polymarket_stake_usdt, kwargs)
             return
         markets = {m.get('interval'): m for m in payload.get('markets') or []}
         for signal in payload.get('signals') or []:
             market = markets.get(signal.get('interval')) or {}
-            trade = self._polymarket_trade(signal, market, threshold)
+            trade = self._polymarket_trade(signal, market, threshold, result.get('polymarket_invert_prediction_enabled'))
             base = {
                 'venue': 'polymarket',
                 'market': 'BTC Up/Down',
@@ -143,7 +145,9 @@ class PaperTradingTool(BaseTool):
                 'window_et': f"{signal.get('start_time_et')} - {signal.get('end_time_et')}",
                 'countdown': signal.get('countdown'),
                 'probability': signal.get('confidence'),
-                'preferred_side': signal.get('preferred_side'),
+                'preferred_side': trade.get('preferred_side') or signal.get('preferred_side'),
+                'predicted_side': signal.get('preferred_side'),
+                'prediction_inverted': bool(trade.get('prediction_inverted')),
                 'liquidity': market.get('liquidity'),
                 'reason': trade['reason'],
             }
@@ -189,8 +193,10 @@ class PaperTradingTool(BaseTool):
                 window=base.get('window_et'),
             ))
 
-    def _polymarket_coordinated_cycle(self, result, payload, bankroll, max_stake_pct, polymarket_stake_usdt):
+    def _polymarket_coordinated_cycle(self, result, payload, bankroll, max_stake_pct, polymarket_stake_usdt, kwargs):
         candidates = payload.get('candidates') or []
+        markets = {m.get('interval'): m for m in payload.get('markets') or []}
+        invert_prediction = bool(result.get('polymarket_invert_prediction_enabled'))
         strategy = payload.get('strategy') or 'BTC Up/Down independent 5m/15m live signal'
         tradable_by_interval = {}
         for candidate in candidates:
@@ -225,9 +231,14 @@ class PaperTradingTool(BaseTool):
         per_window_budget = min(polymarket_stake_usdt, bankroll * max_stake_pct)
         kelly_fraction_setting = result.get('kelly_fraction', 0.25)
         for candidate in tradable:
-            side = 'UP' if candidate.get('preferred_side') == 'Up' else ('DOWN' if candidate.get('preferred_side') == 'Down' else 'NONE')
-            ask = self._float((candidate.get('microstructure') or {}).get('ask'))
+            predicted_side = candidate.get('preferred_side')
+            selected_side = self._opposite_polymarket_side(predicted_side) if invert_prediction else predicted_side
+            side = 'UP' if selected_side == 'Up' else ('DOWN' if selected_side == 'Down' else 'NONE')
+            market = markets.get(candidate.get('interval')) or {}
+            micro = self._side_microstructure_from_market(market, selected_side) if invert_prediction else (candidate.get('microstructure') or {})
+            ask = self._float(micro.get('ask'))
             probability = self._float(candidate.get('probability') or candidate.get('confidence'))
+            edge = probability - ask if probability is not None and ask is not None else None
             full_kelly = self._kelly_fraction(probability, ask)
             fractional_kelly = max(0, min(max_stake_pct, full_kelly * kelly_fraction_setting))
             stake = min(per_window_budget, bankroll * fractional_kelly)
@@ -239,13 +250,15 @@ class PaperTradingTool(BaseTool):
                 'window_et': candidate.get('window_et'),
                 'countdown': candidate.get('countdown'),
                 'probability': probability,
-                'preferred_side': candidate.get('preferred_side'),
+                'preferred_side': selected_side,
+                'predicted_side': predicted_side,
+                'prediction_inverted': invert_prediction,
                 'price_to_beat_reference': candidate.get('price_to_beat_reference'),
                 'current_price_reference': candidate.get('current_price_reference'),
                 'forecast_price_at_close': candidate.get('forecast_price_at_close'),
-                'reason': 'evento independiente pasa confianza, edge, Kelly y microestructura',
+                'reason': 'prediccion invertida por regla de negocio' if invert_prediction else 'evento independiente pasa confianza, edge, Kelly y microestructura',
                 'filters': payload.get('filters') or {},
-                'candidate': candidate,
+                'candidate': {**candidate, 'preferred_side': selected_side, 'predicted_side': predicted_side, 'prediction_inverted': invert_prediction, 'microstructure': micro, 'edge': round(edge, 4) if edge is not None else None},
             }
             if side == 'NONE':
                 result['observations'].append({**base, 'signal': 'NO TRADE', 'reason': 'missing_side'})
@@ -262,13 +275,13 @@ class PaperTradingTool(BaseTool):
                 'mode': result['mode'],
                 'side': side,
                 'price': ask,
-                'edge': candidate.get('edge'),
+                'edge': round(edge, 4) if edge is not None else None,
                 'full_kelly': round(full_kelly, 6),
                 'fractional_kelly': round(fractional_kelly, 6),
                 'stake_usdt': round(stake, 2),
                 'max_loss_usdt': round(stake, 2),
                 'execution': self._execution_label(result['mode']),
-                'token_id': (candidate.get('microstructure') or {}).get('token_id'),
+                'token_id': micro.get('token_id'),
             }
             self._execute_polymarket_live_if_needed(result, order, base)
             result['orders'].append(order)
@@ -289,7 +302,7 @@ class PaperTradingTool(BaseTool):
                 interval=candidate.get('interval'),
                 window=candidate.get('window_et'),
                 indicators={
-                    'candidate': candidate,
+                    'candidate': {**candidate, 'preferred_side': selected_side, 'predicted_side': predicted_side, 'prediction_inverted': invert_prediction, 'microstructure': micro, 'edge': round(edge, 4) if edge is not None else None},
                     'filters': payload.get('filters') or {},
                     'price_to_beat_reference': candidate.get('price_to_beat_reference'),
                     'current_price_reference': candidate.get('current_price_reference'),
@@ -336,7 +349,7 @@ class PaperTradingTool(BaseTool):
         auto_liquidate = self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True)
         auto_claim = self._bool_setting(kwargs.get('polymarket_auto_claim_enabled'), True)
         take_profit_pct = float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100)
-        time_stop_pct = 75
+        time_stop_pct = float(kwargs.get('polymarket_time_stop_pct') or os.getenv('POLYMARKET_TIME_STOP_PCT', '75') or 75)
         try:
             positions = self._fetch_polymarket_positions()
         except Exception as exc:
@@ -357,7 +370,7 @@ class PaperTradingTool(BaseTool):
             exit_reason = None
             if percent_pnl >= take_profit_pct:
                 exit_reason = 'take_profit'
-            elif self._polymarket_time_stop_loss(position, percent_pnl):
+            elif self._polymarket_time_stop_loss(position, percent_pnl, time_stop_pct):
                 exit_reason = 'stop_loss_time_75'
             if not auto_liquidate or redeemable or exit_reason is None:
                 continue
@@ -399,7 +412,7 @@ class PaperTradingTool(BaseTool):
                 })
                 result['errors'].append({'venue': 'polymarket', 'error': f'{exit_reason} failed: {str(exc)[:240]}'})
 
-    def _polymarket_time_stop_loss(self, position: dict, percent_pnl) -> bool:
+    def _polymarket_time_stop_loss(self, position: dict, percent_pnl, time_stop_pct: float = 75) -> bool:
         pnl = self._float(percent_pnl)
         if pnl is None or pnl >= 0:
             return False
@@ -417,7 +430,8 @@ class PaperTradingTool(BaseTool):
         start = datetime.fromtimestamp(start_ts, UTC)
         elapsed = (datetime.now(UTC) - start).total_seconds()
         progress = elapsed / interval
-        return 0.75 <= progress <= 1.25
+        threshold = max(1, min(99, self._float(time_stop_pct) or 75)) / 100
+        return threshold <= progress <= 1.25
 
     def _fetch_polymarket_positions(self) -> list[dict]:
         user = settings.polymarket_funder_address or os.getenv('FUNDER_ADDRESS', '')
@@ -800,17 +814,20 @@ class PaperTradingTool(BaseTool):
         number = self._float(value) or 0
         return round(number * 100, 2) if 0 < number <= 1 else round(number, 2)
 
-    def _polymarket_trade(self, signal: dict, market: dict, threshold: float):
+    def _polymarket_trade(self, signal: dict, market: dict, threshold: float, invert_prediction: bool = False):
         confidence = signal.get('confidence')
         side = signal.get('preferred_side')
         if not signal.get('meets_threshold') or not isinstance(confidence, int | float) or confidence < threshold:
             return {'side': 'NONE', 'reason': 'probabilidad debajo del umbral'}
         if side not in {'Up', 'Down'}:
             return {'side': 'NONE', 'reason': 'sin lado preferido'}
+        predicted_side = side
+        if invert_prediction:
+            side = self._opposite_polymarket_side(side)
         if (market.get('seconds_to_close') or 0) < 45:
             return {'side': 'NONE', 'reason': 'cierre demasiado cercano'}
         ask = self._ask_for_side(market, side)
-        probability = self._side_probability(signal, side)
+        probability = confidence if invert_prediction else self._side_probability(signal, side)
         if ask is None or probability is None:
             return {'side': 'NONE', 'reason': 'falta order book o probabilidad'}
         full_kelly = (probability - ask) / (1 - ask) if ask < 1 else 0
@@ -818,12 +835,42 @@ class PaperTradingTool(BaseTool):
             return {'side': 'NONE', 'reason': 'Kelly<=0'}
         return {
             'side': 'UP' if side == 'Up' else 'DOWN',
+            'preferred_side': side,
+            'predicted_side': predicted_side,
+            'prediction_inverted': invert_prediction,
             'ask': ask,
             'token_id': self._token_id_for_side(market, side),
             'full_kelly': full_kelly,
             'fractional_kelly': full_kelly * 0.25,
             'reason': 'probabilidad y Kelly positivos',
         }
+
+    def _opposite_polymarket_side(self, side: str | None):
+        if side == 'Up':
+            return 'Down'
+        if side == 'Down':
+            return 'Up'
+        return side
+
+    def _side_microstructure_from_market(self, market: dict, side: str | None):
+        for token in market.get('tokens') or []:
+            if token.get('outcome') != side:
+                continue
+            book = token.get('book') or {}
+            bid = book.get('best_bid') or {}
+            ask = book.get('best_ask') or {}
+            bid_price = self._float(bid.get('price'))
+            ask_price = self._float(ask.get('price'))
+            ask_size = self._float(ask.get('size'))
+            spread = ask_price - bid_price if ask_price is not None and bid_price is not None else None
+            return {
+                'bid': bid_price,
+                'ask': ask_price,
+                'ask_size': ask_size,
+                'spread': round(spread, 4) if spread is not None else None,
+                'token_id': token.get('token_id'),
+            }
+        return {'bid': None, 'ask': None, 'ask_size': None, 'spread': None, 'token_id': None}
 
     def _kelly_fraction(self, probability, ask):
         probability = self._float(probability)

@@ -369,8 +369,9 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "max_stake_pct": latest.get("max_stake_pct") or config.get("max_stake_pct"),
         "polymarket_stake_usdt": config.get("polymarket_stake_usdt", latest.get("polymarket_stake_usdt", 1)),
         "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", latest.get("polymarket_auto_liquidate_enabled", True)),
-        "polymarket_time_stop_pct": 75,
+        "polymarket_time_stop_pct": config.get("polymarket_time_stop_pct", latest.get("polymarket_time_stop_pct", 75)),
         "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", latest.get("polymarket_take_profit_pct", 100)),
+        "polymarket_invert_prediction_enabled": config.get("polymarket_invert_prediction_enabled", latest.get("polymarket_invert_prediction_enabled", False)),
         "orders": orders,
         "observations": observations,
         "position_actions": position_actions,
@@ -420,7 +421,8 @@ def _default_polymarket_rules() -> dict[str, Any]:
         "polymarket_btc_updown": {
             "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
             "stake": ["manual fixed stake only: 1, 2 or 3 USDT", "no martingale", "no averaging down"],
-            "exit": ["SL: liquidate after 75% of the window if PnL remains negative", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop: after 75% of the window, liquidate if PnL remains negative"],
+            "exit": ["SL: liquidate after configured window percent if PnL remains negative", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop defaults to 75% of window when PnL remains negative"],
+            "prediction": ["optional invert switch: Down becomes Up and Up becomes Down before order sizing"],
         }
     }
 
@@ -443,8 +445,12 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
         config["polymarket_stake_usdt"] = raw_stake
     if "polymarket_auto_liquidate_enabled" in data or "auto_liquidate" in data:
         config["polymarket_auto_liquidate_enabled"] = bool(data.get("polymarket_auto_liquidate_enabled", data.get("auto_liquidate")))
+    if "polymarket_time_stop_pct" in data:
+        config["polymarket_time_stop_pct"] = max(1.0, min(99.0, float(data["polymarket_time_stop_pct"])))
     if "polymarket_take_profit_pct" in data:
         config["polymarket_take_profit_pct"] = max(1.0, min(500.0, float(data["polymarket_take_profit_pct"])))
+    if "polymarket_invert_prediction_enabled" in data:
+        config["polymarket_invert_prediction_enabled"] = bool(data.get("polymarket_invert_prediction_enabled"))
     if "live_execution_enabled" in data:
         config["live_execution_enabled"] = bool(data.get("live_execution_enabled")) and bool(settings.polymarket_live_trading_enabled)
     if isinstance(data.get("trading_rules"), dict):
@@ -458,6 +464,7 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
     config.setdefault("polymarket_auto_liquidate_enabled", True)
     config.setdefault("polymarket_time_stop_pct", 75)
     config.setdefault("polymarket_take_profit_pct", 100)
+    config.setdefault("polymarket_invert_prediction_enabled", False)
     config.setdefault("live_execution_enabled", False)
     return config
 
@@ -472,8 +479,9 @@ def paper_trading_rules_payload() -> dict[str, Any]:
         "mode": config.get("mode", "observe"),
         "polymarket_stake_usdt": config.get("polymarket_stake_usdt", 1),
         "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", True),
-        "polymarket_time_stop_pct": 75,
+        "polymarket_time_stop_pct": config.get("polymarket_time_stop_pct", 75),
         "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", 100),
+        "polymarket_invert_prediction_enabled": config.get("polymarket_invert_prediction_enabled", False),
         "rules": rules,
         "config_path": str(config_path),
         "live_execution_enabled": bool(config.get("live_execution_enabled", False)),

@@ -245,6 +245,53 @@ def test_paper_trading_allows_only_one_polymarket_trade_per_window(tmp_path, mon
 
 
 
+def test_polymarket_inverts_prediction_before_order_sizing(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+
+    def fake_poly_run(self, **kwargs):
+        return {
+            "strategy": "BTC Up/Down coordinated 5m/15m live signal",
+            "filters": {"min_edge": 0.03},
+            "markets": [{
+                "interval": "5m",
+                "tokens": [
+                    {"outcome": "Up", "token_id": "up-token", "book": {"best_bid": {"price": "0.20"}, "best_ask": {"price": "0.24", "size": "20"}}},
+                    {"outcome": "Down", "token_id": "down-token", "book": {"best_bid": {"price": "0.60"}, "best_ask": {"price": "0.64", "size": "20"}}},
+                ],
+            }],
+            "candidates": [{
+                "interval": "5m",
+                "preferred_side": "Down",
+                "confidence": 0.9,
+                "probability": 0.9,
+                "edge": 0.26,
+                "microstructure": {"ask": 0.64, "spread": 0.04, "ask_size": 20, "token_id": "down-token"},
+                "passes_filters": True,
+                "countdown": "03:00",
+                "window_et": "2026-05-20 12:00:00 EDT - 2026-05-20 12:05:00 EDT",
+            }],
+            "reasons": [],
+        }
+
+    monkeypatch.setattr("tools.paper_trading.PolymarketTool.run", fake_poly_run)
+
+    result = PaperTradingTool().run(
+        action="run_cycle",
+        role="trader",
+        mode="paper",
+        venues=["polymarket"],
+        bankroll_usdt=1000,
+        polymarket_stake_usdt=3,
+        polymarket_invert_prediction_enabled=True,
+    )
+
+    assert result["orders_count"] == 1
+    assert result["orders"][0]["side"] == "UP"
+    assert result["orders"][0]["predicted_side"] == "Down"
+    assert result["orders"][0]["prediction_inverted"] is True
+    assert result["orders"][0]["token_id"] == "up-token"
+
+
 def test_live_polymarket_uses_quarter_kelly_and_executor(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
     monkeypatch.setattr(settings, "polymarket_live_trading_enabled", True)
@@ -419,10 +466,11 @@ def test_live_polymarket_liquidates_position_at_stop_loss(tmp_path, monkeypatch)
         mode="live",
         venues=["polymarket"],
         live_execution_enabled=True,
+        polymarket_time_stop_pct=60,
     )
 
     assert sells == [("token-loss", 3, 0.91)]
     assert result["position_actions_count"] == 1
     assert result["position_actions"][0]["action"] == "liquidate_stop_loss_time_75"
     assert result["position_actions"][0]["status"] == "stop_loss_time_75_order_sent"
-    assert result["position_actions"][0]["threshold_pct"] == 75
+    assert result["position_actions"][0]["threshold_pct"] == 60
