@@ -37,6 +37,7 @@
       </section>
 
       <div class="sidebar-footer">
+        <div id="themeSlot"></div>
         <a href="/dashboard/" class="footer-item"><span class="nav-icon">⬡</span>Dashboard</a>
         <a href="/dashboard/polymarket/" class="footer-item"><span class="nav-icon">▰</span>Polymarket</a>
         <a href="/auth/me" class="footer-item"><span class="nav-icon">⚙️</span>Configuración</a>
@@ -108,6 +109,16 @@
     <div id="sidePanelBody" class="side-panel-body"></div>
   </aside>
   <div id="panelBackdrop" class="panel-backdrop"></div>
+  <script src="../js/theme.js?v=20260531-theme-1"></script>
+  <script>
+    (function(){
+      const slot=document.getElementById('themeSlot');
+      if(slot&&window.QuantLabsTheme){
+        slot.appendChild(window.QuantLabsTheme.button());
+        window.QuantLabsTheme.apply(window.QuantLabsTheme.current());
+      }
+    })();
+  </script>
   <script src="../js/session.js?v=20260517-user"></script>
   <script src="./js/harness.js?v=20260530-harness-health-1"></script>
 </body>

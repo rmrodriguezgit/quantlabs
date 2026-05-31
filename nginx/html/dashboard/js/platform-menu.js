@@ -1,4 +1,11 @@
 (function(){
+  const bootTheme=()=>{
+    const script=document.createElement('script');
+    script.src='/dashboard/js/theme.js?v=20260531-theme-1';
+    script.onload=()=>window.dispatchEvent(new Event('quantlabs-theme-ready'));
+    document.head.appendChild(script);
+  };
+  if(!window.QuantLabsTheme) bootTheme();
   const aside = document.querySelector('aside:not(.sidebar)');
   if (!aside) return;
   const current = window.location.pathname.replace(/\/+$/, '/') || '/';
@@ -31,7 +38,11 @@
     {href:'/logout', icon:'⏻', label:'Logout', danger:true}
   ];
   const render = (adminItems=[]) => {
-    aside.innerHTML = ['<div class="nav-label">Plataforma</div>', ...platform.map(item), '<div class="nav-divider"></div>', '<div class="nav-label">Cuenta</div>', ...adminItems.map(item), ...account.map(item)].join('');
+    aside.innerHTML = ['<div class="nav-label">Plataforma</div>', ...platform.map(item), '<div class="nav-divider"></div>', '<div class="nav-label">Vista</div>', '<div id="themeSlot"></div>', '<div class="nav-divider"></div>', '<div class="nav-label">Cuenta</div>', ...adminItems.map(item), ...account.map(item)].join('');
+    const slot=document.getElementById('themeSlot');
+    const mount=()=>{if(slot&&window.QuantLabsTheme){slot.innerHTML='';slot.appendChild(window.QuantLabsTheme.button());window.QuantLabsTheme.apply(window.QuantLabsTheme.current());}};
+    mount();
+    if(slot&&!window.QuantLabsTheme) window.addEventListener('quantlabs-theme-ready',mount,{once:true});
   };
   render();
   fetch('/auth/userinfo', {credentials:'same-origin', cache:'no-store'})
