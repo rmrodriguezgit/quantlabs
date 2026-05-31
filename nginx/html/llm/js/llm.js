@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-let activeModel='', gpuBusy=false, modelBusy=false, gpuState=null, modelState=null, currentController=null, lastPrompt='', modelCatalog=[];
+let activeModel='', selectedRuntimeModel='', gpuBusy=false, modelBusy=false, gpuState=null, modelState=null, currentController=null, lastPrompt='', modelCatalog=[];
 
 async function jsonFetch(path,options={}){
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
@@ -46,14 +46,17 @@ async function loadActiveModel(){
 
 function renderModels(catalog){
   const select=$('modelSelect');
+  const previous=selectedRuntimeModel||select.value||'';
   modelCatalog=catalog;
   const groups=catalog.reduce((acc,item)=>{(acc[item.backend] ||= []).push(item);return acc;},{});
   select.innerHTML=Object.entries(groups).map(([backend,items])=>
     `<optgroup label="${esc(backend)}">${items.map(item=>`<option value="${esc(item.value)}">${esc(item.name)}</option>`).join('')}</optgroup>`
   ).join('');
-  if(activeModel&&catalog.some(item=>item.value===activeModel))select.value=activeModel;
+  if(previous&&catalog.some(item=>item.value===previous))select.value=previous;
+  else if(activeModel&&catalog.some(item=>item.value===activeModel))select.value=activeModel;
   else if(activeModel&&catalog.some(item=>item.value===`ollama:${activeModel}`))select.value=`ollama:${activeModel}`;
-  $('modelName').textContent=activeModel||select.value||'--';
+  selectedRuntimeModel=select.value||activeModel||'';
+  $('modelName').textContent=selectedRuntimeModel||activeModel||'--';
   applyModelDefaults(select.value||activeModel);
   renderLoadButton();
 }
@@ -63,7 +66,7 @@ function applyModelDefaults(name){
   if($('maxTokens'))$('maxTokens').value=d.tokens;
   if($('temperature'))$('temperature').value=d.temp;
   const subtitle=d.specialist==='codex4u'?' · especialista codex4u':(d.specialist==='ollama'?' · Ollama':'');
-  if($('modelName'))$('modelName').textContent=displayModelName(activeModel||name||'--')+subtitle;
+  if($('modelName'))$('modelName').textContent=displayModelName(name||selectedRuntimeModel||activeModel||'--')+subtitle;
 }
 
 function isOllamaModel(value){ return /^ollama:/i.test(value||''); }
@@ -76,8 +79,8 @@ function renderLoadButton(){
   const selected=$('modelSelect')?.value||'';
   const changed=Boolean(selected&&selected!==activeModel);
   if(isOllamaModel(selected)){
-    btn.disabled=true;
-    btn.textContent='Ollama disponible';
+    btn.disabled=modelBusy||selectedRuntimeModel===selected;
+    btn.textContent=modelBusy?'Cargando modelo...':(selectedRuntimeModel===selected?'Modelo activo':'Usar modelo Ollama');
     return;
   }
   btn.disabled=modelBusy||!changed;
@@ -153,11 +156,12 @@ async function loadModels(){
 async function switchModel(){
   const selected=$('modelSelect').value;
   if(isOllamaModel(selected)){
-    activeModel=selected;
+    selectedRuntimeModel=selected;
     applyModelDefaults(selected);
     renderLoadButton();
     $('responseBox').textContent=`Modelo Ollama listo: ${displayModelName(selected)}`;
     $('requestState').textContent='LISTO';
+    $('llmStatus').textContent='Ollama listo';
     return;
   }
   if(!selected||selected===activeModel||modelBusy)return;
@@ -174,6 +178,7 @@ async function switchModel(){
       body:JSON.stringify({model:selected})
     });
     activeModel=modelState.active_model||modelState.selected_model||selected;
+    selectedRuntimeModel=activeModel;
     await loadModels();
     $('responseBox').textContent=modelState.readiness?.ready
       ? `Modelo cargado: ${activeModel}`
