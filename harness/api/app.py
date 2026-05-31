@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ from api.auth import rate_limit, require_auth
 from config import settings
 from memory.store import SessionStore
 from memory.uploads import UploadStore
+from memory.vector import VectorMemory
 from observability import ValidationCollector
 from orchestrator.engine import HarnessEngine
 from runtime.profiles import detect_compute_profile
@@ -31,8 +33,46 @@ agents = AgentRegistry()
 tools = ToolRegistry()
 sessions = SessionStore()
 uploads = UploadStore()
+vector_memory = VectorMemory()
 app.config["MAX_CONTENT_LENGTH"] = settings.max_upload_mb * 1024 * 1024
 IGNORED_LOG_LINES = ("Importing plotly failed. Interactive plots will not work.",)
+
+
+def active_llm_model() -> str:
+    return os.environ.get("LLM_MODEL", "").strip() or "modelo activo de llama.cpp"
+
+
+def route_agent_for_model(agent: str) -> str:
+    if "qwen2.5-coder" in active_llm_model().lower():
+        return "codex4u"
+    return agent
+
+
+def rag_context(user_id: str, session_id: str, prompt: str) -> str:
+    try:
+        hits = vector_memory.search(vector_memory.embed(prompt), top_k=4)
+    except Exception:
+        return ""
+    lines = []
+    for item in hits:
+        meta = item.get("metadata") or {}
+        if meta.get("user_id") != user_id:
+            continue
+        text = str(item.get("text") or "").strip()
+        if text:
+            lines.append(f"- {text[:900]}")
+    return "\n".join(lines)
+
+
+def remember_exchange(user_id: str, session_id: str, agent: str, prompt: str, response: str):
+    try:
+        vector_memory.add(
+            f"Usuario: {prompt}\nRespuesta: {response}",
+            vector_memory.embed(f"{prompt}\n{response}"),
+            {"user_id": user_id, "session_id": session_id, "agent": agent, "model": active_llm_model()},
+        )
+    except Exception:
+        pass
 
 
 def _task_status_value(task) -> str:
@@ -401,18 +441,26 @@ def chat():
         if not prompt:
             return jsonify({'error': 'message_required'}), 400
         file_ids = data.get('file_ids') or []
+        session_id = data.get('session_id', 'default')
+        agent = route_agent_for_model(data.get('agent', 'planner'))
         context = uploads.context(request.identity['user_id'], file_ids)
         if context:
             prompt = f"{prompt}\n\n[Archivos adjuntos disponibles]\n{context}"
-        return jsonify(
-            engine.chat(
-                data.get('session_id', 'default'),
-                prompt,
-                data.get('agent', 'planner'),
-                request.identity['user_id'],
-                request.identity.get('role'),
-            )
+        memory_context = rag_context(request.identity['user_id'], session_id, prompt)
+        if memory_context:
+            prompt = f"{prompt}\n\n[Memoria RAG relevante]\n{memory_context}"
+        result = engine.chat(
+            session_id,
+            prompt,
+            agent,
+            request.identity['user_id'],
+            request.identity.get('role'),
         )
+        result.setdefault("metadata", {})["active_model"] = active_llm_model()
+        result["metadata"]["effective_agent"] = agent
+        result["metadata"]["rag_enabled"] = True
+        remember_exchange(request.identity['user_id'], session_id, agent, prompt, result.get("response", ""))
+        return jsonify(result)
     except PermissionError as exc:
         return jsonify({'error': str(exc)}), 403
     except Exception as exc:
@@ -441,7 +489,7 @@ def tasks():
 @app.get('/v1/models')
 @require_auth({'admin', 'teacher', 'trader'})
 def models():
-    return jsonify({'models': ['Nous-Hermes-2-Mistral-7B-DPO.Q4_K_M.gguf', 'Qwen2.5']})
+    return jsonify({'models': [active_llm_model()], 'active_model': active_llm_model(), 'rag_enabled': True})
 
 
 @app.get('/v1/memory')

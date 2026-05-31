@@ -1,6 +1,8 @@
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 let activeModel='', selectedRuntimeModel='', gpuBusy=false, modelBusy=false, gpuState=null, modelState=null, currentController=null, lastPrompt='', modelCatalog=[];
+const memoryKey='quantlabs-llm-local-memory-v1';
+let chatMemory=[];
 
 async function jsonFetch(path,options={}){
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
@@ -9,6 +11,32 @@ async function jsonFetch(path,options={}){
   return data;
 }
 const row=(label,value)=>`<div class="server-row"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`;
+
+function loadMemory(){
+  try{chatMemory=JSON.parse(localStorage.getItem(memoryKey)||'[]').slice(-16);}catch(_error){chatMemory=[];}
+  renderMemory();
+}
+
+function saveMemory(){
+  localStorage.setItem(memoryKey,JSON.stringify(chatMemory.slice(-16)));
+}
+
+function renderMemory(){
+  const box=$('responseBox');
+  if(!box)return;
+  if(!chatMemory.length){
+    box.textContent='Listo para consultar.';
+    return;
+  }
+  box.textContent=chatMemory.map(item=>`${item.role==='user'?'Usuario':'LLM'}:\n${item.content}`).join('\n\n');
+}
+
+function pushMemory(role,content){
+  chatMemory.push({role,content:String(content||'').trim(),ts:Date.now()});
+  chatMemory=chatMemory.filter(item=>item.content).slice(-16);
+  saveMemory();
+  renderMemory();
+}
 
 function modelTemplate(name){
   return 'chatml';
@@ -175,7 +203,7 @@ async function switchModel(){
     selectedRuntimeModel=selected;
     applyModelDefaults(selected);
     renderLoadButton();
-    $('responseBox').textContent=`Modelo Ollama listo: ${displayModelName(selected)}`;
+    renderMemory();
     $('requestState').textContent='LISTO';
     $('llmStatus').textContent='Ollama listo';
     return;
@@ -218,11 +246,12 @@ async function submitPrompt(event){
   const requestModel=isOllamaModel(selected)?displayModelName(selected):selected;
   const started=performance.now();
   lastPrompt=prompt;
+  const history=chatMemory.slice(-10).map(item=>({role:item.role,content:item.content}));
   currentController=new AbortController();
   btn.disabled=true;
   $('stopBtn').disabled=false;
   $('requestState').textContent='GENERANDO';
-  $('responseBox').textContent='Pensando...';
+  $('responseBox').textContent=(chatMemory.length?chatMemory.map(item=>`${item.role==='user'?'Usuario':'LLM'}:\n${item.content}`).join('\n\n')+'\n\n':'')+'LLM:\nPensando...';
   $('responseTime').textContent='Tiempo: corriendo...';
   try{
     const payload=await jsonFetch(endpoint,{
@@ -233,6 +262,7 @@ async function submitPrompt(event){
         model:requestModel||undefined,
         messages:[
           {role:'system',content:systemPromptForModel(selected)},
+          ...history,
           {role:'user',content:prompt}
         ],
         max_tokens:Number($('maxTokens').value)||384,
@@ -243,7 +273,8 @@ async function submitPrompt(event){
       })
     });
     const text=payload.choices?.[0]?.message?.content||payload.choices?.[0]?.text||payload.content||JSON.stringify(payload,null,2);
-    $('responseBox').textContent=text;
+    pushMemory('user',prompt);
+    pushMemory('assistant',text);
     const usage=payload.usage;
     $('tokenUsage').textContent=usage?`${usage.prompt_tokens||0}+${usage.completion_tokens||0} tokens`:'OK';
     $('responseTime').textContent=`Tiempo: ${((performance.now()-started)/1000).toFixed(2)} s`;
@@ -303,3 +334,4 @@ $('openServerModal')?.addEventListener('click',openServerModal);
 $('closeServerModal')?.addEventListener('click',closeServerModal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeServerModal();});
 loadModels();
+loadMemory();

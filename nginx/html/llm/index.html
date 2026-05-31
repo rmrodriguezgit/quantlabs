@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/dashboard/css/style.css?v=20260528-command-center-1"/>
   <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-1"/>
-  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-tools-1"/>
+  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-memory-1"/>
 </head>
 <body class="llm-page">
 <div class="layout">
@@ -87,8 +87,8 @@
             </select>
           </label>
           <button id="loadModelBtn" class="secondary-action" type="button">Cargar modelo</button>
-          <button id="retryBtn" class="ghost-action" type="button">Reintentar</button>
-          <button id="stopBtn" class="danger-action" type="button" disabled>Stop</button>
+          <button id="retryBtn" class="ghost-action icon-command" type="button" title="Reintentar" aria-label="Reintentar">↻</button>
+          <button id="stopBtn" class="danger-action icon-command" type="button" title="Detener" aria-label="Detener" disabled>■</button>
           <button id="runBtn" type="submit">Enviar</button>
         </div>
       </form>
@@ -111,6 +111,6 @@
 </div>
 <script src="/dashboard/js/theme.js?v=20260531-theme-1"></script>
 <script src="/dashboard/js/platform-menu.js?v=20260531-theme-1"></script>
-<script src="./js/llm.js?v=20260531-llm-tools-1"></script>
+<script src="./js/llm.js?v=20260531-llm-memory-1"></script>
 </body>
 </html>
