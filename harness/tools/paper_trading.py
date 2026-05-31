@@ -92,7 +92,7 @@ class PaperTradingTool(BaseTool):
         if live_blocked:
             result['errors'].append({
                 'venue': 'polymarket',
-                'error': 'live_execution_blocked: POLYMARKET_LIVE_TRADING_ENABLED and live_execution_enabled must both be true',
+                'error': 'LIVE bloqueado: falta activar la llave de ejecucion real (live_execution_enabled=true)',
             })
         if 'polymarket' in venues:
             if mode == 'live' and not live_blocked:
@@ -305,7 +305,7 @@ class PaperTradingTool(BaseTool):
         if result.get('live_blocked'):
             order['execution'] = 'live_blocked'
             order['transaction_status'] = 'rejected'
-            order['execution_error'] = 'live_execution_enabled is false in runtime config'
+            order['execution_error'] = 'LIVE bloqueado: falta activar la llave de ejecucion real'
             return
         token_id = order.get('token_id')
         if not token_id:
