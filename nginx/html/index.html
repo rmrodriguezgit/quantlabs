@@ -1,12 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QuantLabs AI Capital — Plataforma de Trading Cuantitativo</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <title>QuantLabs AI Capital - Agentes IA Locales para Mercados</title>
   <script>
     (function(){
       const saved=localStorage.getItem('quantlabs-dashboard-theme');
@@ -14,568 +11,218 @@
       document.documentElement.dataset.theme=saved||(prefersLight?'light':'dark');
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260531-ai-solutions-2">
-  <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-2">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css?v=20260531-market-agents-1" />
 </head>
 <body>
+  <nav class="site-nav">
+    <a class="brand" href="/">
+      <span class="brand-mark">QL</span>
+      <span>QuantLabs AI Capital</span>
+    </a>
+    <div class="nav-links">
+      <a href="#polymarket">Polymarket</a>
+      <a href="#stocks">Mercado accionario</a>
+      <a href="#packages">Paquetes</a>
+      <a href="#sectors">Sectores</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme-button" type="button" aria-label="Cambiar tema">
+        <span data-theme-icon>☾</span>
+        <span data-theme-label>Modo noche</span>
+      </button>
+      <a class="nav-login" href="/login">Entrar</a>
+      <a class="nav-primary" href="/dashboard/">Dashboard</a>
+    </div>
+  </nav>
 
-<!-- ═══════════════════ NAV ═══════════════════ -->
-<nav>
-  <a href="#" class="nav-logo">
-    <div class="nav-logo-icon">QL</div>
-    <span>QuantLabs AI</span>
-  </a>
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Agentes IA locales para mercados</p>
+        <h1>Polymarket y mercado accionario con inteligencia privada, auditable y sin nube.</h1>
+        <p class="hero-sub">Diseñamos agentes que corren en tu infraestructura con NVIDIA Jetson Orin, modelos LLM locales, RAG privado, reglas de riesgo y tableros operativos para tomar decisiones con datos, no con intuición.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="mailto:info@quantlabs.site?subject=Demo%20QuantLabs%20AI%20Capital">Agendar demo</a>
+          <a class="btn secondary" href="#packages">Ver paquetes</a>
+        </div>
+        <div class="trust-row">
+          <span>Sin costo por token</span>
+          <span>Datos locales</span>
+          <span>Docker + Python + GPU</span>
+        </div>
+      </div>
+      <div class="market-console" aria-label="Vista previa del agente QuantLabs">
+        <div class="console-top">
+          <span>AGENT</span>
+          <strong>Polymrkt + Stocks</strong>
+          <em>live observe</em>
+        </div>
+        <div class="decision-card">
+          <span>Decisión actual</span>
+          <strong>NO TRADE</strong>
+          <small>edge insuficiente · Kelly <= 0 · no ejecuta órdenes</small>
+        </div>
+        <div class="signal-table">
+          <div class="row head"><span>Mercado</span><span>Prob.</span><span>Edge</span><span>Acción</span></div>
+          <div class="row"><span>BTC 5m</span><span>76%</span><span>+1.8%</span><strong>NO TRADE</strong></div>
+          <div class="row"><span>BTC 15m</span><span>83%</span><span>+3.4%</span><strong>UP WATCH</strong></div>
+          <div class="row"><span>NVDA</span><span>68%</span><span>Riesgo alto</span><strong>WAIT</strong></div>
+        </div>
+        <div class="console-note">RAG privado + Chainlink + order book + indicadores técnicos + reporte auditable.</div>
+      </div>
+    </section>
 
-  <ul class="nav-links">
-    <li><a href="#features">Características</a></li>
-    <li><a href="#how">Cómo Funciona</a></li>
-    <li><a href="#pricing">Planes</a></li>
-    <li><a href="#faq">FAQ</a></li>
-  </ul>
+    <section class="metrics">
+      <div><strong>100%</strong><span>privacidad local</span></div>
+      <div><strong>0</strong><span>dependencia de nube</span></div>
+      <div><strong>24/7</strong><span>agentes en tu red</span></div>
+      <div><strong>2</strong><span>motores financieros core</span></div>
+    </section>
 
-  <div class="nav-cta">
-    <button class="landing-theme-toggle" id="landingThemeToggle" type="button" aria-label="Cambiar tema">
-      <span data-theme-icon>☾</span>
-      <span data-theme-label>Modo noche</span>
-    </button>
-    <a href="/login" class="btn btn-ghost">Iniciar Sesión</a>
-    <a href="https://quantlabs.site/dashboard" class="btn btn-primary">Dashboard →</a>
-  </div>
+    <section id="polymarket" class="product-section">
+      <div class="section-heading">
+        <p class="eyebrow">Producto core 01</p>
+        <h2>Agente Polymarket para mercados de predicción</h2>
+        <p>Un especialista que analiza ventanas BTC Up/Down 5m y 15m, precio a superar, Chainlink, order book, probabilidad, edge y Kelly. El modo inicial recomendado es observe: primero audita, luego automatiza.</p>
+      </div>
+      <div class="feature-grid">
+        <article>
+          <span>01</span>
+          <h3>Lectura de mercado</h3>
+          <p>Ventanas ET, countdown, precio a superar fijo, cotización BTC/USD y predicción de cierre con modelo local.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Microestructura CLOB</h3>
+          <p>Bid/ask UP y DOWN, liquidez, spread, costo de entrada y edge contra ask del lado elegido.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Riesgo y staking</h3>
+          <p>Kelly full, Kelly 1/4, tope de banca, SL/TP operativo y liquidación manual de emergencia.</p>
+        </article>
+        <article>
+          <span>04</span>
+          <h3>Auditoría</h3>
+          <p>Respuesta en tabla, razones NO TRADE, artefactos JSON y trazabilidad por agente/herramienta.</p>
+        </article>
+      </div>
+    </section>
 
-  <button class="hamburger" id="hamburger" aria-label="Menú">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
+    <section id="stocks" class="product-section alt">
+      <div class="section-heading">
+        <p class="eyebrow">Producto core 02</p>
+        <h2>Agente para mercado accionario y portafolios</h2>
+        <p>Un analista local para acciones, ETFs y watchlists: indicadores técnicos, earnings, sentimiento, riesgo, backtesting y reportes ejecutivos con datos que permanecen dentro de tu infraestructura.</p>
+      </div>
+      <div class="stock-layout">
+        <div class="stock-card">
+          <h3>Motor QuantLab</h3>
+          <ul>
+            <li>RSI, MACD, medias, Bollinger, VWAP y ATR.</li>
+            <li>Backtesting con métricas de drawdown, win-rate y Sharpe.</li>
+            <li>Reportes por activo, sector y portafolio.</li>
+            <li>API interna para integrarlo con dashboards o notebooks.</li>
+          </ul>
+        </div>
+        <div class="watchlist">
+          <div><span>NVDA</span><strong>Momentum</strong><em>Riesgo medio</em></div>
+          <div><span>SPY</span><strong>Neutral</strong><em>Esperar pullback</em></div>
+          <div><span>BTC</span><strong>Volatilidad</strong><em>Validar liquidez</em></div>
+          <div><span>QQQ</span><strong>Alcista</strong><em>Confirmar volumen</em></div>
+        </div>
+      </div>
+    </section>
 
-<!-- Mobile menu -->
-<div class="mobile-menu" id="mobileMenu">
-  <a href="#features" onclick="closeMobile()">Características</a>
-  <a href="#how" onclick="closeMobile()">Cómo Funciona</a>
-  <a href="#pricing" onclick="closeMobile()">Planes</a>
-  <a href="#faq" onclick="closeMobile()">FAQ</a>
-  <button class="landing-theme-toggle mobile-theme-toggle" id="landingThemeToggleMobile" type="button" aria-label="Cambiar tema">
-    <span data-theme-icon>☾</span>
-    <span data-theme-label>Modo noche</span>
-  </button>
-  <a href="/login" onclick="closeMobile()">Iniciar Sesión</a>
-  <a href="https://quantlabs.site/dashboard" class="btn btn-primary" style="border-radius:8px;margin-top:8px;">Dashboard →</a>
-</div>
+    <section class="hardware" id="hardware">
+      <div class="section-heading compact">
+        <p class="eyebrow">Infraestructura local</p>
+        <h2>NVIDIA Jetson Orin como base del laboratorio</h2>
+      </div>
+      <div class="hardware-grid">
+        <article><span>Orin Nano 4GB</span><strong>$6,900 MXN</strong><p>Primer laboratorio, RAG ligero, asistentes internos.</p></article>
+        <article class="featured"><span>Orin Nano 8GB</span><strong>$9,900 MXN</strong><p>LLM local 7B/8B, oficina, Excel, documentos y análisis ligero.</p></article>
+        <article><span>Orin NX 16GB</span><strong>$19,900 MXN</strong><p>Polymarket, acciones, RAG privado y múltiples agentes.</p></article>
+        <article><span>AGX Orin 32GB</span><strong>$49,900 MXN</strong><p>Trading lab avanzado, investigación, visión y modelos mayores.</p></article>
+      </div>
+      <p class="note">Precios referenciales de hardware. El paquete final depende de disponibilidad, almacenamiento, instalación, alcance de datos y soporte.</p>
+    </section>
 
-<!-- ═══════════════════ TICKER ═══════════════════ -->
-<div class="ticker-wrap" style="margin-top:72px;">
-  <div class="ticker-track" id="ticker">
-    <div class="ticker-item"><span class="ticker-sym">AAPL</span><span class="ticker-price">$189.42</span><span class="ticker-up">▲ +1.23%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">NVDA</span><span class="ticker-price">$875.10</span><span class="ticker-up">▲ +2.87%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">BTC-USD</span><span class="ticker-price">$67,420</span><span class="ticker-up">▲ +3.14%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">SPY</span><span class="ticker-price">$528.64</span><span class="ticker-up">▲ +0.72%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">TSLA</span><span class="ticker-price">$242.18</span><span class="ticker-dn">▼ −0.45%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">ETH-USD</span><span class="ticker-price">$3,892</span><span class="ticker-up">▲ +1.98%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">MSFT</span><span class="ticker-price">$415.33</span><span class="ticker-up">▲ +0.61%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">AMZN</span><span class="ticker-price">$192.74</span><span class="ticker-dn">▼ −0.19%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">GOLD</span><span class="ticker-price">$2,341</span><span class="ticker-up">▲ +0.88%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">QQQ</span><span class="ticker-price">$451.22</span><span class="ticker-up">▲ +1.05%</span></div>
-    <!-- duplicate for seamless loop -->
-    <div class="ticker-item"><span class="ticker-sym">AAPL</span><span class="ticker-price">$189.42</span><span class="ticker-up">▲ +1.23%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">NVDA</span><span class="ticker-price">$875.10</span><span class="ticker-up">▲ +2.87%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">BTC-USD</span><span class="ticker-price">$67,420</span><span class="ticker-up">▲ +3.14%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">SPY</span><span class="ticker-price">$528.64</span><span class="ticker-up">▲ +0.72%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">TSLA</span><span class="ticker-price">$242.18</span><span class="ticker-dn">▼ −0.45%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">ETH-USD</span><span class="ticker-price">$3,892</span><span class="ticker-up">▲ +1.98%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">MSFT</span><span class="ticker-price">$415.33</span><span class="ticker-up">▲ +0.61%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">AMZN</span><span class="ticker-price">$192.74</span><span class="ticker-dn">▼ −0.19%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">GOLD</span><span class="ticker-price">$2,341</span><span class="ticker-up">▲ +0.88%</span></div>
-    <div class="ticker-item"><span class="ticker-sym">QQQ</span><span class="ticker-price">$451.22</span><span class="ticker-up">▲ +1.05%</span></div>
-  </div>
-</div>
+    <section id="packages" class="packages">
+      <div class="section-heading">
+        <p class="eyebrow">Oferta comercial</p>
+        <h2>Paquetes orientados a resultados</h2>
+      </div>
+      <div class="package-grid">
+        <article>
+          <span class="tag">Observe</span>
+          <h3>Polymarket Analyst</h3>
+          <strong>$85,000 MXN</strong>
+          <p>Agente de análisis y auditoría para BTC Up/Down sin ejecución automática.</p>
+          <ul><li>Dashboard Polymarket</li><li>Reglas NO TRADE</li><li>Kelly y edge</li><li>Soporte 30 días</li></ul>
+        </article>
+        <article class="featured">
+          <span class="tag">Core</span>
+          <h3>Market Decision Lab</h3>
+          <strong>$148,000 MXN</strong>
+          <p>Polymarket + acciones + RAG privado + tableros y notebooks.</p>
+          <ul><li>Orin NX recomendado</li><li>Agent Harness</li><li>API QuantLab</li><li>Soporte 90 días</li></ul>
+        </article>
+        <article>
+          <span class="tag">Enterprise</span>
+          <h3>Quant Trading Lab</h3>
+          <strong>$237,000 MXN</strong>
+          <p>Sistema completo para investigación, validación y operación controlada.</p>
+          <ul><li>AGX Orin recomendado</li><li>Modelos a medida</li><li>Backtesting</li><li>Soporte 6 meses</li></ul>
+        </article>
+      </div>
+    </section>
 
-<!-- ═══════════════════ HERO ═══════════════════ -->
-<section id="hero">
-  <div class="orb orb-green"></div>
-  <div class="orb orb-cyan"></div>
-  <div class="orb orb-magenta"></div>
+    <section id="sectors" class="sectors">
+      <div class="section-heading compact">
+        <p class="eyebrow">Servicios anexos</p>
+        <h2>Agentes IA locales por industria</h2>
+      </div>
+      <div class="sector-grid">
+        <article><h3>Legal</h3><p>Contratos, expedientes, búsqueda semántica y escritos.</p><strong>Desde $38,000 MXN</strong></article>
+        <article><h3>Médico</h3><p>Notas clínicas, historial, reportes y privacidad local.</p><strong>Desde $42,000 MXN</strong></article>
+        <article><h3>Empresa</h3><p>Excel, correo, minutas, reportes y procesos internos.</p><strong>Desde $29,000 MXN</strong></article>
+        <article><h3>Universidad</h3><p>Tesis, papers, repositorios, tutorías e investigación.</p><strong>Desde $45,000 MXN</strong></article>
+      </div>
+    </section>
 
-  <div class="hero-inner">
-    <div>
-      <div class="hero-badge">⚡ IA Cuantitativa de Nivel Institucional</div>
-      <h1>
-        Trading<br>
-        <span class="accent-green">Algorítmico</span><br>
-        <span class="accent-cyan">Potenciado por IA</span>
-      </h1>
-      <p class="hero-sub">
-        Plataforma cuantitativa de alto rendimiento con modelos de machine learning, análisis técnico avanzado y ejecución de estrategias en tiempo real. Conecta tu portafolio y opera con inteligencia institucional.
-      </p>
+    <section class="cta">
+      <h2>Construyamos tu laboratorio privado de decisión financiera.</h2>
+      <p>Podemos iniciar en modo observe, validar resultados y crecer hacia automatización con controles de riesgo claros.</p>
       <div class="hero-actions">
-        <a href="/login" class="btn btn-primary">Acceder a la Plataforma →</a>
+        <a class="btn primary" href="mailto:info@quantlabs.site?subject=Demo%20agentes%20IA%20locales">Solicitar cotización</a>
+        <a class="btn secondary" href="/llm/">Probar LLM Local</a>
       </div>
-      <div class="hero-stats">
-        <div class="stat-item">
-          <span class="stat-val">+340%</span>
-          <span class="stat-lbl">Retorno Promedio</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-val">2.4ms</span>
-          <span class="stat-lbl">Latencia de Señal</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-val">98.7%</span>
-          <span class="stat-lbl">Uptime</span>
-        </div>
-      </div>
-    </div>
+    </section>
+  </main>
 
-    <!-- Terminal card -->
-    <div class="terminal-card">
-      <div class="terminal-header">
-        <div class="term-dot term-dot-r"></div>
-        <div class="term-dot term-dot-y"></div>
-        <div class="term-dot term-dot-g"></div>
-        <span class="terminal-title">quantlab-ai ~ python strategy.py</span>
-      </div>
-      <div class="terminal-body">
-        <div class="t-line"><span class="t-prompt">$</span><span class="t-cmd">python quantlab/run_strategy.py --ticker AAPL</span></div>
-        <div class="t-out t-cyan">▶ Cargando modelo RSI-MACD-VWAP hybrid...</div>
-        <div class="t-out t-green">✓ Datos descargados: 252 días de trading</div>
-        <div class="t-out">  Calculando señales técnicas...</div>
-        <div class="t-out t-green">✓ SMA20: 188.32 | EMA50: 185.74</div>
-        <div class="t-out t-green">✓ RSI(14): 62.4 — Zona neutral-alcista</div>
-        <div class="t-out t-cyan">✓ MACD cruce alcista detectado</div>
-        <div class="t-out t-mag">✓ Bollinger: precio en banda superior</div>
-        <div class="t-out" style="margin-top:6px;">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
-        <div class="t-out t-green" style="font-size:13px;margin-top:4px;">🟢 SEÑAL: COMPRA FUERTE — Score: 8.4/10</div>
-        <div class="t-out">   Stop-loss: $183.20 | Target: $198.50</div>
-        <div class="t-out">   R/R Ratio: 1:2.7</div>
-        <div class="t-out t-cyan" style="margin-top:6px;">▶ Enviando orden al broker...</div>
-        <div class="t-out t-green">✓ Orden ejecutada — 10 acciones @ $189.42</div>
-        <div class="t-line" style="margin-top:8px;"><span class="t-prompt">$</span><span class="t-cursor"></span></div>
+  <footer>
+    <strong>QuantLabs AI Capital</strong>
+    <span>Agentes IA locales para mercados, empresas e investigación. Precios en MXN, IVA no incluido.</span>
+  </footer>
 
-        <div class="mini-chart">
-          <svg width="100%" height="60" viewBox="0 0 300 60" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#00ff99" stop-opacity=".4"/>
-                <stop offset="100%" stop-color="#00ff99" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path d="M0,45 L30,40 L60,42 L90,30 L120,35 L150,20 L180,25 L210,15 L240,10 L270,18 L300,8"
-                  fill="none" stroke="#00ff99" stroke-width="2" stroke-linecap="round"/>
-            <path d="M0,45 L30,40 L60,42 L90,30 L120,35 L150,20 L180,25 L210,15 L240,10 L270,18 L300,8 L300,60 L0,60 Z"
-                  fill="url(#lineGrad)"/>
-            <!-- Signal dots -->
-            <circle cx="90"  cy="30" r="4" fill="#ff4466"/>
-            <circle cx="150" cy="20" r="4" fill="#00ff99"/>
-            <circle cx="210" cy="15" r="4" fill="#00ff99"/>
-          </svg>
-          <div style="display:flex;justify-content:space-between;margin-top:4px;">
-            <span style="font-size:10px;color:var(--muted);">AAPL — 1Y</span>
-            <span style="font-size:10px;color:var(--primary);font-weight:700;">+34.2%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════ FEATURES ═══════════════════ -->
-<section id="features">
-  <div class="section-inner">
-    <div class="section-header reveal">
-      <div class="section-tag">Plataforma</div>
-      <h2>Todo lo que necesitas para operar<br>con ventaja cuantitativa</h2>
-      <p class="section-sub">Integramos machine learning, análisis técnico e indicadores institucionales en un solo ecosistema.</p>
-    </div>
-    <div class="features-grid">
-      <div class="feat-card reveal">
-        <div class="feat-icon feat-icon-green">📈</div>
-        <h3>Indicadores Técnicos Avanzados</h3>
-        <p>SMA, EMA, RSI, MACD, Bollinger Bands, VWAP, ATR y más de 40 indicadores calculados en tiempo real con Python y TA-Lib.</p>
-      </div>
-      <div class="feat-card reveal" style="transition-delay:.1s">
-        <div class="feat-icon feat-icon-cyan">🤖</div>
-        <h3>Motor de IA y LLM</h3>
-        <p>Análisis narrativo de mercado con modelos de lenguaje grande. Interpreta noticias, reportes y sentimiento del mercado automáticamente.</p>
-      </div>
-      <div class="feat-card reveal" style="transition-delay:.2s">
-        <div class="feat-icon feat-icon-mag">⚡</div>
-        <h3>Señales en Tiempo Real</h3>
-        <p>Detección automática de patrones: cruces de medias, divergencias RSI, compresión de Bollinger y señales MACD con alertas instantáneas.</p>
-      </div>
-      <div class="feat-card reveal" style="transition-delay:.05s">
-        <div class="feat-icon feat-icon-cyan">📊</div>
-        <h3>Backtesting Institucional</h3>
-        <p>Prueba tus estrategias con datos históricos reales vía yfinance. Métricas de Sharpe, drawdown, win-rate y P&L automatizados.</p>
-      </div>
-      <div class="feat-card reveal" style="transition-delay:.15s">
-        <div class="feat-icon feat-icon-green">🔐</div>
-        <h3>Seguridad con JWT</h3>
-        <p>Autenticación con tokens JWT, sesiones seguras y control de acceso granular. Tus estrategias y datos protegidos 24/7.</p>
-      </div>
-      <div class="feat-card reveal" style="transition-delay:.25s">
-        <div class="feat-icon feat-icon-mag">📓</div>
-        <h3>Jupyter Diario + GPU</h3>
-        <p>Dos entornos separados: uno ligero para análisis cotidiano y otro con CUDA, RAPIDS cuDF, PyTorch y TensorFlow sobre NVIDIA T4.</p>
-      </div>
-      <div class="feat-card reveal">
-        <div class="feat-icon feat-icon-green">⚡</div>
-        <h3>API QuantLab</h3>
-        <p>Consultas REST especializadas con modo CPU o GPU, tickers configurables, tablas dinámicas, JSON técnico y visualización financiera.</p>
-      </div>
-      <div class="feat-card reveal" style="transition-delay:.1s">
-        <div class="feat-icon feat-icon-cyan">🧠</div>
-        <h3>Arquitectura Modular</h3>
-        <p>Servicios separados para autenticación, API, LLM, Jupyter y workers GPU. Más claridad operativa, mejor escalabilidad y mantenimiento seguro.</p>
-      </div>
-      <div class="feat-card reveal" style="transition-delay:.2s">
-        <div class="feat-icon feat-icon-mag">⛏️</div>
-        <h3>Monitoreo BitAxe</h3>
-        <p>Panel en vivo para hashrate, shares, dificultad, temperatura, red y pool; telemetría útil con actualización continua.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
-<section id="how">
-  <div class="section-inner">
-    <div class="section-header reveal">
-      <div class="section-tag">Proceso</div>
-      <h2>De datos crudos a decisiones<br>de inversión en minutos</h2>
-      <p class="section-sub">Flujo cuantitativo end-to-end desde la obtención de datos hasta la ejecución de órdenes.</p>
-    </div>
-    <div class="steps-grid">
-      <div class="step-item reveal">
-        <div class="step-num">01</div>
-        <h3>Consulta el Mercado</h3>
-        <p>Selecciona activo, periodo e intervalo desde el dashboard o vía API. Procesa con pandas para uso diario o cuDF cuando necesitas GPU.</p>
-      </div>
-      <div class="step-item reveal" style="transition-delay:.15s">
-        <div class="step-num">02</div>
-        <h3>Convierte Datos en Lectura</h3>
-        <p>Velas, RSI, MACD, Bollinger, VWAP, medias y retorno acumulado se transforman en una visión operable del contexto.</p>
-      </div>
-      <div class="step-item reveal" style="transition-delay:.3s">
-        <div class="step-num">03</div>
-        <h3>Decide, Prueba y Escala</h3>
-        <p>Valida hipótesis en Jupyter, contrasta señales con el LLM y pasa de exploración a automatización sin salir del mismo ecosistema.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════ PRICING ═══════════════════ -->
-<section id="pricing">
-  <div class="section-inner">
-    <div class="section-header reveal">
-      <div class="section-tag">Soluciones IA local</div>
-      <h2>Orin + IA privada<br>lista para trabajar</h2>
-      <p class="section-sub">Equipos NVIDIA Jetson Orin configurados con modelos locales, automatizaciones y tableros a medida. Los precios de hardware son referencia de Amazon.com.mx/importación y pueden variar por disponibilidad.</p>
-    </div>
-    <div class="hardware-grid reveal">
-      <div class="hardware-card">
-        <div class="hardware-tag">Entrada</div>
-        <h3>Orin Nano 4GB</h3>
-        <div class="hardware-price">$6,900 MXN</div>
-        <p>Asistentes ligeros, clasificación de documentos, búsqueda semántica y flujos internos.</p>
-        <span>Modelos: Phi-3 mini, TinyLlama, embeddings locales.</span>
-      </div>
-      <div class="hardware-card featured">
-        <div class="hardware-tag">Recomendado</div>
-        <h3>Orin Nano 8GB</h3>
-        <div class="hardware-price">$9,900 MXN</div>
-        <p>IA local para oficina, médicos, abogados, Excel, correo, reportes y prototipos de trading.</p>
-        <span>Modelos: Mistral 7B, Llama 3.1 8B, Qwen Coder ligero.</span>
-      </div>
-      <div class="hardware-card">
-        <div class="hardware-tag">Profesional</div>
-        <h3>Orin NX 16GB</h3>
-        <div class="hardware-price">$19,900 MXN</div>
-        <p>RAG privado, tableros multiusuario, automatizaciones con documentos y agentes por rol.</p>
-        <span>Modelos: Qwen 14B Q4, Phi-4 Q4, Llama 3.1 8B.</span>
-      </div>
-      <div class="hardware-card">
-        <div class="hardware-tag">Laboratorio</div>
-        <h3>Orin AGX 32GB</h3>
-        <div class="hardware-price">$49,900 MXN</div>
-        <p>Investigación, visión, trading avanzado, múltiples modelos y cargas con mayor contexto.</p>
-        <span>Modelos: Qwen Coder 14B, Mixtral compacto, pipelines multimodales.</span>
-      </div>
-    </div>
-    <div class="solutions-grid reveal">
-      <div class="solution-card">
-        <h3>Despachos legales</h3>
-        <p>Búsqueda en contratos, resúmenes, comparativos, vencimientos y cartas base.</p>
-        <strong>Desde $24,900 MXN</strong>
-      </div>
-      <div class="solution-card">
-        <h3>Consultorios médicos</h3>
-        <p>Notas clínicas, expedientes locales, plantillas, reportes y búsqueda privada.</p>
-        <strong>Desde $29,900 MXN</strong>
-      </div>
-      <div class="solution-card">
-        <h3>Excel + correo</h3>
-        <p>Lectura de hojas, reportes automáticos, alertas, conciliaciones y emails.</p>
-        <strong>Desde $18,900 MXN</strong>
-      </div>
-      <div class="solution-card">
-        <h3>Secretarial IA</h3>
-        <p>Minutas, agenda, respuestas sugeridas, documentos frecuentes y seguimiento.</p>
-        <strong>Desde $19,900 MXN</strong>
-      </div>
-      <div class="solution-card">
-        <h3>Universidad e investigación</h3>
-        <p>RAG académico, papers, datasets, notebooks y asistentes por proyecto.</p>
-        <strong>Desde $34,900 MXN</strong>
-      </div>
-      <div class="solution-card">
-        <h3>Trading y Polymarket</h3>
-        <p>Dashboard, señales, validación, reglas SL/TP, agentes y control operativo.</p>
-        <strong>Desde $39,900 MXN</strong>
-      </div>
-      <div class="solution-card wide">
-        <h3>I+D con presupuesto ajustado</h3>
-        <p>Diseñamos un primer laboratorio local con alcance medible: datos, modelo, tablero, bitácora y plan de crecimiento.</p>
-        <strong>Desde $14,900 MXN</strong>
-      </div>
-    </div>
-    <div class="pricing-note reveal">
-      <span>Incluye instalación base, Docker, Ollama/llama.cpp, panel web y capacitación inicial. El hardware puede comprarse por separado o integrarse en paquete.</span>
-      <a href="mailto:info@quantlabs.site" class="btn btn-primary">Cotizar solución →</a>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════ TESTIMONIALS ═══════════════════ -->
-<section id="testimonials">
-  <div class="section-inner">
-    <div class="section-header reveal">
-      <div class="section-tag">Testimonios</div>
-      <h2>Traders que ya operan<br>con ventaja cuantitativa</h2>
-    </div>
-    <div class="testi-grid">
-      <div class="testi-card reveal">
-        <div class="stars">★★★★★</div>
-        <p class="testi-quote">"Pasé de operar por intuición a tener señales basadas en datos. Mi win-rate subió de 48% a 71% en 3 meses usando los modelos de QuantLabs."</p>
-        <div class="testi-author-row">
-          <div class="testi-name">Carlos Mendoza</div>
-          <div class="testi-role">Trader Independiente, CDMX</div>
-          <div class="testi-stat">Win-rate: 48% → 71%</div>
-        </div>
-      </div>
-      <div class="testi-card reveal" style="transition-delay:.1s">
-        <div class="stars">★★★★★</div>
-        <p class="testi-quote">"El módulo de backtesting me ahorró meses de trabajo. En días tenía mis estrategias validadas con 5 años de datos históricos reales."</p>
-        <div class="testi-author-row">
-          <div class="testi-name">Ana Rodríguez</div>
-          <div class="testi-role">Portfolio Manager, Monterrey</div>
-          <div class="testi-stat">Ahorro: 3 meses de desarrollo</div>
-        </div>
-      </div>
-      <div class="testi-card reveal" style="transition-delay:.2s">
-        <div class="stars">★★★★★</div>
-        <p class="testi-quote">"La integración del LLM para analizar noticias es un game-changer. Ahora entiendo el contexto macroeconómico de cada señal técnica."</p>
-        <div class="testi-author-row">
-          <div class="testi-name">Roberto Vega</div>
-          <div class="testi-role">Gestor de Fondos, Guadalajara</div>
-          <div class="testi-stat">+18% alfa anualizado</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════ FAQ ═══════════════════ -->
-<section id="faq">
-  <div class="section-inner">
-    <div class="section-header reveal">
-      <div class="section-tag">Preguntas Frecuentes</div>
-      <h2>Resolvemos tus dudas<br>antes de empezar</h2>
-    </div>
-    <div class="faq-list reveal">
-      <div class="faq-item open">
-        <button class="faq-q">¿Necesito saber programar para usar QuantLabs?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">No es necesario. La plataforma tiene una interfaz visual completa. Sin embargo, si quieres personalizar estrategias, nuestros notebooks en Jupyter están documentados paso a paso con Python, ideales para cualquier nivel.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">¿Los datos de mercado son en tiempo real?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">El plan Starter incluye datos con 15 minutos de retraso. Los planes Pro e Institucional tienen acceso a datos en tiempo real vía yfinance Premium, Alpaca Markets y APIs de exchanges cripto.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">¿Puedo conectar mi broker para operar automáticamente?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">Sí. El plan Pro incluye integración con Alpaca (USA), IBKR y Binance para criptos. El plan Institucional soporta brokers prime y FIX API para ejecución de alta frecuencia.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">¿Cómo funciona el módulo de IA y LLM?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">Nuestro LLM analiza noticias financieras, reportes de earnings y sentiment de redes sociales en tiempo real. Combina este análisis con señales técnicas para darte un score de confianza en cada operación.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">¿Están seguros mis datos y estrategias?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">Totalmente. Usamos autenticación JWT, sesiones protegidas y separación modular de servicios. Tus estrategias se mantienen privadas dentro de tu entorno.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">¿Cuándo debo usar CPU y cuándo GPU?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">Usa CPU para consultas ligeras, análisis exploratorio y notebooks cotidianos. Usa GPU cuando trabajes con RAPIDS, grandes volúmenes de datos o entrenamiento acelerado.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">¿Qué incluye API QuantLab?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">Incluye endpoints para salud del sistema, mercado en CPU/GPU y modelos, además de selectores de ticker, periodo e intervalo dentro del dashboard.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">¿Puedo usar la plataforma sin salir del navegador?<span class="faq-arrow">⌄</span></button>
-        <div class="faq-a">Sí. Dashboard, módulos visuales, consultas API y Jupyter están integrados en una sola experiencia web, con acceso por autenticación.</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════ LOGIN ═══════════════════ -->
-<section id="login">
-  <div class="section-inner">
-    <div class="login-wrap">
-      <div class="login-info reveal">
-        <div class="section-tag">Acceso a la Plataforma</div>
-        <h2>Inicia sesión y<br>opera con inteligencia</h2>
-        <p class="section-sub">Accede a tu dashboard de trading, notebooks de Jupyter y el asistente LLM desde un solo lugar.</p>
-        <div class="login-bullets">
-          <div class="login-bullet"><div class="login-bullet-icon">📊</div>Dashboard con señales en tiempo real</div>
-          <div class="login-bullet"><div class="login-bullet-icon">📓</div>Jupyter Notebooks preconfigurados</div>
-          <div class="login-bullet"><div class="login-bullet-icon">🤖</div>Asistente LLM de análisis financiero</div>
-          <div class="login-bullet"><div class="login-bullet-icon">🔐</div>Sesión segura con JWT</div>
-        </div>
-      </div>
-
-      <div class="login-form-card reveal" style="transition-delay:.15s">
-        <h3>Bienvenido de vuelta</h3>
-        <p class="login-hint">Ingresa tus credenciales para acceder</p>
-
-        <!-- Form POST real → /login (Flask JWT auth) -->
-        <form method="POST" action="/login" autocomplete="on" id="landingLoginForm">
-
-          <div class="form-group">
-            <label class="form-label">USUARIO</label>
-            <input
-              type="text"
-              class="form-input"
-              name="username"
-              id="loginUser"
-              placeholder="tu_usuario"
-              autocomplete="username"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label">CONTRASEÑA</label>
-            <input
-              type="password"
-              class="form-input"
-              name="password"
-              id="loginPass"
-              placeholder="••••••••••"
-              autocomplete="current-password"
-              required
-            />
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-full" style="font-size:15px;padding:14px 24px;" id="loginBtn">
-            Entrar al Dashboard →
-          </button>
-
-        </form>
-
-        <div style="margin-top:20px;text-align:center;">
-          <a href="/login" class="form-link" style="font-size:13px;color:var(--muted);">
-            ¿Prefieres la página de acceso completa? →
-          </a>
-        </div>
-
-        <p class="login-register" style="margin-top:14px;">
-          Plataforma de acceso institucional · <span style="color:var(--primary);font-family:'Space Mono',monospace;font-size:11px;">JWT + PostgreSQL</span>
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════ FOOTER ═══════════════════ -->
-<footer>
-  <div class="footer-inner">
-    <div class="footer-grid">
-      <div class="footer-brand">
-        <div class="nav-logo" style="text-decoration:none;display:inline-flex;">
-          <div class="nav-logo-icon">QL</div>
-          <span style="font-size:15px;font-weight:700;color:var(--fg);">QuantLabs AI Capital</span>
-        </div>
-        <p>Plataforma de trading cuantitativo con inteligencia artificial para traders e inversores profesionales. Operamos datos, no emociones.</p>
-      </div>
-      <div class="footer-col">
-        <h4>Plataforma</h4>
-        <ul>
-          <li><a href="#features">Características</a></li>
-          <li><a href="https://quantlabs.site/dashboard">Dashboard</a></li>
-          <li><a href="https://quantlabs.site/jupyter">Jupyter</a></li>
-          <li><a href="#pricing">Precios</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>Recursos</h4>
-        <ul>
-          <li><a href="#">Documentación</a></li>
-          <li><a href="#">Notebooks</a></li>
-          <li><a href="#">API Docs</a></li>
-          <li><a href="#">Blog Cuantitativo</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>Empresa</h4>
-        <ul>
-          <li><a href="#">Nosotros</a></li>
-          <li><a href="#">Equipo Quant</a></li>
-          <li><a href="#">Contacto</a></li>
-          <li><a href="#">Afiliados</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>Legal</h4>
-        <ul>
-          <li><a href="#">Privacidad</a></li>
-          <li><a href="#">Términos de Uso</a></li>
-          <li><a href="#">Cookies</a></li>
-          <li><a href="#">Disclaimer</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>© 2026 QuantLabs AI Capital — Todos los derechos reservados. Las inversiones conllevan riesgos.</p>
-      <div class="footer-socials">
-        <a href="#" title="Twitter/X">𝕏</a>
-        <a href="#" title="LinkedIn">in</a>
-        <a href="#" title="GitHub">⌥</a>
-        <a href="#" title="YouTube">▶</a>
-      </div>
-    </div>
-  </div>
-</footer>
-
-<!-- ═══════════════════ SCRIPTS ═══════════════════ -->
-<script src="/dashboard/js/theme.js?v=20260531-theme-2"></script>
-<script src="./js/app.js"></script>
-<script>
-  (function(){
-    const applyLandingTheme=(theme)=>{
-      const next=theme==='light'?'light':'dark';
-      document.documentElement.dataset.theme=next;
-      localStorage.setItem('quantlabs-dashboard-theme',next);
-      document.querySelectorAll('[data-theme-label]').forEach(el=>{el.textContent=next==='dark'?'Modo noche':'Modo día';});
-      document.querySelectorAll('[data-theme-icon]').forEach(el=>{el.textContent=next==='dark'?'☾':'☀';});
-    };
-    applyLandingTheme(document.documentElement.dataset.theme||'dark');
-    document.querySelectorAll('.landing-theme-toggle').forEach((btn)=>{
-      btn.addEventListener('click',()=>{
-        const next=document.documentElement.dataset.theme==='dark'?'light':'dark';
-        if(window.QuantLabsTheme) window.QuantLabsTheme.apply(next);
-        applyLandingTheme(next);
+  <script>
+    (function(){
+      const applyTheme=(theme)=>{
+        const next=theme==='light'?'light':'dark';
+        document.documentElement.dataset.theme=next;
+        localStorage.setItem('quantlabs-dashboard-theme',next);
+        document.querySelectorAll('[data-theme-label]').forEach(el=>{el.textContent=next==='dark'?'Modo noche':'Modo dia';});
+        document.querySelectorAll('[data-theme-icon]').forEach(el=>{el.textContent=next==='dark'?'☾':'☀';});
+      };
+      applyTheme(document.documentElement.dataset.theme||'dark');
+      document.querySelectorAll('.theme-button').forEach(button=>{
+        button.addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
       });
-    });
-  })();
-</script>
+    })();
+  </script>
 </body>
 </html>
