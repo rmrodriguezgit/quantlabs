@@ -17,7 +17,7 @@ function modelTemplate(name){
 function modelDefaults(name){
   if(/^ollama:mistral/i.test(name))return {tokens:768,temp:0.4,specialist:'general'};
   if(/^ollama:/i.test(name))return {tokens:768,temp:0.5,specialist:'general'};
-  if(/coder/i.test(name))return {tokens:1024,temp:0.2,specialist:'codex4u'};
+  if(/coder/i.test(name))return {tokens:256,temp:0.2,specialist:'codex4u'};
   if(/phi-4/i.test(name))return {tokens:768,temp:0.35,specialist:'planner'};
   if(/qwen2\.5-14b/i.test(name))return {tokens:768,temp:0.45,specialist:'coding'};
   return {tokens:384,temp:0.7,specialist:'coding'};
@@ -236,6 +236,8 @@ async function submitPrompt(event){
           {role:'user',content:prompt}
         ],
         max_tokens:Number($('maxTokens').value)||384,
+        max_completion_tokens:Number($('maxTokens').value)||384,
+        n_predict:Number($('maxTokens').value)||384,
         temperature:Number($('temperature').value)||0.7,
         stream:false
       })
@@ -289,6 +291,13 @@ $('stopBtn')?.addEventListener('click',()=>currentController?.abort());
 $('retryBtn')?.addEventListener('click',()=>{if(lastPrompt){$('prompt').value=lastPrompt;$('promptForm').requestSubmit();}});
 $('copyPromptBtn')?.addEventListener('click',()=>navigator.clipboard?.writeText($('prompt').value||''));
 $('editPromptBtn')?.addEventListener('click',()=>$('prompt')?.focus());
+$('editResponseBtn')?.addEventListener('click',()=>{
+  const box=$('responseBox');
+  if(!box)return;
+  const editing=box.getAttribute('contenteditable')==='true';
+  box.setAttribute('contenteditable',editing?'false':'true');
+  if(!editing)box.focus();
+});
 document.addEventListener('click',e=>{if(e.target.classList.contains('copy-response'))navigator.clipboard?.writeText($('responseBox').textContent||''); if(e.target.matches('[data-close-server]'))closeServerModal();});
 $('openServerModal')?.addEventListener('click',openServerModal);
 $('closeServerModal')?.addEventListener('click',closeServerModal);

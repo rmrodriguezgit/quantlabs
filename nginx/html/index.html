@@ -7,7 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/css/style.css?v=20260531-ai-solutions">
+  <script>
+    (function(){
+      const saved=localStorage.getItem('quantlabs-dashboard-theme');
+      const prefersLight=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches;
+      document.documentElement.dataset.theme=saved||(prefersLight?'light':'dark');
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/style.css?v=20260531-ai-solutions-2">
   <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-2">
 </head>
 <body>
@@ -552,13 +559,23 @@
 <script src="/dashboard/js/theme.js?v=20260531-theme-2"></script>
 <script src="./js/app.js"></script>
 <script>
-  document.querySelectorAll('.landing-theme-toggle').forEach((btn)=>{
-    btn.addEventListener('click',()=>{
-      if(window.QuantLabsTheme){
-        window.QuantLabsTheme.apply(document.documentElement.dataset.theme==='dark'?'light':'dark');
-      }
+  (function(){
+    const applyLandingTheme=(theme)=>{
+      const next=theme==='light'?'light':'dark';
+      document.documentElement.dataset.theme=next;
+      localStorage.setItem('quantlabs-dashboard-theme',next);
+      document.querySelectorAll('[data-theme-label]').forEach(el=>{el.textContent=next==='dark'?'Modo noche':'Modo día';});
+      document.querySelectorAll('[data-theme-icon]').forEach(el=>{el.textContent=next==='dark'?'☾':'☀';});
+    };
+    applyLandingTheme(document.documentElement.dataset.theme||'dark');
+    document.querySelectorAll('.landing-theme-toggle').forEach((btn)=>{
+      btn.addEventListener('click',()=>{
+        const next=document.documentElement.dataset.theme==='dark'?'light':'dark';
+        if(window.QuantLabsTheme) window.QuantLabsTheme.apply(next);
+        applyLandingTheme(next);
+      });
     });
-  });
+  })();
 </script>
 </body>
 </html>

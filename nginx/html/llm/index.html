@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/dashboard/css/style.css?v=20260528-command-center-1"/>
   <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-1"/>
-  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-nav-1"/>
+  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-tools-1"/>
 </head>
 <body class="llm-page">
 <div class="layout">
@@ -57,10 +57,23 @@
         <div><span id="requestState">LISTO</span><span id="tokenUsage">--</span></div>
       </div>
       <div id="chatWindow" class="chat-window">
-        <div class="chat-message assistant"><div class="message-tools"><button class="copy-response" type="button">Copiar respuesta</button></div><pre id="responseBox">Listo para consultar.</pre><small id="responseTime">Tiempo: --</small></div>
+        <div class="chat-message assistant">
+          <div class="message-tools">
+            <button class="icon-action copy-response" type="button" title="Copiar respuesta" aria-label="Copiar respuesta">⧉</button>
+            <button id="editResponseBtn" class="icon-action" type="button" title="Editar respuesta" aria-label="Editar respuesta">✎</button>
+          </div>
+          <pre id="responseBox">Listo para consultar.</pre>
+          <small id="responseTime">Tiempo: --</small>
+        </div>
       </div>
       <form id="promptForm" class="chat-composer">
-        <textarea id="prompt" rows="4" placeholder="Escribe tu consulta para el modelo local..."></textarea>
+        <div class="prompt-box">
+          <div class="prompt-tools">
+            <button id="copyPromptBtn" class="icon-action" type="button" title="Copiar prompt" aria-label="Copiar prompt">⧉</button>
+            <button id="editPromptBtn" class="icon-action" type="button" title="Editar prompt" aria-label="Editar prompt">✎</button>
+          </div>
+          <textarea id="prompt" rows="4" placeholder="Escribe tu consulta para el modelo local..."></textarea>
+        </div>
         <div class="composer-bar">
           <label>Tokens <input id="maxTokens" type="number" min="16" max="4096" step="16" value="384"></label>
           <label>Temp
@@ -75,8 +88,6 @@
           </label>
           <button id="loadModelBtn" class="secondary-action" type="button">Cargar modelo</button>
           <button id="retryBtn" class="ghost-action" type="button">Reintentar</button>
-          <button id="copyPromptBtn" class="ghost-action" type="button">Copiar</button>
-          <button id="editPromptBtn" class="ghost-action" type="button">Editar</button>
           <button id="stopBtn" class="danger-action" type="button" disabled>Stop</button>
           <button id="runBtn" type="submit">Enviar</button>
         </div>
@@ -100,6 +111,6 @@
 </div>
 <script src="/dashboard/js/theme.js?v=20260531-theme-1"></script>
 <script src="/dashboard/js/platform-menu.js?v=20260531-theme-1"></script>
-<script src="./js/llm.js?v=20260531-llm-nav-1"></script>
+<script src="./js/llm.js?v=20260531-llm-tools-1"></script>
 </body>
 </html>
