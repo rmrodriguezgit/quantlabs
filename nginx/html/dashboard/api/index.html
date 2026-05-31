@@ -1,4 +1,4 @@
-<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API QuantLab</title><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/><link rel="stylesheet" href="../css/style.css"><link rel="stylesheet" href="./css/api.css?v=20260523-ticker-modal"><script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script></head><body>
+<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API QuantLab</title><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/><link rel="stylesheet" href="../css/style.css"><link rel="stylesheet" href="./css/api.css?v=20260531-ticker-redesign"><script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script></head><body>
 <div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div>
 <header>
   <a href="/" class="logo">
@@ -62,15 +62,25 @@
         </div>
         <div id="assetMsg" class="asset-msg" role="status"></div>
       </section>
+      <div class="ticker-admin-grid">
       <section class="ticker-section">
         <div class="ticker-section-head"><div><div class="asset-label">Tickers activos</div><p>Edita símbolo, tipo y etiqueta sin salir de API QuantLab.</p></div><span id="assetCount" class="asset-count">0 activos</span></div>
+        <div class="asset-toolbar">
+          <input id="assetSearch" placeholder="Buscar ticker o nombre">
+          <select id="assetTypeFilter"><option value="">Todos los tipos</option><option>Acciones</option><option>Criptos</option><option>Divisas</option><option>Otros</option></select>
+        </div>
         <div id="assetRows" class="asset-list"></div>
       </section>
       <section class="ticker-section catalog-note">
-        <div class="ticker-section-head"><div><div class="asset-label">Catálogo sugerido</div><p>Activa o desactiva símbolos comunes por tipo de mercado.</p></div></div>
-        <div id="assetUniverse"></div>
+        <div class="ticker-section-head"><div><div class="asset-label">Catálogo sugerido</div><p>Lista completa A-Z. Activa o desactiva símbolos comunes por tipo de mercado.</p></div><span id="catalogCount" class="asset-count">0 sugeridos</span></div>
+        <div class="asset-toolbar catalog-toolbar">
+          <input id="catalogSearch" placeholder="Buscar en catálogo sugerido">
+          <select id="catalogTypeFilter"><option value="">Todo el catálogo</option><option>Acciones</option><option>Criptos</option><option>Divisas</option></select>
+        </div>
+        <div id="assetUniverse" class="catalog-grid"></div>
       </section>
+      </div>
     </div>
   </section>
 </div>
-<script src="../js/platform-menu.js?v=20260523-shared"></script><script src="../js/session.js?v=20260517-user"></script><script src="./js/api.js?v=20260528-json-guard"></script></body></html>
+<script src="../js/platform-menu.js?v=20260523-shared"></script><script src="../js/session.js?v=20260517-user"></script><script src="./js/api.js?v=20260531-ticker-redesign"></script></body></html>

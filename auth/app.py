@@ -413,6 +413,9 @@ DEFAULT_USER_ASSETS = ["HWM","PLTR","NVDA","V","AMZN","WM"]
 ASSET_GROUPS = {"Acciones": STOCK_ASSETS, "Criptos": CRYPTO_ASSETS, "Divisas": FX_ASSETS}
 ASSET_TYPES = {s: group for group, items in ASSET_GROUPS.items() for s in items}
 
+def sorted_asset_catalog():
+    return {group: sorted(items, key=str.casefold) for group, items in sorted(ASSET_GROUPS.items())}
+
 def ensure_user_assets(cur, user_id):
     cur.execute("SELECT COUNT(*) AS n FROM user_assets WHERE user_id=%s", (user_id,))
     if cur.fetchone()["n"] == 0:
@@ -593,7 +596,7 @@ def user_assets():
             conn.rollback(); cur.close(); conn.close(); return jsonify({"error":"El ticker ya existe"}), 409
     cur.execute("SELECT symbol,asset_type,label FROM user_assets WHERE user_id=%s ORDER BY asset_type,symbol", (data["user_id"],))
     assets=cur.fetchall(); selected=[r["symbol"] for r in assets]; cur.close(); conn.close()
-    return jsonify({"catalog":ASSET_GROUPS, "selected":selected, "assets":assets})
+    return jsonify({"catalog":sorted_asset_catalog(), "selected":selected, "assets":assets})
 
 @app.route("/auth/assets/<path:symbol>", methods=["PATCH", "DELETE"])
 def mutate_user_asset(symbol):

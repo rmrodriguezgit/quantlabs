@@ -35,3 +35,33 @@
 .json-card{border:1px solid rgba(0,229,255,.16);border-radius:10px;background:rgba(0,0,0,.16);padding:12px;margin:0 0 12px}.json-card>strong{display:block;margin-bottom:10px;font-size:12px;color:var(--accent);font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:.06em}.json-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}.json-field{border:1px solid rgba(255,255,255,.09);border-radius:8px;background:rgba(255,255,255,.04);padding:9px 10px;min-width:0}.json-field span{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}.json-field strong{display:block;color:#f3fbff;font-size:18px;line-height:1.25;word-break:break-word}.json-field pre{margin:0;white-space:pre-wrap;font-size:12px;color:var(--text)}
 
 .token-usage{margin:10px 0 0;color:var(--muted);font-family:'Space Mono',monospace;font-size:11px;text-align:right}.context-stats.compact{grid-template-columns:repeat(3,minmax(0,1fr));margin:10px 0 0}.context-stats.compact[hidden]{display:none}
+
+html[data-theme="light"] body:not(.home-page){background:#eef3f5;color:#172026}
+html[data-theme="light"] .app-shell{background:#eef3f5}
+html[data-theme="light"] .sidebar{background:#fff;border-right:1px solid #dbe5e8;box-shadow:8px 0 30px rgba(24,39,52,.05)}
+html[data-theme="light"] .brand-block{color:#172026}
+html[data-theme="light"] .brand-block span,html[data-theme="light"] .section-label{color:#667681}
+html[data-theme="light"] .nav-item,html[data-theme="light"] .footer-item{color:#52636d;border-radius:8px}
+html[data-theme="light"] .nav-item:hover,html[data-theme="light"] .footer-item:hover,html[data-theme="light"] .nav-item.active{background:#eef6f9;color:#172026}
+html[data-theme="light"] .sidebar-footer{border-top:1px solid #dbe5e8}
+html[data-theme="light"] .chat-search{background:#f7fafb;color:#172026;border-color:#dbe5e8}
+html[data-theme="light"] .chat-row{color:#172026;border-radius:8px}
+html[data-theme="light"] .chat-row:hover,html[data-theme="light"] .chat-row.active{background:#eef6f9}
+html[data-theme="light"] .workspace{background:#eef3f5}
+html[data-theme="light"] .response-status{background:#fff;border-color:#dbe5e8;box-shadow:0 12px 32px rgba(24,39,52,.07)}
+html[data-theme="light"] .response-status strong,html[data-theme="light"] .workspace-header h1,html[data-theme="light"] .chat-title-block h3{color:#172026}
+html[data-theme="light"] .harness-card{background:#fff;border-color:#dbe5e8;border-radius:8px;box-shadow:0 18px 50px rgba(24,39,52,.08)}
+html[data-theme="light"] .messages{background:#f7fafb;border-color:#dbe5e8}
+html[data-theme="light"] .msg-user{background:#e7f0ff;border-color:#b9d2ff;color:#172026}
+html[data-theme="light"] .msg-agent{background:#fff;border-color:#dbe5e8;color:#172026}
+html[data-theme="light"] .msg-body,html[data-theme="light"] .md-list li,html[data-theme="light"] .system-json{color:#172026}
+html[data-theme="light"] .diagnostic-panel div,html[data-theme="light"] .attachment-preview,html[data-theme="light"] .attachment-chip,html[data-theme="light"] .panel-card,html[data-theme="light"] .panel-list li,html[data-theme="light"] .search-hit,html[data-theme="light"] .automation-kpi,html[data-theme="light"] .rule-card,html[data-theme="light"] .json-card,html[data-theme="light"] .json-field{background:#f7fafb;border-color:#dbe5e8}
+html[data-theme="light"] .diagnostic-panel strong,html[data-theme="light"] .json-field strong,html[data-theme="light"] .rule-values span{color:#172026}
+html[data-theme="light"] .chat-card form{background:linear-gradient(180deg,rgba(255,255,255,0),#fff 34%)}
+html[data-theme="light"] input,html[data-theme="light"] select{background:#fff;color:#172026;border-color:#cfdce2;border-radius:8px}
+html[data-theme="light"] button{border-radius:8px}
+html[data-theme="light"] .side-panel{background:#fff;border-left:1px solid #dbe5e8;box-shadow:-24px 0 60px rgba(24,39,52,.14)}
+html[data-theme="light"] .panel-backdrop.open{background:rgba(23,32,38,.22)}
+html[data-theme="light"] .md-table-wrap{background:#fff;border-color:#dbe5e8}
+html[data-theme="light"] .md-table th{background:#f2f7f9;color:#52636d}
+html[data-theme="light"] .md-table td{color:#172026;border-bottom-color:#e4ecef}
