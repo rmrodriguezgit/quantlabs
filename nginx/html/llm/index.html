@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/dashboard/css/style.css?v=20260531-logo"/>
   <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-1"/>
-  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-chat-bubbles-1"/>
+  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-whatsapp-1"/>
 </head>
 <body class="llm-page">
 <div class="layout">
@@ -57,20 +57,10 @@
         <div><span id="requestState">LISTO</span><span id="tokenUsage">--</span></div>
       </div>
       <div id="chatWindow" class="chat-window">
-        <div class="conversation-grid">
-          <article class="chat-message user">
-            <div class="bubble-head">
-              <span>Prompt</span>
-              <small id="promptMeta">Listo</small>
-            </div>
-            <div class="message-tools">
-              <button id="copyPromptBubbleBtn" class="icon-action" type="button" title="Copiar prompt" aria-label="Copiar prompt">⧉</button>
-            </div>
-            <pre id="promptBubble">Escribe una consulta para iniciar.</pre>
-          </article>
+        <div id="messageStream" class="message-stream">
           <article class="chat-message assistant">
             <div class="bubble-head">
-              <span>Response</span>
+              <span>LLM Local</span>
               <small id="responseTime">Tiempo: --</small>
             </div>
             <div class="message-tools">
@@ -131,6 +121,6 @@
 </div>
 <script src="/dashboard/js/theme.js?v=20260531-theme-1"></script>
 <script src="/dashboard/js/platform-menu.js?v=20260531-logo-self"></script>
-<script src="./js/llm.js?v=20260531-llm-chat-bubbles-1"></script>
+<script src="./js/llm.js?v=20260531-llm-whatsapp-1"></script>
 </body>
 </html>

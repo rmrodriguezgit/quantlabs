@@ -43,6 +43,24 @@ def run_project(args, timeout=120):
     )
 
 
+def reload_nginx():
+    test = run_docker(["exec", "quantlab_nginx", "nginx", "-t"], timeout=15)
+    if test.returncode != 0:
+        return {
+            "ok": False,
+            "stage": "test",
+            "stdout": test.stdout.strip(),
+            "stderr": test.stderr.strip(),
+        }
+    reload_proc = run_docker(["exec", "quantlab_nginx", "nginx", "-s", "reload"], timeout=15)
+    return {
+        "ok": reload_proc.returncode == 0,
+        "stage": "reload",
+        "stdout": reload_proc.stdout.strip(),
+        "stderr": reload_proc.stderr.strip(),
+    }
+
+
 def model_profile(model):
     lower = model.lower()
     if "qwen2.5-coder-14b" in lower:
@@ -176,6 +194,7 @@ def switch_llm_model(model):
         payload["error"] = "docker compose failed"
         return 500, payload
     payload["readiness"] = wait_for_model(model)
+    payload["nginx_reload"] = reload_nginx()
     return (200 if payload["readiness"].get("ready") else 202), payload
 
 

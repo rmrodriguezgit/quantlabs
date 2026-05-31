@@ -22,19 +22,52 @@ function saveMemory(){
 }
 
 function renderMemory(){
-  const box=$('responseBox'), promptBox=$('promptBubble'), promptMeta=$('promptMeta');
-  if(!box)return;
+  const stream=$('messageStream');
+  if(!stream)return;
   if(!chatMemory.length){
-    box.textContent='Listo para consultar.';
-    if(promptBox)promptBox.textContent='Escribe una consulta para iniciar.';
-    if(promptMeta)promptMeta.textContent='Listo';
+    stream.innerHTML=assistantBubble('Listo para consultar.','Tiempo: --',true);
     return;
   }
-  const lastUser=[...chatMemory].reverse().find(item=>item.role==='user');
-  const lastAssistant=[...chatMemory].reverse().find(item=>item.role==='assistant');
-  if(promptBox)promptBox.textContent=lastUser?.content||'Sin prompt reciente.';
-  if(promptMeta)promptMeta.textContent=lastUser?new Date(lastUser.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Listo';
-  box.textContent=lastAssistant?.content||chatMemory.map(item=>`${item.role==='user'?'Usuario':'LLM'}:\n${item.content}`).join('\n\n');
+  stream.innerHTML=chatMemory.map((item,index)=>{
+    const time=new Date(item.ts||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    const isLastAssistant=item.role==='assistant'&&!chatMemory.slice(index+1).some(next=>next.role==='assistant');
+    return item.role==='user'?userBubble(item.content,time):assistantBubble(item.content,time,isLastAssistant);
+  }).join('');
+  scrollChatToBottom();
+}
+
+function userBubble(content,time='Ahora'){
+  return `<article class="chat-message user"><div class="bubble-head"><span>Prompt</span><small>${esc(time)}</small></div><pre class="message-body">${esc(content)}</pre></article>`;
+}
+
+function assistantBubble(content,time='Tiempo: --',withTools=false){
+  const tools=withTools?`<div class="message-tools"><button class="icon-action copy-response" type="button" title="Copiar respuesta" aria-label="Copiar respuesta">⧉</button><button id="editResponseBtn" class="icon-action" type="button" title="Editar respuesta" aria-label="Editar respuesta">✎</button></div>`:'';
+  const idAttr=withTools?' id="responseBox"':'';
+  const timeId=withTools?' id="responseTime"':'';
+  return `<article class="chat-message assistant"><div class="bubble-head"><span>LLM Local</span><small${timeId}>${esc(time)}</small></div>${tools}<pre${idAttr} class="message-body">${esc(content)}</pre></article>`;
+}
+
+function renderPending(prompt){
+  const stream=$('messageStream');
+  if(!stream)return;
+  const base=chatMemory.map(item=>{
+    const time=new Date(item.ts||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    return item.role==='user'?userBubble(item.content,time):assistantBubble(item.content,time,false);
+  }).join('');
+  stream.innerHTML=base+userBubble(prompt,'Ahora')+assistantBubble('Pensando...','Tiempo: corriendo...',true);
+  scrollChatToBottom();
+}
+
+function setLatestAssistantText(text){
+  if(!$('responseBox'))renderMemory();
+  const box=$('responseBox');
+  if(box)box.textContent=String(text||'');
+  scrollChatToBottom();
+}
+
+function scrollChatToBottom(){
+  const win=$('chatWindow');
+  if(win)win.scrollTop=win.scrollHeight;
 }
 
 function pushMemory(role,content){
@@ -254,7 +287,7 @@ async function switchModel(){
   setRequestState('CARGANDO');
   $('serverBadge').textContent='LOAD';
   setLlmStatus('Cargando modelo','loading');
-  $('responseBox').textContent=`Cargando ${selected}...\nEsto puede tardar mientras Docker recrea quantlab_llm y el modelo entra a GPU.`;
+  setLatestAssistantText(`Cargando ${selected}...\nEsto puede tardar mientras Docker recrea quantlab_llm y el modelo entra a GPU.`);
   renderLoadButton();
   try{
     modelState=await jsonFetch('/admin/llm-model',{
@@ -265,12 +298,12 @@ async function switchModel(){
     activeModel=modelState.active_model||modelState.selected_model||selected;
     selectedRuntimeModel=activeModel;
     await loadModels();
-    $('responseBox').textContent=modelState.readiness?.ready
+    setLatestAssistantText(modelState.readiness?.ready
       ? `Modelo cargado: ${activeModel}`
-      : `Modelo solicitado: ${activeModel}\nEl contenedor reinicio, pero aun esta calentando. Espera unos segundos y prueba de nuevo.`;
+      : `Modelo solicitado: ${activeModel}\nEl contenedor reinicio, pero aun esta calentando. Espera unos segundos y prueba de nuevo.`);
     setRequestState(modelState.readiness?.ready?'LISTO':'CARGANDO');
   }catch(error){
-    $('responseBox').textContent=`No fue posible cargar el modelo: ${error.message}`;
+    setLatestAssistantText(`No fue posible cargar el modelo: ${error.message}`);
     setRequestState('ERROR');
   }finally{
     modelBusy=false;
@@ -281,7 +314,7 @@ async function switchModel(){
 async function submitPrompt(event){
   event.preventDefault();
   const prompt=$('prompt').value.trim();
-  if(!prompt){$('responseBox').textContent='Escribe una consulta antes de enviar.';return;}
+  if(!prompt){setLatestAssistantText('Escribe una consulta antes de enviar.');return;}
   const btn=$('runBtn'), selected=$('modelSelect').value||activeModel;
   const endpoint=isOllamaModel(selected)?'/ollama/v1/chat/completions':'/llm-api/v1/chat/completions';
   const requestModel=isOllamaModel(selected)?displayModelName(selected):selected;
@@ -292,9 +325,7 @@ async function submitPrompt(event){
   btn.disabled=true;
   $('stopBtn').disabled=false;
   setRequestState('GENERANDO');
-  $('promptBubble').textContent=prompt;
-  $('promptMeta').textContent='Enviado ahora';
-  $('responseBox').textContent='Pensando...';
+  renderPending(prompt);
   $('responseTime').textContent='Tiempo: corriendo...';
   try{
     const payload=await jsonFetch(endpoint,{
@@ -323,7 +354,7 @@ async function submitPrompt(event){
     $('responseTime').textContent=`Tiempo: ${((performance.now()-started)/1000).toFixed(2)} s`;
     setRequestState('LISTO');
   }catch(error){
-    $('responseBox').textContent=error.name==='AbortError'?'Petición detenida.':`No fue posible consultar el LLM: ${error.message}`;
+    setLatestAssistantText(error.name==='AbortError'?'Petición detenida.':`No fue posible consultar el LLM: ${error.message}`);
     setRequestState('ERROR');
     $('responseTime').textContent=`Tiempo: ${((performance.now()-started)/1000).toFixed(2)} s`;
   }finally{
@@ -364,16 +395,16 @@ $('specialistSelect')?.addEventListener('change',()=>applyModelDefaults($('model
 $('stopBtn')?.addEventListener('click',()=>currentController?.abort());
 $('retryBtn')?.addEventListener('click',()=>{if(lastPrompt){$('prompt').value=lastPrompt;$('promptForm').requestSubmit();}});
 $('copyPromptBtn')?.addEventListener('click',()=>navigator.clipboard?.writeText($('prompt').value||''));
-$('copyPromptBubbleBtn')?.addEventListener('click',()=>navigator.clipboard?.writeText($('promptBubble')?.textContent||''));
 $('editPromptBtn')?.addEventListener('click',()=>$('prompt')?.focus());
-$('editResponseBtn')?.addEventListener('click',()=>{
+document.addEventListener('click',e=>{
+  if(e.target.id!=='editResponseBtn')return;
   const box=$('responseBox');
   if(!box)return;
   const editing=box.getAttribute('contenteditable')==='true';
   box.setAttribute('contenteditable',editing?'false':'true');
   if(!editing)box.focus();
 });
-document.addEventListener('click',e=>{if(e.target.classList.contains('copy-response'))navigator.clipboard?.writeText($('responseBox').textContent||''); if(e.target.matches('[data-close-server]'))closeServerModal();});
+document.addEventListener('click',e=>{if(e.target.classList.contains('copy-response'))navigator.clipboard?.writeText($('responseBox')?.textContent||''); if(e.target.matches('[data-close-server]'))closeServerModal();});
 $('openServerModal')?.addEventListener('click',openServerModal);
 $('closeServerModal')?.addEventListener('click',closeServerModal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeServerModal();});
