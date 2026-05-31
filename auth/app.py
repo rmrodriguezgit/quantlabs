@@ -183,6 +183,13 @@ LOGIN_HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QuantLab AI Capital | Login</title>
+<script>
+(function(){
+    const saved=localStorage.getItem('quantlabs-dashboard-theme');
+    const prefersLight=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches;
+    document.documentElement.dataset.theme=saved||(prefersLight?'light':'dark');
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -196,6 +203,28 @@ LOGIN_HTML = """
     --magenta:#ff00cc;
     --fg:#ffffff;
     --muted:#7070a0;
+    --input-bg:rgba(255,255,255,.04);
+    --input-border:rgba(255,255,255,.08);
+    --input-placeholder:rgba(255,255,255,.28);
+    --label:rgba(255,255,255,.72);
+    --grid:rgba(0,255,153,.03);
+    --card-shadow:0 24px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.03);
+}
+html[data-theme="light"] {
+    --bg:#f4f7f8;
+    --card:#ffffff;
+    --border:#d7e2e7;
+    --primary:#008f63;
+    --accent:#155ec2;
+    --magenta:#c43d8b;
+    --fg:#172026;
+    --muted:#637380;
+    --input-bg:#f8fbfc;
+    --input-border:#d7e2e7;
+    --input-placeholder:#9aa8b3;
+    --label:#637380;
+    --grid:rgba(0,143,99,.045);
+    --card-shadow:0 24px 80px rgba(31,45,61,.12), inset 0 1px 0 rgba(255,255,255,.75);
 }
 *, *::before, *::after { box-sizing:border-box; }
 html, body { min-height:100%; }
@@ -215,8 +244,8 @@ body::before {
     position:fixed;
     inset:0;
     background-image:
-      linear-gradient(rgba(0,255,153,.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,255,153,.03) 1px, transparent 1px);
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
     background-size:48px 48px;
 }
 .orb {
@@ -238,7 +267,9 @@ body::before {
     align-items:center;
     gap:12px;
     margin-bottom:18px;
+    justify-content:space-between;
 }
+.brand-main { display:flex; align-items:center; gap:12px; }
 .logo-icon {
     width:42px;
     height:42px;
@@ -259,11 +290,11 @@ body::before {
     font-size:12px;
 }
 .card {
-    background:rgba(13,8,32,.88);
-    border:1px solid rgba(0,255,153,.14);
+    background:color-mix(in srgb, var(--card) 92%, transparent);
+    border:1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
     border-radius:22px;
     padding:30px;
-    box-shadow:0 24px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.03);
+    box-shadow:var(--card-shadow);
     backdrop-filter:blur(18px);
 }
 .badge {
@@ -291,7 +322,7 @@ h1 {
     margin:18px 0 8px;
     font-size:28px;
     line-height:1.05;
-    letter-spacing:-.04em;
+    letter-spacing:0;
 }
 h1 span { color:var(--primary); }
 .lead {
@@ -303,29 +334,29 @@ h1 span { color:var(--primary); }
 label {
     display:block;
     margin:14px 0 7px;
-    color:rgba(255,255,255,.72);
+    color:var(--label);
     font:700 11px 'Space Mono', monospace;
     letter-spacing:.05em;
     text-transform:uppercase;
 }
 input {
     width:100%;
-    border:1px solid rgba(255,255,255,.08);
+    border:1px solid var(--input-border);
     border-radius:12px;
-    background:rgba(255,255,255,.04);
+    background:var(--input-bg);
     color:var(--fg);
     padding:14px 15px;
     font:14px 'Syne', sans-serif;
     outline:none;
     transition:border-color .2s, box-shadow .2s, background .2s;
 }
-input::placeholder { color:rgba(255,255,255,.28); }
+input::placeholder { color:var(--input-placeholder); }
 input:focus {
-    border-color:rgba(0,229,255,.55);
-    box-shadow:0 0 0 4px rgba(0,229,255,.08);
-    background:rgba(255,255,255,.06);
+    border-color:color-mix(in srgb, var(--accent) 55%, var(--input-border));
+    box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+    background:var(--input-bg);
 }
-button {
+button[type="submit"] {
     width:100%;
     margin-top:20px;
     border:0;
@@ -338,11 +369,23 @@ button {
     transition:transform .2s, filter .2s, box-shadow .2s;
     box-shadow:0 12px 28px rgba(0,255,153,.16);
 }
-button:hover {
+button[type="submit"]:hover {
     transform:translateY(-1px);
     filter:saturate(1.15);
     box-shadow:0 16px 34px rgba(0,255,153,.22);
 }
+.theme-toggle {
+    width:auto;
+    margin:0;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:9px 11px;
+    color:var(--fg);
+    background:var(--card);
+    font:700 11px 'Space Mono', monospace;
+    box-shadow:none;
+}
+.theme-toggle:hover { transform:none; filter:none; box-shadow:none; border-color:color-mix(in srgb, var(--primary) 42%, var(--border)); }
 .error {
     margin-top:14px;
     padding:11px 12px;
@@ -363,6 +406,7 @@ button:hover {
 @media (max-width:480px) {
     .card { padding:24px; }
     h1 { font-size:24px; }
+    .brand { align-items:flex-start; }
     .footer { flex-direction:column; }
 }
 </style>
@@ -373,11 +417,14 @@ button:hover {
 <div class="orb orb3"></div>
 <div class="shell">
     <div class="brand">
-        <div class="logo-icon">QL</div>
-        <div class="brand-copy">
-            <strong>QuantLabs AI</strong>
-            <span>Capital dashboard</span>
+        <div class="brand-main">
+            <div class="logo-icon">QL</div>
+            <div class="brand-copy">
+                <strong>QuantLabs AI</strong>
+                <span>Capital dashboard</span>
+            </div>
         </div>
+        <button class="theme-toggle" type="button" aria-label="Cambiar tema"><span data-theme-icon>☾</span> <span data-theme-label>Modo noche</span></button>
     </div>
     <div class="card">
         <div class="badge">Acceso protegido</div>
@@ -400,6 +447,21 @@ button:hover {
         </div>
     </div>
 </div>
+<script>
+(function(){
+    const applyTheme=(theme)=>{
+        const next=theme==='light'?'light':'dark';
+        document.documentElement.dataset.theme=next;
+        localStorage.setItem('quantlabs-dashboard-theme',next);
+        document.querySelectorAll('[data-theme-label]').forEach(el=>{el.textContent=next==='dark'?'Modo noche':'Modo dia';});
+        document.querySelectorAll('[data-theme-icon]').forEach(el=>{el.textContent=next==='dark'?'☾':'☀';});
+    };
+    applyTheme(document.documentElement.dataset.theme||'dark');
+    document.querySelectorAll('.theme-toggle').forEach(button=>{
+        button.addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+    });
+})();
+</script>
 </body>
 </html>
 """
