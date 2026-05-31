@@ -271,10 +271,17 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
 
     def _agents(self) -> list[dict[str, Any]]:
         statuses = [self.normalize_status(item) for item in self._status_files()]
-        if not any(item["agent"] == "paper_trading" for item in statuses):
-            paper = self._paper_trading_status()
-            if paper:
-                statuses.append(self.normalize_status(paper))
+        paper = self._paper_trading_status()
+        if paper:
+            normalized_paper = self.normalize_status(paper)
+            replaced = False
+            for index, status in enumerate(statuses):
+                if status["agent"] == "paper_trading":
+                    statuses[index] = normalized_paper
+                    replaced = True
+                    break
+            if not replaced:
+                statuses.append(normalized_paper)
         for status in statuses:
             last = status.get("last_execution")
             status["last_age_seconds"] = self._age_seconds(last)
@@ -297,24 +304,42 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
 
     def _paper_trading_status(self) -> dict[str, Any] | None:
         root = Path(settings.artifact_root) / "paper_trading"
+        config = self._paper_trading_config(root)
         files = sorted(root.glob("*.jsonl")) if root.exists() else []
-        if not files:
-            return None
-        records = self._jsonl_tail(files[-1], 10)
-        if not records:
-            return None
-        latest = records[-1]
+        records = self._jsonl_tail(files[-1], 10) if files else []
+        latest = records[-1] if records else {}
         orders = latest.get("orders") or []
         wins = sum(1 for item in orders if item.get("paper"))
+        enabled = bool(config.get("enabled", True)) if config else True
+        mode = str(config.get("mode") or latest.get("mode") or "observe").lower()
+        if mode not in MODES:
+            mode = "observe"
+        status = "error" if latest.get("errors") else ("running" if enabled else "stopped")
+        if not enabled:
+            mode = "observe"
+        rules = config.get("trading_rules") or latest.get("rules") or {}
+        events = self._paper_events(records[-6:]) if records else []
+        if config:
+            events.insert(
+                0,
+                {
+                    "time": self._now(),
+                    "event": "Runtime config",
+                    "detail": (
+                        f"enabled={enabled} mode={mode} stake={config.get('polymarket_stake_usdt', '--')} "
+                        f"SL={config.get('polymarket_stop_loss_pct', '--')} TP={config.get('polymarket_take_profit_pct', '--')}"
+                    ),
+                },
+            )
         return {
             "agent": "paper_trading",
-            "mode": latest.get("mode", "paper"),
-            "status": "running" if not latest.get("errors") else "error",
+            "mode": mode,
+            "status": status,
             "strategy": "Universal Paper Trading Runner",
             "market": "Polymarket/MEXC",
             "symbol": "multi",
             "timeframe": "1m cron",
-            "start_time": records[0].get("created_at"),
+            "start_time": records[0].get("created_at") if records else None,
             "last_execution": latest.get("created_at"),
             "prediction": self._paper_prediction(orders),
             "confidence": self._max_probability(orders),
@@ -331,11 +356,21 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
             "gpu": True,
             "model": "Prophet + technical filters",
             "health": "OK" if not latest.get("errors") else "ERROR",
-            "events": self._paper_events(records[-6:]),
+            "events": events,
             "log_path": str(root / "systemd.log"),
             "transactions": self._transactions_from_paper_records(records[-4:]),
-            "rules": latest.get("rules") or {},
+            "rules": rules,
         }
+
+    def _paper_trading_config(self, root: Path) -> dict[str, Any]:
+        path = root / "config.json"
+        if not path.exists():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
 
     def _transactions_from_status(self, status: dict[str, Any]) -> list[dict[str, Any]]:
         agent = str(status.get("agent") or status.get("name") or "unknown_agent")
