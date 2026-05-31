@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/css/style.css?v=2">
+  <link rel="stylesheet" href="/css/style.css?v=20260531-ai-solutions">
+  <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-2">
 </head>
 <body>
 
@@ -26,6 +27,10 @@
   </ul>
 
   <div class="nav-cta">
+    <button class="landing-theme-toggle" id="landingThemeToggle" type="button" aria-label="Cambiar tema">
+      <span data-theme-icon>☾</span>
+      <span data-theme-label>Modo noche</span>
+    </button>
     <a href="/login" class="btn btn-ghost">Iniciar Sesión</a>
     <a href="https://quantlabs.site/dashboard" class="btn btn-primary">Dashboard →</a>
   </div>
@@ -41,6 +46,10 @@
   <a href="#how" onclick="closeMobile()">Cómo Funciona</a>
   <a href="#pricing" onclick="closeMobile()">Planes</a>
   <a href="#faq" onclick="closeMobile()">FAQ</a>
+  <button class="landing-theme-toggle mobile-theme-toggle" id="landingThemeToggleMobile" type="button" aria-label="Cambiar tema">
+    <span data-theme-icon>☾</span>
+    <span data-theme-label>Modo noche</span>
+  </button>
   <a href="/login" onclick="closeMobile()">Iniciar Sesión</a>
   <a href="https://quantlabs.site/dashboard" class="btn btn-primary" style="border-radius:8px;margin-top:8px;">Dashboard →</a>
 </div>
@@ -250,66 +259,80 @@
 <section id="pricing">
   <div class="section-inner">
     <div class="section-header reveal">
-      <div class="section-tag">Planes</div>
-      <h2>Precios transparentes<br>sin sorpresas</h2>
-      <p class="section-sub">Desde traders individuales hasta mesas de operación institucionales. Escala según tu estrategia.</p>
+      <div class="section-tag">Soluciones IA local</div>
+      <h2>Orin + IA privada<br>lista para trabajar</h2>
+      <p class="section-sub">Equipos NVIDIA Jetson Orin configurados con modelos locales, automatizaciones y tableros a medida. Los precios de hardware son referencia de Amazon.com.mx/importación y pueden variar por disponibilidad.</p>
     </div>
-    <div class="pricing-grid">
-      <div class="price-card reveal">
-        <div class="price-name">Starter</div>
-        <div class="price-desc">Ideal para aprender trading cuantitativo</div>
-        <div>
-          <span class="price-amount">Gratis</span>
-        </div>
-        <hr class="price-divider"/>
-        <ul class="price-features">
-          <li>Acceso a Jupyter Notebooks</li>
-          <li>5 indicadores técnicos básicos</li>
-          <li>1 activo en tiempo real</li>
-          <li>Comunidad y soporte base</li>
-          <li>Dashboard de solo lectura</li>
-          <li>Acceso a Jupyter Diario</li>
-        </ul>
-        <a href="/login" class="btn btn-ghost btn-full">Comenzar Gratis</a>
+    <div class="hardware-grid reveal">
+      <div class="hardware-card">
+        <div class="hardware-tag">Entrada</div>
+        <h3>Orin Nano 4GB</h3>
+        <div class="hardware-price">$6,900 MXN</div>
+        <p>Asistentes ligeros, clasificación de documentos, búsqueda semántica y flujos internos.</p>
+        <span>Modelos: Phi-3 mini, TinyLlama, embeddings locales.</span>
       </div>
-      <div class="price-card featured reveal" style="transition-delay:.15s">
-        <div class="price-badge">MÁS POPULAR</div>
-        <div class="price-name">Pro Trader</div>
-        <div class="price-desc">Para traders activos y portafolios reales</div>
-        <div>
-          <span class="price-amount">$199</span>
-          <span class="price-period">/mes</span>
-        </div>
-        <hr class="price-divider"/>
-        <ul class="price-features">
-          <li>Todos los indicadores técnicos</li>
-          <li>Señales de IA en tiempo real</li>
-          <li>Backtesting ilimitado</li>
-          <li>LLM para análisis de noticias</li>
-          <li>Acceso a API QuantLab CPU/GPU</li>
-          <li>Jupyter GPU con RAPIDS cuDF</li>
-          <li>Soporte prioritario 24/7</li>
-        </ul>
-        <a href="/login" class="btn btn-primary btn-full">Activar Plan Pro</a>
+      <div class="hardware-card featured">
+        <div class="hardware-tag">Recomendado</div>
+        <h3>Orin Nano 8GB</h3>
+        <div class="hardware-price">$9,900 MXN</div>
+        <p>IA local para oficina, médicos, abogados, Excel, correo, reportes y prototipos de trading.</p>
+        <span>Modelos: Mistral 7B, Llama 3.1 8B, Qwen Coder ligero.</span>
       </div>
-      <div class="price-card reveal" style="transition-delay:.3s">
-        <div class="price-name">Institucional</div>
-        <div class="price-desc">Mesas de trading y fondos de inversión</div>
-        <div>
-          <span class="price-amount">Custom</span>
-        </div>
-        <hr class="price-divider"/>
-        <ul class="price-features">
-          <li>Modelos de IA personalizados</li>
-          <li>Integración con brokers prime</li>
-          <li>Equipo cuantitativo dedicado</li>
-          <li>SLA garantizado 99.9%</li>
-          <li>Compliance y reportes regulatorios</li>
-          <li>Usuarios ilimitados</li>
-          <li>Despliegue y módulos a medida</li>
-        </ul>
-        <a href="mailto:info@quantlabs.site" class="btn btn-ghost btn-full">Contactar Ventas</a>
+      <div class="hardware-card">
+        <div class="hardware-tag">Profesional</div>
+        <h3>Orin NX 16GB</h3>
+        <div class="hardware-price">$19,900 MXN</div>
+        <p>RAG privado, tableros multiusuario, automatizaciones con documentos y agentes por rol.</p>
+        <span>Modelos: Qwen 14B Q4, Phi-4 Q4, Llama 3.1 8B.</span>
       </div>
+      <div class="hardware-card">
+        <div class="hardware-tag">Laboratorio</div>
+        <h3>Orin AGX 32GB</h3>
+        <div class="hardware-price">$49,900 MXN</div>
+        <p>Investigación, visión, trading avanzado, múltiples modelos y cargas con mayor contexto.</p>
+        <span>Modelos: Qwen Coder 14B, Mixtral compacto, pipelines multimodales.</span>
+      </div>
+    </div>
+    <div class="solutions-grid reveal">
+      <div class="solution-card">
+        <h3>Despachos legales</h3>
+        <p>Búsqueda en contratos, resúmenes, comparativos, vencimientos y cartas base.</p>
+        <strong>Desde $24,900 MXN</strong>
+      </div>
+      <div class="solution-card">
+        <h3>Consultorios médicos</h3>
+        <p>Notas clínicas, expedientes locales, plantillas, reportes y búsqueda privada.</p>
+        <strong>Desde $29,900 MXN</strong>
+      </div>
+      <div class="solution-card">
+        <h3>Excel + correo</h3>
+        <p>Lectura de hojas, reportes automáticos, alertas, conciliaciones y emails.</p>
+        <strong>Desde $18,900 MXN</strong>
+      </div>
+      <div class="solution-card">
+        <h3>Secretarial IA</h3>
+        <p>Minutas, agenda, respuestas sugeridas, documentos frecuentes y seguimiento.</p>
+        <strong>Desde $19,900 MXN</strong>
+      </div>
+      <div class="solution-card">
+        <h3>Universidad e investigación</h3>
+        <p>RAG académico, papers, datasets, notebooks y asistentes por proyecto.</p>
+        <strong>Desde $34,900 MXN</strong>
+      </div>
+      <div class="solution-card">
+        <h3>Trading y Polymarket</h3>
+        <p>Dashboard, señales, validación, reglas SL/TP, agentes y control operativo.</p>
+        <strong>Desde $39,900 MXN</strong>
+      </div>
+      <div class="solution-card wide">
+        <h3>I+D con presupuesto ajustado</h3>
+        <p>Diseñamos un primer laboratorio local con alcance medible: datos, modelo, tablero, bitácora y plan de crecimiento.</p>
+        <strong>Desde $14,900 MXN</strong>
+      </div>
+    </div>
+    <div class="pricing-note reveal">
+      <span>Incluye instalación base, Docker, Ollama/llama.cpp, panel web y capacitación inicial. El hardware puede comprarse por separado o integrarse en paquete.</span>
+      <a href="mailto:info@quantlabs.site" class="btn btn-primary">Cotizar solución →</a>
     </div>
   </div>
 </section>
@@ -526,6 +549,16 @@
 </footer>
 
 <!-- ═══════════════════ SCRIPTS ═══════════════════ -->
+<script src="/dashboard/js/theme.js?v=20260531-theme-2"></script>
 <script src="./js/app.js"></script>
+<script>
+  document.querySelectorAll('.landing-theme-toggle').forEach((btn)=>{
+    btn.addEventListener('click',()=>{
+      if(window.QuantLabsTheme){
+        window.QuantLabsTheme.apply(document.documentElement.dataset.theme==='dark'?'light':'dark');
+      }
+    });
+  });
+</script>
 </body>
 </html>

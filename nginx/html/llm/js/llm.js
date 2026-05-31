@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-let activeModel='', gpuBusy=false, modelBusy=false, gpuState=null, modelState=null;
+let activeModel='', gpuBusy=false, modelBusy=false, gpuState=null, modelState=null, currentController=null, lastPrompt='';
 
 async function jsonFetch(path,options={}){
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
@@ -11,8 +11,14 @@ async function jsonFetch(path,options={}){
 const row=(label,value)=>`<div class="server-row"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`;
 
 function modelTemplate(name){
-  if(/mistral-nemo/i.test(name))return 'mistral';
   return 'chatml';
+}
+
+function modelDefaults(name){
+  if(/coder/i.test(name))return {tokens:1024,temp:0.2,specialist:'codex4u'};
+  if(/phi-4/i.test(name))return {tokens:768,temp:0.35,specialist:'planner'};
+  if(/qwen2\.5-14b/i.test(name))return {tokens:768,temp:0.45,specialist:'coding'};
+  return {tokens:384,temp:0.7,specialist:'coding'};
 }
 
 async function loadModelCatalog(){
@@ -36,7 +42,16 @@ function renderModels(catalog){
   select.innerHTML=catalog.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');
   if(activeModel&&catalog.includes(activeModel))select.value=activeModel;
   $('modelName').textContent=activeModel||select.value||'--';
+  applyModelDefaults(select.value||activeModel);
   renderLoadButton();
+}
+
+function applyModelDefaults(name){
+  const d=modelDefaults(name||'');
+  if($('maxTokens'))$('maxTokens').value=d.tokens;
+  if($('temperature'))$('temperature').value=d.temp;
+  const subtitle=d.specialist==='codex4u'?' · especialista codex4u':'';
+  if($('modelName'))$('modelName').textContent=(activeModel||name||'--')+subtitle;
 }
 
 function renderLoadButton(){
@@ -94,6 +109,7 @@ async function loadModels(){
       row('Modelo activo',activeModel||'--'),
       row('Modelos en carpeta',modelList.length),
       row('Template sugerido',modelTemplate(activeModel||$('modelSelect').value||'')),
+      row('Especialista',modelState?.specialist||modelDefaults(activeModel).specialist),
       row('Contexto / GPU layers',modelState?`${modelState.ctx_size} / ${modelState.gpu_layers}`:'--'),
       row('Backend','llama.cpp')
     ].join('');
@@ -143,17 +159,23 @@ async function submitPrompt(event){
   const prompt=$('prompt').value.trim();
   if(!prompt){$('responseBox').textContent='Escribe una consulta antes de enviar.';return;}
   const btn=$('runBtn'), selected=$('modelSelect').value||activeModel;
+  const started=performance.now();
+  lastPrompt=prompt;
+  currentController=new AbortController();
   btn.disabled=true;
+  $('stopBtn').disabled=false;
   $('requestState').textContent='GENERANDO';
   $('responseBox').textContent='Pensando...';
+  $('responseTime').textContent='Tiempo: corriendo...';
   try{
     const payload=await jsonFetch('/llm-api/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
+      signal:currentController.signal,
       body:JSON.stringify({
         model:selected||undefined,
         messages:[
-          {role:'system',content:'Eres QuantLabs AI, un asistente privado. Responde claro, directo y en español.'},
+          {role:'system',content:systemPromptForModel(selected)},
           {role:'user',content:prompt}
         ],
         max_tokens:Number($('maxTokens').value)||384,
@@ -165,16 +187,38 @@ async function submitPrompt(event){
     $('responseBox').textContent=text;
     const usage=payload.usage;
     $('tokenUsage').textContent=usage?`${usage.prompt_tokens||0}+${usage.completion_tokens||0} tokens`:'OK';
+    $('responseTime').textContent=`Tiempo: ${((performance.now()-started)/1000).toFixed(2)} s`;
     $('requestState').textContent='LISTO';
   }catch(error){
-    $('responseBox').textContent=`No fue posible consultar el LLM: ${error.message}`;
+    $('responseBox').textContent=error.name==='AbortError'?'Petición detenida.':`No fue posible consultar el LLM: ${error.message}`;
     $('requestState').textContent='ERROR';
+    $('responseTime').textContent=`Tiempo: ${((performance.now()-started)/1000).toFixed(2)} s`;
   }finally{
     btn.disabled=false;
+    $('stopBtn').disabled=true;
+    currentController=null;
   }
 }
 
+function systemPromptForModel(model){
+  if(/qwen2\.5-coder/i.test(model||'')){
+    return 'Eres codex4u, programador especialista para servidor Ubuntu, Docker, Python, shell scripts, JavaScript, Node.js, HTML y CSS. Responde en español, con pasos verificables y comandos seguros.';
+  }
+  return 'Eres QuantLabs AI, un asistente privado. Responde claro, directo y en español.';
+}
+
+function openServerModal(){ $('serverModal')?.classList.add('open'); $('serverModal')?.setAttribute('aria-hidden','false'); }
+function closeServerModal(){ $('serverModal')?.classList.remove('open'); $('serverModal')?.setAttribute('aria-hidden','true'); }
+
 $('promptForm')?.addEventListener('submit',submitPrompt);
 $('loadModelBtn')?.addEventListener('click',switchModel);
-$('modelSelect')?.addEventListener('change',renderLoadButton);
+$('modelSelect')?.addEventListener('change',()=>{applyModelDefaults($('modelSelect').value);renderLoadButton();});
+$('stopBtn')?.addEventListener('click',()=>currentController?.abort());
+$('retryBtn')?.addEventListener('click',()=>{if(lastPrompt){$('prompt').value=lastPrompt;$('promptForm').requestSubmit();}});
+$('copyPromptBtn')?.addEventListener('click',()=>navigator.clipboard?.writeText($('prompt').value||''));
+$('editPromptBtn')?.addEventListener('click',()=>$('prompt')?.focus());
+document.addEventListener('click',e=>{if(e.target.classList.contains('copy-response'))navigator.clipboard?.writeText($('responseBox').textContent||''); if(e.target.matches('[data-close-server]'))closeServerModal();});
+$('openServerModal')?.addEventListener('click',openServerModal);
+$('closeServerModal')?.addEventListener('click',closeServerModal);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeServerModal();});
 loadModels();

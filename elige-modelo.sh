@@ -4,7 +4,7 @@
 # Cambia el modelo LLM activo sin tocar docker-compose.yml
 # =============================================================
 
-MODELS_DIR="/home/quantlab/quantlab-ai-capital/models"
+MODELS_DIR="${QUANTLAB_RUNTIME_DIR:-/home/quantlab/quantlab-runtime}/models"
 ENV_FILE="/home/quantlab/quantlab-ai-capital/.env"
 COMPOSE_FILE="/home/quantlab/quantlab-ai-capital/docker-compose.yml"
 SYMLINK="$MODELS_DIR/current-model.gguf"
@@ -75,22 +75,22 @@ echo ""
 echo -e "  Configurando parámetros para ${CYAN}$SELECTED${NC}..."
 
 case "$SELECTED" in
+    *Qwen2.5-Coder-14B*)
+        TEMPLATE="chatml"
+        CTX=8192
+        GPU_LAYERS=40
+        THREADS=6
+        ;;
     *Qwen2.5-14B*)
         TEMPLATE="chatml"
         CTX=8192
         GPU_LAYERS=40
         THREADS=6
         ;;
-    *DeepSeek*)
+    *phi-4*|*Phi-4*)
         TEMPLATE="chatml"
         CTX=8192
-        GPU_LAYERS=32
-        THREADS=6
-        ;;
-    *Mistral-Nemo*)
-        TEMPLATE="mistral"
-        CTX=16384
-        GPU_LAYERS=35
+        GPU_LAYERS=40
         THREADS=6
         ;;
     *Nous-Hermes*|*Mistral*)

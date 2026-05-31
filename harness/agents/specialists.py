@@ -88,6 +88,17 @@ print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 'No pude ejecutar correctamente en Jupyter GPU.\n\nSTDERR:\n' + (stderr or 'sin error disponible')
 
 
+class Codex4UAgent(CodingAgent):
+    name='codex4u'
+    workflow='ubuntu_server_programming'
+    instructions='''Rol: CODEX4U.
+Eres programador especialista para servidores Ubuntu. Trabajas con Docker, Python, shell scripts, JavaScript, Node.js, HTML y CSS.
+
+Prioriza diagnostico reproducible, cambios pequenos, comandos no destructivos, permisos correctos, servicios verificables y rollback claro.
+
+Cuando el modelo activo sea Qwen Coder, eres el especialista preferido para implementacion. Antes de editar revisa archivos reales, estado del servicio y dependencias. Despues valida con pruebas, sintaxis, logs o healthchecks. No expongas secretos, no rompas .env y no reinicies servicios criticos sin razon operativa.'''
+
+
 class PolymrktAgent(BaseAgent):
     name='polymrkt'
     workflow='polymarket_signal_flow'

@@ -5,7 +5,7 @@
 # =========================================================
 
 PROJECT_DIR="/home/quantlab/quantlab-ai-capital"
-MODELS_DIR="${PROJECT_DIR}/models"
+MODELS_DIR="${QUANTLAB_RUNTIME_DIR:-/home/quantlab/quantlab-runtime}/models"
 
 CURRENT_LINK="${MODELS_DIR}/current-model.gguf"
 
@@ -16,8 +16,8 @@ CURRENT_LINK="${MODELS_DIR}/current-model.gguf"
 declare -A MODELS
 
 MODELS[qwen]="Qwen2.5-14B-Instruct-Q4_K_M.gguf"
-MODELS[mistral]="Mistral-7B-Instruct-v0.3-Q4_K_M.gguf"
-MODELS[deepseek]="DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf"
+MODELS[qwen-coder]="Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
+MODELS[phi4]="phi-4-Q4_K_M.gguf"
 MODELS[nous-hermes]="Nous-Hermes-2-Mistral-7B-DPO.Q4_K_M.gguf"
 
 # =========================================================
@@ -34,8 +34,8 @@ echo ""
 echo "Uso:"
 echo ""
 echo "./model-menu.sh qwen"
-echo "./model-menu.sh mistral"
-echo "./model-menu.sh deepseek"
+echo "./model-menu.sh qwen-coder"
+echo "./model-menu.sh phi4"
 echo "./model-menu.sh nous-hermes"
 echo ""
 echo "./model-menu.sh status"
@@ -49,8 +49,8 @@ echo "MODELOS"
 echo "==============================================="
 echo ""
 echo "qwen         → Agentes + Finanzas"
-echo "mistral      → Español"
-echo "deepseek     → Matemáticas + razonamiento"
+echo "qwen-coder   → Código + automatización"
+echo "phi4         → Razonamiento general"
 echo "nous-hermes  → Más estable"
 echo ""
 }
@@ -193,8 +193,8 @@ echo "🧠 QUANTLAB MODEL SELECTOR"
 echo "==============================================="
 echo ""
 echo "1) QWEN"
-echo "2) MISTRAL"
-echo "3) DEEPSEEK"
+echo "2) QWEN CODER 14B"
+echo "3) PHI-4 14B"
 echo "4) NOUS-HERMES"
 echo "5) STATUS"
 echo "6) TEST"
@@ -211,11 +211,11 @@ case $OPTION in
     ;;
 
 2)
-    switch_model mistral
+    switch_model qwen-coder
     ;;
 
 3)
-    switch_model deepseek
+    switch_model phi4
     ;;
 
 4)
@@ -256,12 +256,12 @@ qwen)
     switch_model qwen
     ;;
 
-mistral)
-    switch_model mistral
+qwen-coder)
+    switch_model qwen-coder
     ;;
 
-deepseek)
-    switch_model deepseek
+phi4)
+    switch_model phi4
     ;;
 
 nous-hermes)

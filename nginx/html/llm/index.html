@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/dashboard/css/style.css?v=20260528-command-center-1"/>
   <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-1"/>
-  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-ui-1"/>
+  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-chat-2"/>
 </head>
 <body class="llm-page">
 <header>
@@ -27,50 +27,53 @@
       <div>
         <p class="eyebrow">LLM LOCAL</p>
         <h1>Modelo privado en QuantLabs</h1>
-        <p>Consulta directa al servidor llama.cpp sin exponer la interfaz generada.</p>
+        <p>Chat privado contra modelos locales y Ollama.</p>
       </div>
       <div class="llm-model-card">
         <span>Modelo activo</span>
         <strong id="modelName">--</strong>
+        <button id="openServerModal" class="server-open" type="button">Servidor</button>
       </div>
     </section>
 
-    <section class="llm-grid fade">
-      <article class="llm-panel prompt-panel">
-        <div class="panel-head"><div><p>PROMPT</p><h2>Consulta</h2></div><span id="requestState">LISTO</span></div>
-        <form id="promptForm" class="prompt-form">
-          <label>
-            <span>Modelo disponible</span>
-            <select id="modelSelect"></select>
-          </label>
-          <label>
-            <span>Instruccion</span>
-            <textarea id="prompt" rows="10" placeholder="Escribe aqui tu consulta para el modelo local..."></textarea>
-          </label>
-          <div class="prompt-options">
-            <label><span>Tokens</span><input id="maxTokens" type="number" min="16" max="2048" step="16" value="384"></label>
-            <label><span>Temperatura</span><input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7"></label>
-            <button id="loadModelBtn" class="secondary-action" type="button">Cargar modelo</button>
-            <button id="runBtn" type="submit">Enviar</button>
-          </div>
-        </form>
-      </article>
-
-      <article class="llm-panel response-panel">
-        <div class="panel-head"><div><p>RESPUESTA</p><h2>Salida del modelo</h2></div><span id="tokenUsage">--</span></div>
-        <pre id="responseBox">Listo para consultar.</pre>
-      </article>
-
-      <article class="llm-panel health-panel">
-        <div class="panel-head"><div><p>SERVIDOR</p><h2>Estado</h2></div><span id="serverBadge">SYNC</span></div>
-        <div id="gpuControl" class="gpu-control-box"></div>
-        <div id="serverInfo" class="server-info"></div>
-      </article>
+    <section class="llm-chat fade">
+      <div class="chat-head"><div><p>CHAT LOCAL</p><h2>Prompt privado</h2></div><div><span id="requestState">LISTO</span><span id="tokenUsage">--</span></div></div>
+      <div id="chatWindow" class="chat-window">
+        <div class="chat-message assistant"><div class="message-tools"><button class="copy-response" type="button">Copiar respuesta</button></div><pre id="responseBox">Listo para consultar.</pre><small id="responseTime">Tiempo: --</small></div>
+      </div>
+      <form id="promptForm" class="chat-composer">
+        <textarea id="prompt" rows="4" placeholder="Escribe tu consulta para el modelo local..."></textarea>
+        <div class="composer-bar">
+          <select id="modelSelect"></select>
+          <label>Tokens <input id="maxTokens" type="number" min="16" max="4096" step="16" value="384"></label>
+          <label>Temp <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7"></label>
+          <button id="loadModelBtn" class="secondary-action" type="button">Cargar modelo</button>
+          <button id="retryBtn" class="ghost-action" type="button">Reintentar</button>
+          <button id="copyPromptBtn" class="ghost-action" type="button">Copiar</button>
+          <button id="editPromptBtn" class="ghost-action" type="button">Editar</button>
+          <button id="stopBtn" class="danger-action" type="button" disabled>Stop</button>
+          <button id="runBtn" type="submit">Enviar</button>
+        </div>
+      </form>
     </section>
   </main>
 </div>
+<div class="server-modal" id="serverModal" aria-hidden="true">
+  <div class="server-modal-backdrop" data-close-server></div>
+  <section class="server-dialog" role="dialog" aria-modal="true" aria-labelledby="serverTitle">
+    <header class="server-dialog-head">
+      <div><p>SERVIDOR</p><h2 id="serverTitle">Estado del LLM</h2></div>
+      <button id="closeServerModal" type="button" aria-label="Cerrar">x</button>
+    </header>
+    <div class="server-dialog-body">
+      <div class="panel-head"><div><p>GPU</p><h2>Control</h2></div><span id="serverBadge">SYNC</span></div>
+      <div id="gpuControl" class="gpu-control-box"></div>
+      <div id="serverInfo" class="server-info"></div>
+    </div>
+  </section>
+</div>
 <script src="/dashboard/js/theme.js?v=20260531-theme-1"></script>
 <script src="/dashboard/js/platform-menu.js?v=20260531-theme-1"></script>
-<script src="./js/llm.js?v=20260531-llm-ui-1"></script>
+<script src="./js/llm.js?v=20260531-llm-chat-2"></script>
 </body>
 </html>

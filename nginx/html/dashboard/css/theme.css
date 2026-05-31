@@ -175,3 +175,117 @@ html[data-theme="dark"] pre{
 html[data-theme="light"] .home-page{
   --bg:#eef3f5;--card:#ffffff;--card2:#f7fafb;--border:#dbe5e8;--primary:#00a66a;--accent:#1967d2;--magenta:#b36b00;--fg:#172026;--muted:#667681;
 }
+html[data-theme="light"] body{
+  background:#f4f7f8;
+}
+html[data-theme="light"] header,
+html[data-theme="light"] aside,
+html[data-theme="light"] .sidebar{
+  background:rgba(255,255,255,.92);
+  border-color:#d8e2e6;
+  box-shadow:0 12px 30px rgba(31,45,61,.06);
+}
+html[data-theme="light"] .command-card,
+html[data-theme="light"] .ops-kpi,
+html[data-theme="light"] .module-tile,
+html[data-theme="light"] .panel,
+html[data-theme="light"] .status-card,
+html[data-theme="light"] .lane-card,
+html[data-theme="light"] .window-card,
+html[data-theme="light"] .evidence-row,
+html[data-theme="light"] .infra-row,
+html[data-theme="light"] .discovery-row,
+html[data-theme="light"] .mini-stat,
+html[data-theme="light"] .order-row,
+html[data-theme="light"] .guard-row,
+html[data-theme="light"] .activity-row,
+html[data-theme="light"] .api-panel,
+html[data-theme="light"] .api-card,
+html[data-theme="light"] .metric-card,
+html[data-theme="light"] .ops-panel,
+html[data-theme="light"] .harness-card,
+html[data-theme="light"] .diagnostic-panel,
+html[data-theme="light"] .panel-card{
+  background:#ffffff;
+  border-color:#d8e2e6;
+  color:#172026;
+  box-shadow:0 12px 32px rgba(31,45,61,.06);
+}
+html[data-theme="light"] .api-panel h2,
+html[data-theme="light"] .api-panel h3,
+html[data-theme="light"] .harness-card h2,
+html[data-theme="light"] .harness-card h3,
+html[data-theme="light"] .panel h2,
+html[data-theme="light"] .panel h3{
+  color:#172026;
+}
+html[data-theme="light"] .card-head,
+html[data-theme="light"] .panel-head,
+html[data-theme="light"] .tx-table th{
+  background:linear-gradient(180deg,#ffffff,#f7fafb);
+  border-color:#d8e2e6;
+  color:#172026;
+}
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea,
+html[data-theme="light"] .chat-search,
+html[data-theme="light"] .filter-label select,
+html[data-theme="light"] .control-field select,
+html[data-theme="light"] .rule-grid input{
+  background:#ffffff;
+  color:#172026;
+  border-color:#cbd8dd;
+}
+html[data-theme="light"] .tx-table-wrap,
+html[data-theme="light"] .table-wrap,
+html[data-theme="light"] .log-box,
+html[data-theme="light"] pre{
+  background:#f7fafb;
+  border-color:#d8e2e6;
+  color:#172026;
+}
+html[data-theme="dark"] .bitaxe-panel{
+  background:#101722;
+  border-color:#263444;
+  box-shadow:0 20px 54px rgba(0,0,0,.28);
+}
+html[data-theme="light"] .bitaxe-panel{
+  background:#ffffff;
+  border-color:#d8e2e6;
+  box-shadow:0 18px 45px rgba(31,45,61,.08);
+}
+html[data-theme="light"] .bx-panel-title,
+html[data-theme="light"] .bx-wallet-box #bx-wallet{
+  color:#155ec2;
+}
+html[data-theme="light"] .bx-panel-sub,
+html[data-theme="light"] .bx-refresh-btn,
+html[data-theme="light"] .bx-kpi-label,
+html[data-theme="light"] .bx-kpi-unit,
+html[data-theme="light"] .bx-section-label,
+html[data-theme="light"] .bx-bar-label,
+html[data-theme="light"] .bx-share-l,
+html[data-theme="light"] .bx-wallet-label,
+html[data-theme="light"] .bx-ik{
+  color:#637380;
+}
+html[data-theme="light"] .bx-kpi,
+html[data-theme="light"] .bx-card-inner,
+html[data-theme="light"] .bx-pill-neu{
+  background:#f7fafb;
+  border-color:#d8e2e6;
+}
+html[data-theme="light"] .bx-kpi-val,
+html[data-theme="light"] .bx-share-n:not(.bx-good):not(.bx-bad),
+html[data-theme="light"] .bx-bar-val,
+html[data-theme="light"] .bx-iv{
+  color:#172026;
+}
+html[data-theme="light"] .bx-bar-track{
+  background:#e7eef1;
+}
+html[data-theme="light"] .bx-wallet-box{
+  background:#eef6ff;
+  border-color:#cadcf7;
+}

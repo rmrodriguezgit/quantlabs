@@ -7,7 +7,7 @@
     const next=theme==='light'?'light':'dark';
     root.dataset.theme=next;
     localStorage.setItem(storageKey,next);
-    document.querySelectorAll('[data-theme-label]').forEach(el=>{el.textContent=next==='dark'?'Modo noche':'Modo dia';});
+    document.querySelectorAll('[data-theme-label]').forEach(el=>{el.textContent=next==='dark'?'Modo noche':'Modo día';});
     document.querySelectorAll('[data-theme-icon]').forEach(el=>{el.textContent=next==='dark'?'☾':'☀';});
   };
   const ensureCss=()=>{

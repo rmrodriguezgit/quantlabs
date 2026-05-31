@@ -45,15 +45,15 @@ def run_project(args, timeout=120):
 
 def model_profile(model):
     lower = model.lower()
+    if "qwen2.5-coder-14b" in lower:
+        return {"template": "chatml", "ctx": 8192, "gpu_layers": 40, "threads": 6, "agent": "codex4u"}
     if "qwen2.5-14b" in lower:
-        return {"template": "chatml", "ctx": 8192, "gpu_layers": 40, "threads": 6}
-    if "deepseek" in lower:
-        return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6}
-    if "mistral-nemo" in lower:
-        return {"template": "mistral", "ctx": 16384, "gpu_layers": 35, "threads": 6}
+        return {"template": "chatml", "ctx": 8192, "gpu_layers": 40, "threads": 6, "agent": "coding"}
+    if "phi-4" in lower:
+        return {"template": "chatml", "ctx": 8192, "gpu_layers": 40, "threads": 6, "agent": "planner"}
     if "nous-hermes" in lower or "mistral" in lower:
-        return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6}
-    return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6}
+        return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6, "agent": "coding"}
+    return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6, "agent": "coding"}
 
 
 def env_values():
@@ -109,6 +109,7 @@ def llm_model_status():
         "ctx_size": int(values.get("LLM_CTX_SIZE") or profile["ctx"]),
         "gpu_layers": int(values.get("LLM_GPU_LAYERS") or profile["gpu_layers"]),
         "threads": int(values.get("LLM_THREADS") or profile["threads"]),
+        "specialist": values.get("LLM_SPECIALIST") or profile.get("agent") or "",
         "gpu": gpu_status(),
     }
 
@@ -152,6 +153,7 @@ def switch_llm_model(model):
             "LLM_CTX_SIZE": str(profile["ctx"]),
             "LLM_GPU_LAYERS": str(profile["gpu_layers"]),
             "LLM_THREADS": str(profile["threads"]),
+            "LLM_SPECIALIST": profile.get("agent", "coding"),
         }
     )
     symlink = MODELS_DIR / "current-model.gguf"

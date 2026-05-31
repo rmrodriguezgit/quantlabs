@@ -1,58 +1,55 @@
 #!/bin/bash
-COMPOSE="/home/quantlab/quantlab-ai-capital/docker-compose.yml"
+set -euo pipefail
 
-case "$1" in
+PROJECT_DIR="/home/quantlab/quantlab-ai-capital"
+RUNTIME_DIR="${QUANTLAB_RUNTIME_DIR:-/home/quantlab/quantlab-runtime}"
+MODELS_DIR="${RUNTIME_DIR}/models"
+ENV_FILE="${PROJECT_DIR}/.env"
+COMPOSE="${PROJECT_DIR}/docker-compose.yml"
+CURRENT_LINK="${MODELS_DIR}/current-model.gguf"
+
+case "${1:-}" in
   nous-hermes)
     MODEL="Nous-Hermes-2-Mistral-7B-DPO.Q4_K_M.gguf"
-    TEMPLATE="chatml"
-    ;;
-  llama3)
-    MODEL="Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-    TEMPLATE="llama3"
-    ;;
-  mistral)
-    MODEL="Mistral-Nemo-Instruct-2407-Q4_K_M.gguf"
-    TEMPLATE="mistral"
-    ;;
-  deepseek)
-    MODEL="DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
     TEMPLATE="chatml"
     ;;
   qwen)
     MODEL="Qwen2.5-14B-Instruct-Q4_K_M.gguf"
     TEMPLATE="chatml"
     ;;
+  qwen-coder)
+    MODEL="Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
+    TEMPLATE="chatml"
+    ;;
+  phi4)
+    MODEL="phi-4-Q4_K_M.gguf"
+    TEMPLATE="chatml"
+    ;;
   *)
-    echo "Uso: $0 {nous-hermes|llama3|mistral|deepseek|qwen}"
+    echo "Uso: $0 {qwen|qwen-coder|phi4|nous-hermes}"
     echo ""
     echo "Modelos disponibles:"
-    ls /home/quantlab/quantlab-ai-capital/models/*.gguf | xargs -I{} basename {}
+    find "$MODELS_DIR" -maxdepth 1 -type f -name "*.gguf" -printf "%f\n" | sort
     exit 1
     ;;
 esac
 
-# Actualizar .env
-sed -i "s/^LLM_MODEL=.*/LLM_MODEL=${MODEL}/" .env
-sed -i "s/^LLM_CHAT_TEMPLATE=.*/LLM_CHAT_TEMPLATE=${TEMPLATE}/" .env
+if [ ! -f "${MODELS_DIR}/${MODEL}" ]; then
+  echo "Modelo no encontrado: ${MODELS_DIR}/${MODEL}"
+  exit 1
+fi
 
-sudo python3 -c "
-import json
-    c = json.load(f)
-c['agents']['defaults']['model']['primary'] = 'custom-llm-8080/${MODEL}'
-c['models']['providers']['custom-llm-8080']['models'][0]['id'] = '${MODEL}'
-    json.dump(c, f, indent=2)
-"
+cd "$PROJECT_DIR"
+sed -i "s/^LLM_MODEL=.*/LLM_MODEL=${MODEL}/" "$ENV_FILE"
+sed -i "s/^LLM_CHAT_TEMPLATE=.*/LLM_CHAT_TEMPLATE=${TEMPLATE}/" "$ENV_FILE"
+ln -sfn "${MODELS_DIR}/${MODEL}" "$CURRENT_LINK"
 
-echo "✅ Cambiando a: $1 ($MODEL)"
+echo "Cambiando modelo a: ${MODEL}"
+docker compose -f "$COMPOSE" up -d --force-recreate llm
 
-# Reiniciar servicios
-docker compose -f ${COMPOSE} up -d --force-recreate llm
-
-echo "⏳ Esperando que cargue el modelo..."
+echo "Esperando que el modelo responda..."
 sleep 8
-
-# Prueba rápida
-echo "🧪 Probando modelo..."
+curl -fsS http://127.0.0.1:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d "{\"model\":\"${MODEL}\",\"messages\":[{\"role\":\"system\",\"content\":\"Eres un asistente útil. Responde en español.\"},{\"role\":\"user\",\"content\":\"Hola, responde en una sola oración.\"}],\"max_tokens\":50}" \
-  | python3 -c "import json,sys; r=json.load(sys.stdin); print('🤖 Respuesta:', r['choices'][0]['message']['content'])"
+  -d "{\"model\":\"${MODEL}\",\"messages\":[{\"role\":\"system\",\"content\":\"Responde en español.\"},{\"role\":\"user\",\"content\":\"Confirma el modelo activo en una frase.\"}],\"max_tokens\":60}" \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['choices'][0]['message']['content'])"
