@@ -9,44 +9,70 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/dashboard/css/style.css?v=20260528-command-center-1"/>
   <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-1"/>
-  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-chat-4"/>
+  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-nav-1"/>
 </head>
 <body class="llm-page">
-<header>
-  <a href="/dashboard/" class="logo"><div class="logo-icon">QL</div><span class="logo-name">QuantLabs AI</span><span class="logo-badge">LLM</span></a>
-  <div class="header-right">
-    <div class="session-pill"><div class="session-dot"></div><span id="llmStatus">Conectando</span></div>
-    <a href="/dashboard/" class="session-pill">Dashboard</a>
-    <a href="/logout" class="btn-logout">Cerrar sesion</a>
-  </div>
-</header>
 <div class="layout">
   <aside></aside>
   <main class="llm-shell">
-    <section class="llm-hero fade">
-      <div>
+    <section class="llm-control-panel fade">
+      <div class="llm-title-block">
         <p class="eyebrow">LLM LOCAL</p>
-        <h1>Modelo privado en QuantLabs</h1>
-        <p>Chat privado contra modelos locales y Ollama.</p>
+        <h1>Chat privado</h1>
+        <span id="llmStatus">Conectando</span>
       </div>
-      <div class="llm-model-card">
-        <span>Modelo activo</span>
-        <strong id="modelName">--</strong>
-        <button id="openServerModal" class="server-open" type="button">Servidor</button>
-      </div>
+      <label class="control-field">
+        <span>Backend</span>
+        <select id="backendSelect">
+          <option value="llama.cpp">llama.cpp</option>
+          <option value="Ollama">Ollama</option>
+        </select>
+      </label>
+      <label class="control-field model-field">
+        <span>Modelo</span>
+        <select id="modelSelect"></select>
+      </label>
+      <label class="control-field">
+        <span>Especialista</span>
+        <select id="specialistSelect">
+          <option value="general">General</option>
+          <option value="programador">Programador</option>
+          <option value="abogado">Abogado</option>
+          <option value="medico">Médico</option>
+          <option value="universidad">Universidad</option>
+          <option value="trading">Trading</option>
+          <option value="polymarket">Polymarket</option>
+          <option value="contador">Contador</option>
+          <option value="secretaria">Secretaria</option>
+        </select>
+      </label>
+      <button id="openServerModal" class="server-open" type="button">Servidor</button>
     </section>
-
     <section class="llm-chat fade">
-      <div class="chat-head"><div><p>CHAT LOCAL</p><h2>Prompt privado</h2></div><div><span id="requestState">LISTO</span><span id="tokenUsage">--</span></div></div>
+      <div class="chat-head">
+        <div>
+          <p>MODELO EN USO</p>
+          <h2 id="modelName">--</h2>
+        </div>
+        <div><span id="requestState">LISTO</span><span id="tokenUsage">--</span></div>
+      </div>
       <div id="chatWindow" class="chat-window">
         <div class="chat-message assistant"><div class="message-tools"><button class="copy-response" type="button">Copiar respuesta</button></div><pre id="responseBox">Listo para consultar.</pre><small id="responseTime">Tiempo: --</small></div>
       </div>
       <form id="promptForm" class="chat-composer">
         <textarea id="prompt" rows="4" placeholder="Escribe tu consulta para el modelo local..."></textarea>
         <div class="composer-bar">
-          <select id="modelSelect"></select>
           <label>Tokens <input id="maxTokens" type="number" min="16" max="4096" step="16" value="384"></label>
-          <label>Temp <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7"></label>
+          <label>Temp
+            <select id="temperature">
+              <option value="0.2">0.2</option>
+              <option value="0.3">0.3</option>
+              <option value="0.4">0.4</option>
+              <option value="0.5">0.5</option>
+              <option value="0.7">0.7</option>
+              <option value="1">1.0</option>
+            </select>
+          </label>
           <button id="loadModelBtn" class="secondary-action" type="button">Cargar modelo</button>
           <button id="retryBtn" class="ghost-action" type="button">Reintentar</button>
           <button id="copyPromptBtn" class="ghost-action" type="button">Copiar</button>
@@ -74,6 +100,6 @@
 </div>
 <script src="/dashboard/js/theme.js?v=20260531-theme-1"></script>
 <script src="/dashboard/js/platform-menu.js?v=20260531-theme-1"></script>
-<script src="./js/llm.js?v=20260531-llm-chat-4"></script>
+<script src="./js/llm.js?v=20260531-llm-nav-1"></script>
 </body>
 </html>

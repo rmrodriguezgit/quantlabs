@@ -15,7 +15,8 @@ function modelTemplate(name){
 }
 
 function modelDefaults(name){
-  if(/^ollama:/i.test(name))return {tokens:768,temp:0.45,specialist:'ollama'};
+  if(/^ollama:mistral/i.test(name))return {tokens:768,temp:0.4,specialist:'general'};
+  if(/^ollama:/i.test(name))return {tokens:768,temp:0.5,specialist:'general'};
   if(/coder/i.test(name))return {tokens:1024,temp:0.2,specialist:'codex4u'};
   if(/phi-4/i.test(name))return {tokens:768,temp:0.35,specialist:'planner'};
   if(/qwen2\.5-14b/i.test(name))return {tokens:768,temp:0.45,specialist:'coding'};
@@ -46,15 +47,23 @@ async function loadActiveModel(){
 
 function renderModels(catalog){
   const select=$('modelSelect');
+  const backendSelect=$('backendSelect');
   const previous=selectedRuntimeModel||select.value||'';
   modelCatalog=catalog;
-  const groups=catalog.reduce((acc,item)=>{(acc[item.backend] ||= []).push(item);return acc;},{});
-  select.innerHTML=Object.entries(groups).map(([backend,items])=>
-    `<optgroup label="${esc(backend)}">${items.map(item=>`<option value="${esc(item.value)}">${esc(item.name)}</option>`).join('')}</optgroup>`
-  ).join('');
-  if(previous&&catalog.some(item=>item.value===previous))select.value=previous;
-  else if(activeModel&&catalog.some(item=>item.value===activeModel))select.value=activeModel;
-  else if(activeModel&&catalog.some(item=>item.value===`ollama:${activeModel}`))select.value=`ollama:${activeModel}`;
+  const backends=[...new Set(catalog.map(item=>item.backend))];
+  if(backendSelect){
+    const keep=backendSelect.value;
+    backendSelect.innerHTML=backends.map(backend=>`<option value="${esc(backend)}">${esc(backend)}</option>`).join('');
+    if(keep&&backends.includes(keep))backendSelect.value=keep;
+    else if(activeModel&&catalog.some(item=>item.backend==='llama.cpp'&&item.value===activeModel))backendSelect.value='llama.cpp';
+    else backendSelect.value=backends[0]||'llama.cpp';
+  }
+  const backend=backendSelect?.value||'llama.cpp';
+  const filtered=catalog.filter(item=>item.backend===backend);
+  select.innerHTML=filtered.map(item=>`<option value="${esc(item.value)}">${esc(item.name)}</option>`).join('');
+  if(previous&&filtered.some(item=>item.value===previous))select.value=previous;
+  else if(activeModel&&filtered.some(item=>item.value===activeModel))select.value=activeModel;
+  else if(activeModel&&filtered.some(item=>item.value===`ollama:${activeModel}`))select.value=`ollama:${activeModel}`;
   selectedRuntimeModel=select.value||activeModel||'';
   $('modelName').textContent=selectedRuntimeModel||activeModel||'--';
   applyModelDefaults(select.value||activeModel);
@@ -65,13 +74,19 @@ function applyModelDefaults(name){
   const d=modelDefaults(name||'');
   if($('maxTokens'))$('maxTokens').value=d.tokens;
   if($('temperature'))$('temperature').value=d.temp;
-  const subtitle=d.specialist==='codex4u'?' · especialista codex4u':(d.specialist==='ollama'?' · Ollama':'');
+  const backend=isOllamaModel(name)?'Ollama':'llama.cpp';
+  const specialistLabel=$('specialistSelect')?.selectedOptions?.[0]?.textContent||specialistName(d.specialist);
+  const subtitle=` · ${backend} · ${specialistLabel}`;
   if($('modelName'))$('modelName').textContent=displayModelName(name||selectedRuntimeModel||activeModel||'--')+subtitle;
 }
 
 function isOllamaModel(value){ return /^ollama:/i.test(value||''); }
 function displayModelName(value){ return String(value||'').replace(/^ollama:/i,''); }
 function selectedModelMeta(value){ return modelCatalog.find(item=>item.value===value)||null; }
+function specialistName(value){
+  const names={general:'General',programador:'Programador',codex4u:'Programador',abogado:'Abogado',medico:'Médico',universidad:'Universidad',trading:'Trading',polymarket:'Polymarket',contador:'Contador',secretaria:'Secretaria'};
+  return names[value]||'General';
+}
 
 function renderLoadButton(){
   const btn=$('loadModelBtn');
@@ -129,6 +144,7 @@ async function loadModels(){
       ...catalog.filter(item=>item.backend==='Ollama')
     ];
     activeModel=active||modelList[0]?.value||'';
+    if(!selectedRuntimeModel)selectedRuntimeModel=activeModel;
     renderModels(modelList.length?modelList:[activeModel].filter(Boolean).map(name=>({name,backend:'llama.cpp',value:name})));
     $('llmStatus').textContent='LLM listo';
     $('serverBadge').textContent='OK';
@@ -138,7 +154,7 @@ async function loadModels(){
       row('Modelos locales',modelList.filter(item=>item.backend==='llama.cpp').length),
       row('Modelos Ollama',modelList.filter(item=>item.backend==='Ollama').length),
       row('Template sugerido',modelTemplate(activeModel||$('modelSelect').value||'')),
-      row('Especialista',modelState?.specialist||modelDefaults(activeModel).specialist),
+      row('Especialista',$('specialistSelect')?.selectedOptions?.[0]?.textContent||specialistName(modelState?.specialist||modelDefaults(activeModel).specialist)),
       row('Contexto / GPU layers',modelState?`${modelState.ctx_size} / ${modelState.gpu_layers}`:'--'),
       row('Backend','llama.cpp + Ollama')
     ].join('');
@@ -242,10 +258,23 @@ async function submitPrompt(event){
 }
 
 function systemPromptForModel(model){
+  const specialist=$('specialistSelect')?.value||'general';
+  const prompts={
+    general:'Eres QuantLabs AI, un asistente privado. Responde claro, directo y en español.',
+    programador:'Eres codex4u, programador especialista para servidor Ubuntu, Docker, Python, shell scripts, JavaScript, Node.js, HTML y CSS. Responde en español, con pasos verificables y comandos seguros.',
+    abogado:'Eres un asistente legal privado. Ayuda a revisar, resumir y estructurar documentos. No sustituyes asesoria legal profesional; senala riesgos y supuestos.',
+    medico:'Eres un asistente clinico privado para organizar informacion medica. No das diagnosticos definitivos; recomienda validar con un profesional de salud.',
+    universidad:'Eres un asistente academico de investigacion. Ayuda con papers, tesis, metodologia, citas, notas y analisis critico.',
+    trading:'Eres un asistente de trading cuantitativo. Prioriza riesgo, supuestos, drawdown, sizing, invalidacion y evidencia.',
+    polymarket:'Eres especialista en Polymarket. Evalua mercados, probabilidad, liquidez, edge, riesgo y reglas SL/TP antes de cualquier accion.',
+    contador:'Eres un asistente contable. Ayuda con conciliaciones, Excel, facturas, clasificacion, reportes y controles.',
+    secretaria:'Eres un asistente secretarial. Ayuda con agenda, minutas, correos, seguimiento, documentos y priorizacion.'
+  };
+  if(specialist!=='general')return prompts[specialist]||prompts.general;
   if(/qwen2\.5-coder/i.test(model||'')){
     return 'Eres codex4u, programador especialista para servidor Ubuntu, Docker, Python, shell scripts, JavaScript, Node.js, HTML y CSS. Responde en español, con pasos verificables y comandos seguros.';
   }
-  return 'Eres QuantLabs AI, un asistente privado. Responde claro, directo y en español.';
+  return prompts.general;
 }
 
 function openServerModal(){ $('serverModal')?.classList.add('open'); $('serverModal')?.setAttribute('aria-hidden','false'); }
@@ -254,6 +283,8 @@ function closeServerModal(){ $('serverModal')?.classList.remove('open'); $('serv
 $('promptForm')?.addEventListener('submit',submitPrompt);
 $('loadModelBtn')?.addEventListener('click',switchModel);
 $('modelSelect')?.addEventListener('change',()=>{applyModelDefaults($('modelSelect').value);renderLoadButton();});
+$('backendSelect')?.addEventListener('change',()=>renderModels(modelCatalog));
+$('specialistSelect')?.addEventListener('change',()=>applyModelDefaults($('modelSelect').value||selectedRuntimeModel));
 $('stopBtn')?.addEventListener('click',()=>currentController?.abort());
 $('retryBtn')?.addEventListener('click',()=>{if(lastPrompt){$('prompt').value=lastPrompt;$('promptForm').requestSubmit();}});
 $('copyPromptBtn')?.addEventListener('click',()=>navigator.clipboard?.writeText($('prompt').value||''));
