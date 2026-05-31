@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -53,13 +54,69 @@ def rag_enabled_for_agent(agent: str) -> bool:
     return (agent or "").strip() not in {"polymrkt"}
 
 
+RAG_MARKER = "[Memoria RAG relevante]"
+RAG_STOP_WORDS = {
+    "como", "para", "puedes", "dime", "decir", "decirme", "hacer", "haz", "los", "las", "una", "uno", "con", "del", "que", "por", "favor", "usuario", "respuesta",
+    "analiza", "usando", "objetivo", "reglas", "actual", "actuales", "muestra", "devuelve", "exactamente",
+}
+RAG_OPERATIONAL_TERMS = {"nginx", "docker", "gpu", "nvidia", "servicio", "servicios", "reinicio", "reiniciar", "detener", "parar", "systemctl", "compose", "contenedor", "harness", "api", "llm"}
+RAG_TOPIC_GROUPS = {
+    "gpu": {"gpu", "nvidia", "nvidia-smi", "cuda"},
+    "nginx": {"nginx", "docker", "compose", "contenedor"},
+    "harness": {"harness", "agent", "agente"},
+    "llm": {"llm", "modelo", "ollama", "llama"},
+}
+
+
 def normalize_rag_text(text: str) -> str:
     return " ".join(str(text or "").strip().lower().split())
 
 
+def strip_rag_sections(text: str) -> str:
+    value = str(text or "")
+    while RAG_MARKER in value:
+        start = value.find(RAG_MARKER)
+        response_at = value.find("Respuesta:", start)
+        if response_at == -1:
+            value = value[:start].rstrip()
+        else:
+            value = value[:start].rstrip() + "\n" + value[response_at:].lstrip()
+    return value.strip()
+
+
+def rag_tokens(text: str) -> set[str]:
+    cleaned = normalize_rag_text(strip_rag_sections(text))
+    return {token for token in re.findall(r"[a-záéíóúñü0-9_-]{3,}", cleaned) if token not in RAG_STOP_WORDS}
+
+
+def rag_topic(tokens: set[str]) -> str | None:
+    for topic, words in RAG_TOPIC_GROUPS.items():
+        if tokens & words:
+            return topic
+    return None
+
+
+def rag_hit_relevant(prompt: str, text: str, agent: str) -> bool:
+    prompt_tokens = rag_tokens(prompt)
+    text_tokens = rag_tokens(text)
+    if not prompt_tokens or not text_tokens:
+        return False
+    overlap = prompt_tokens & text_tokens
+    prompt_topic = rag_topic(prompt_tokens)
+    text_topic = rag_topic(text_tokens)
+    if prompt_topic and text_topic and prompt_topic != text_topic:
+        return False
+    if prompt_topic and text_topic == prompt_topic:
+        return True
+    operational_overlap = overlap & RAG_OPERATIONAL_TERMS
+    if (agent or "").strip() in {"execution", "codex4u", "coding"}:
+        return bool(operational_overlap) and len(overlap) >= 2
+    return len(overlap) >= 2
+
+
 def rag_context(user_id: str, session_id: str, agent: str, prompt: str) -> str:
     try:
-        hits = vector_memory.search(vector_memory.embed(prompt), top_k=24)
+        hits = vector_memory.search(vector_memory.embed(prompt), top_k=32)
     except Exception:
         return ""
     lines = []
@@ -70,31 +127,36 @@ def rag_context(user_id: str, session_id: str, agent: str, prompt: str) -> str:
             continue
         if meta.get("agent") != agent:
             continue
-        text = str(item.get("text") or "").strip()
+        text = strip_rag_sections(item.get("text") or "")
+        if not rag_hit_relevant(prompt, text, agent):
+            continue
         fingerprint = meta.get("text_hash") or normalize_rag_text(text)
         if not text or fingerprint in seen:
             continue
         seen.add(fingerprint)
-        lines.append(f"- {text[:900]}")
-        if len(lines) >= 4:
+        lines.append(f"- {text[:700]}")
+        if len(lines) >= 3:
             break
     return "\n".join(lines)
 
 
 def remember_exchange(user_id: str, session_id: str, agent: str, prompt: str, response: str):
     try:
-        text = f"Usuario: {prompt}\nRespuesta: {response}"
+        clean_prompt = strip_rag_sections(prompt)
+        clean_response = strip_rag_sections(response)
+        if not clean_prompt or len(clean_prompt) > 4000:
+            return
+        text = f"Usuario: {clean_prompt}\nRespuesta: {clean_response}"
         text_hash = vector_memory._hash(text)
         if vector_memory.exists_duplicate(text_hash, {"user_id": user_id, "agent": agent}):
             return
         vector_memory.add(
             text,
-            vector_memory.embed(f"{prompt}\n{response}"),
+            vector_memory.embed(f"{clean_prompt}\n{clean_response}"),
             {"user_id": user_id, "session_id": session_id, "agent": agent, "model": active_llm_model(), "text_hash": text_hash},
         )
     except Exception:
         pass
-
 
 def _task_status_value(task) -> str:
     status = getattr(task, "status", None)
