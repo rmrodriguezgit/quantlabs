@@ -20,8 +20,9 @@
 .prompt-form label{display:grid;gap:7px;color:var(--muted);font:700 11px "Space Mono",monospace;text-transform:uppercase;letter-spacing:.08em}
 .prompt-form textarea,.prompt-form input,.prompt-form select{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--card2);color:var(--fg);padding:12px;font:500 14px Inter,system-ui,sans-serif}
 .prompt-form textarea{resize:vertical;min-height:250px;line-height:1.5}
-.prompt-options{display:grid;grid-template-columns:120px 140px 1fr;gap:10px;align-items:end}
+.prompt-options{display:grid;grid-template-columns:120px 140px 1fr 1fr;gap:10px;align-items:end}
 .prompt-options button{height:45px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer}
+.prompt-options .secondary-action{background:color-mix(in srgb,var(--primary) 14%,transparent);border-color:var(--primary);color:var(--primary)}
 .prompt-options button:disabled{opacity:.55;cursor:wait}
 #responseBox{margin:14px;min-height:560px;max-height:calc(100vh - 300px);overflow:auto;border:1px solid var(--border);border-radius:8px;background:var(--card2);color:var(--fg);padding:16px;font:500 14px/1.6 Inter,system-ui,sans-serif;white-space:pre-wrap}
 .server-info{display:grid;gap:10px;padding:14px}

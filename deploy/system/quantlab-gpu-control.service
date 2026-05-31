@@ -16,7 +16,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/run/quantlab
+ReadWritePaths=/run/quantlab /home/quantlab/quantlab-ai-capital/.env /home/quantlab/quantlab-runtime/models
 
 [Install]
 WantedBy=multi-user.target

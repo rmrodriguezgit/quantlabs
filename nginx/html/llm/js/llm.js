@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-let activeModel='', gpuBusy=false, gpuState=null;
+let activeModel='', gpuBusy=false, modelBusy=false, gpuState=null, modelState=null;
 
 async function jsonFetch(path,options={}){
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
@@ -21,9 +21,14 @@ async function loadModelCatalog(){
 }
 
 async function loadActiveModel(){
-  const payload=await jsonFetch('/llm-api/v1/models');
-  const models=payload.data||payload.models||[];
-  return models[0]?.id||models[0]?.name||models[0]?.model||'';
+  try{
+    modelState=await jsonFetch('/admin/llm-model?ts='+Date.now());
+    return modelState.active_model||'';
+  }catch(_error){
+    const payload=await jsonFetch('/llm-api/v1/models');
+    const models=payload.data||payload.models||[];
+    return models[0]?.id||models[0]?.name||models[0]?.model||'';
+  }
 }
 
 function renderModels(catalog){
@@ -31,6 +36,16 @@ function renderModels(catalog){
   select.innerHTML=catalog.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');
   if(activeModel&&catalog.includes(activeModel))select.value=activeModel;
   $('modelName').textContent=activeModel||select.value||'--';
+  renderLoadButton();
+}
+
+function renderLoadButton(){
+  const btn=$('loadModelBtn');
+  if(!btn)return;
+  const selected=$('modelSelect')?.value||'';
+  const changed=Boolean(selected&&selected!==activeModel);
+  btn.disabled=modelBusy||!changed;
+  btn.textContent=modelBusy?'Cargando modelo...':(changed?'Cargar modelo':'Modelo activo');
 }
 
 async function loadGpuControl(){
@@ -69,15 +84,17 @@ async function setGpuPower(action){
 async function loadModels(){
   try{
     const [catalog,active]=await Promise.all([loadModelCatalog(),loadActiveModel()]);
-    activeModel=active||catalog[0]||'';
-    renderModels(catalog.length?catalog:[activeModel].filter(Boolean));
+    const modelList=(modelState?.models&&modelState.models.length)?modelState.models:catalog;
+    activeModel=active||modelList[0]||'';
+    renderModels(modelList.length?modelList:[activeModel].filter(Boolean));
     $('llmStatus').textContent='LLM listo';
     $('serverBadge').textContent='OK';
     $('serverInfo').innerHTML=[
       row('Endpoint','/llm-api/v1/chat/completions'),
       row('Modelo activo',activeModel||'--'),
-      row('Modelos en carpeta',catalog.length),
+      row('Modelos en carpeta',modelList.length),
       row('Template sugerido',modelTemplate(activeModel||$('modelSelect').value||'')),
+      row('Contexto / GPU layers',modelState?`${modelState.ctx_size} / ${modelState.gpu_layers}`:'--'),
       row('Backend','llama.cpp')
     ].join('');
   }catch(error){
@@ -89,6 +106,36 @@ async function loadModels(){
     gpuState={available:false,error:error.message,containers:[],gpu_enabled:false};
     renderGpuControl();
   });
+}
+
+async function switchModel(){
+  const selected=$('modelSelect').value;
+  if(!selected||selected===activeModel||modelBusy)return;
+  modelBusy=true;
+  $('requestState').textContent='CARGANDO';
+  $('serverBadge').textContent='LOAD';
+  $('llmStatus').textContent='Cargando modelo';
+  $('responseBox').textContent=`Cargando ${selected}...\nEsto puede tardar mientras Docker recrea quantlab_llm y el modelo entra a GPU.`;
+  renderLoadButton();
+  try{
+    modelState=await jsonFetch('/admin/llm-model',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:selected})
+    });
+    activeModel=modelState.active_model||modelState.selected_model||selected;
+    await loadModels();
+    $('responseBox').textContent=modelState.readiness?.ready
+      ? `Modelo cargado: ${activeModel}`
+      : `Modelo solicitado: ${activeModel}\nEl contenedor reinicio, pero aun esta calentando. Espera unos segundos y prueba de nuevo.`;
+    $('requestState').textContent=modelState.readiness?.ready?'LISTO':'CARGANDO';
+  }catch(error){
+    $('responseBox').textContent=`No fue posible cargar el modelo: ${error.message}`;
+    $('requestState').textContent='ERROR';
+  }finally{
+    modelBusy=false;
+    renderLoadButton();
+  }
 }
 
 async function submitPrompt(event){
@@ -128,4 +175,6 @@ async function submitPrompt(event){
 }
 
 $('promptForm')?.addEventListener('submit',submitPrompt);
+$('loadModelBtn')?.addEventListener('click',switchModel);
+$('modelSelect')?.addEventListener('change',renderLoadButton);
 loadModels();

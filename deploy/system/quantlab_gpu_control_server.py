@@ -10,9 +10,16 @@ import json
 import os
 import subprocess
 import sys
+import time
+from pathlib import Path
 
 SOCKET_PATH = os.environ.get("QUANTLAB_GPU_CONTROL_SOCKET", "/run/quantlab/gpu-control.sock")
 CONTAINERS = ["quantlab_market_gpu", "quantlab_llm"]
+PROJECT_DIR = Path(os.environ.get("QUANTLAB_PROJECT_DIR", "/home/quantlab/quantlab-ai-capital"))
+RUNTIME_DIR = Path(os.environ.get("QUANTLAB_RUNTIME_DIR", "/home/quantlab/quantlab-runtime"))
+MODELS_DIR = RUNTIME_DIR / "models"
+ENV_FILE = PROJECT_DIR / ".env"
+COMPOSE_FILE = PROJECT_DIR / "docker-compose.yml"
 
 
 def run_docker(args, timeout=45):
@@ -23,6 +30,151 @@ def run_docker(args, timeout=45):
         timeout=timeout,
         check=False,
     )
+
+
+def run_project(args, timeout=120):
+    return subprocess.run(
+        args,
+        cwd=str(PROJECT_DIR),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def model_profile(model):
+    lower = model.lower()
+    if "qwen2.5-14b" in lower:
+        return {"template": "chatml", "ctx": 8192, "gpu_layers": 40, "threads": 6}
+    if "deepseek" in lower:
+        return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6}
+    if "mistral-nemo" in lower:
+        return {"template": "mistral", "ctx": 16384, "gpu_layers": 35, "threads": 6}
+    if "nous-hermes" in lower or "mistral" in lower:
+        return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6}
+    return {"template": "chatml", "ctx": 8192, "gpu_layers": 32, "threads": 6}
+
+
+def env_values():
+    values = {}
+    try:
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            if not line or line.lstrip().startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    except OSError:
+        return values
+    return values
+
+
+def update_env(updates):
+    lines = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
+    seen = set()
+    next_lines = []
+    for line in lines:
+        if "=" not in line or line.lstrip().startswith("#"):
+            next_lines.append(line)
+            continue
+        key = line.split("=", 1)[0].strip()
+        if key in updates:
+            next_lines.append(f"{key}={updates[key]}")
+            seen.add(key)
+        else:
+            next_lines.append(line)
+    for key, value in updates.items():
+        if key not in seen:
+            next_lines.append(f"{key}={value}")
+    ENV_FILE.write_text("\n".join(next_lines) + "\n", encoding="utf-8")
+
+
+def available_models():
+    if not MODELS_DIR.exists():
+        return []
+    return sorted(path.name for path in MODELS_DIR.glob("*.gguf") if not path.is_symlink())
+
+
+def llm_model_status():
+    values = env_values()
+    active = values.get("LLM_MODEL") or ""
+    models = available_models()
+    profile = model_profile(active)
+    return {
+        "available": True,
+        "models": models,
+        "active_model": active,
+        "loaded": active in models,
+        "template": values.get("LLM_CHAT_TEMPLATE") or profile["template"],
+        "ctx_size": int(values.get("LLM_CTX_SIZE") or profile["ctx"]),
+        "gpu_layers": int(values.get("LLM_GPU_LAYERS") or profile["gpu_layers"]),
+        "threads": int(values.get("LLM_THREADS") or profile["threads"]),
+        "gpu": gpu_status(),
+    }
+
+
+def wait_for_model(model, timeout=180):
+    deadline = time.time() + timeout
+    last_error = ""
+    while time.time() < deadline:
+        proc = run_project(
+            [
+                "docker",
+                "exec",
+                "quantlab_harness",
+                "python3",
+                "-c",
+                (
+                    "import requests,sys;"
+                    "r=requests.get('http://llm:8080/v1/models',timeout=5);"
+                    "print(r.text);"
+                    "sys.exit(0 if r.ok and %r in r.text else 1)"
+                ) % model,
+            ],
+            timeout=12,
+        )
+        if proc.returncode == 0:
+            return {"ready": True, "response": proc.stdout.strip()[:1000]}
+        last_error = (proc.stderr or proc.stdout or "").strip()
+        time.sleep(3)
+    return {"ready": False, "error": last_error or "model did not become ready"}
+
+
+def switch_llm_model(model):
+    models = available_models()
+    if model not in models:
+        return 400, {"error": "model not found", "models": models}
+    profile = model_profile(model)
+    update_env(
+        {
+            "LLM_MODEL": model,
+            "LLM_CHAT_TEMPLATE": profile["template"],
+            "LLM_CTX_SIZE": str(profile["ctx"]),
+            "LLM_GPU_LAYERS": str(profile["gpu_layers"]),
+            "LLM_THREADS": str(profile["threads"]),
+        }
+    )
+    symlink = MODELS_DIR / "current-model.gguf"
+    try:
+        if symlink.exists() or symlink.is_symlink():
+            symlink.unlink()
+        symlink.symlink_to(MODELS_DIR / model)
+    except OSError:
+        pass
+    proc = run_project(["docker", "compose", "-f", str(COMPOSE_FILE), "up", "-d", "--no-deps", "--force-recreate", "llm"], timeout=180)
+    payload = llm_model_status()
+    payload["selected_model"] = model
+    payload["profile"] = profile
+    payload["result"] = {
+        "returncode": proc.returncode,
+        "stdout": proc.stdout.strip(),
+        "stderr": proc.stderr.strip(),
+    }
+    if proc.returncode != 0:
+        payload["error"] = "docker compose failed"
+        return 500, payload
+    payload["readiness"] = wait_for_model(model)
+    return (200 if payload["readiness"].get("ready") else 202), payload
 
 
 def gpu_status():
@@ -70,7 +222,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path.split("?", 1)[0] != "/admin/gpu":
+        path = self.path.split("?", 1)[0]
+        if path == "/admin/llm-model":
+            try:
+                self.send_json(200, llm_model_status())
+            except Exception as exc:
+                self.send_json(500, {"error": str(exc), "available": False, "models": []})
+            return
+        if path != "/admin/gpu":
             self.send_json(404, {"error": "not found"})
             return
         try:
@@ -79,7 +238,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": str(exc), "available": False, "containers": []})
 
     def do_POST(self):
-        if self.path.split("?", 1)[0] != "/admin/gpu":
+        path = self.path.split("?", 1)[0]
+        if path not in {"/admin/gpu", "/admin/llm-model"}:
             self.send_json(404, {"error": "not found"})
             return
         length = int(self.headers.get("Content-Length") or "0")
@@ -87,6 +247,14 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             self.send_json(400, {"error": "invalid JSON"})
+            return
+        if path == "/admin/llm-model":
+            model = str(payload.get("model") or "").strip()
+            try:
+                status, data = switch_llm_model(model)
+                self.send_json(status, data)
+            except Exception as exc:
+                self.send_json(500, {"error": str(exc), "available": False})
             return
         action = str(payload.get("action") or "").strip().lower()
         if action not in {"start", "stop"}:
