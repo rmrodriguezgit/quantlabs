@@ -632,9 +632,17 @@ def liquidate_polymarket_trade():
     token_id = str(data.get("token_id") or data.get("asset") or "").strip()
     shares = float(data.get("shares") or data.get("size") or 0)
     current_price = float(data.get("current_price") or data.get("price") or 0)
-    if not token_id or shares <= 0 or current_price <= 0:
-        return jsonify({"error": "token_id_shares_current_price_required"}), 400
+    if not token_id:
+        return jsonify({"error": "token_id_required"}), 400
     try:
+        if shares <= 0 or current_price <= 0:
+            positions = tools.tools["paper_trading"]._fetch_polymarket_positions()
+            match = next((row for row in positions if str(row.get("asset") or "") == token_id), None)
+            if match:
+                shares = float(match.get("size") or 0)
+                current_price = float(match.get("curPrice") or match.get("avgPrice") or current_price or 0)
+        if shares <= 0 or current_price <= 0:
+            return jsonify({"error": "open_position_not_found_for_token"}), 400
         result = tools.tools["paper_trading"]._place_polymarket_market_sell(token_id, shares, current_price)
     except Exception as exc:
         return jsonify({"error": str(exc)[:300]}), 500

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/style.css?v=20260531-logo">
-  <link rel="stylesheet" href="./css/polymarket.css?v=20260531-live-gate-1">
+  <link rel="stylesheet" href="./css/polymarket.css?v=20260531-live-gate-stack-1">
 </head>
 <body class="poly-page">
 <header>
@@ -46,9 +46,11 @@
       <article class="panel control-panel">
         <div class="panel-head"><div><p>CONTROL</p><h2>Trading Polymarket</h2></div><span id="controlSaveState">DETENIDO</span></div>
         <div class="control-body">
-          <label class="toggle-line"><input id="tradingEnabled" type="checkbox"><span></span><strong>Activar trading</strong></label>
+          <div class="switch-stack">
+            <label class="toggle-line"><input id="tradingEnabled" type="checkbox"><span></span><strong>Activar trading</strong></label>
+            <label class="toggle-line live-gate"><input id="liveExecutionEnabled" type="checkbox"><span></span><strong>Ejecutar LIVE real</strong></label>
+          </div>
           <div class="control-field"><small>Modo</small><select id="tradingMode"><option value="observe">Observe</option><option value="paper">Paper</option><option value="live">Live</option></select></div>
-          <label class="toggle-line live-gate"><input id="liveExecutionEnabled" type="checkbox"><span></span><strong>Ejecutar LIVE real</strong></label>
           <div class="control-field"><small>Stake manual</small><div class="stake-group" id="stakeGroup"><button data-stake="1">$1</button><button data-stake="2">$2</button><button data-stake="3">$3</button></div></div>
           <label class="toggle-line"><input id="autoLiquidate" type="checkbox"><span></span><strong>Liquidacion automatica SL / TP</strong></label>
           <div class="rule-grid">
@@ -89,6 +91,6 @@
 </div>
 <script src="../js/platform-menu.js?v=20260531-logo-self"></script>
 <script src="../js/session.js?v=20260517-user"></script>
-<script src="./js/polymarket.js?v=20260531-live-gate-2"></script>
+<script src="./js/polymarket.js?v=20260531-live-gate-stack-1"></script>
 </body>
 </html>
