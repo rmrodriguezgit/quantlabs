@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/dashboard/css/style.css?v=20260531-logo"/>
   <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-1"/>
-  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-memory-1"/>
+  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-chat-bubbles-1"/>
 </head>
 <body class="llm-page">
 <div class="layout">
@@ -57,13 +57,28 @@
         <div><span id="requestState">LISTO</span><span id="tokenUsage">--</span></div>
       </div>
       <div id="chatWindow" class="chat-window">
-        <div class="chat-message assistant">
-          <div class="message-tools">
-            <button class="icon-action copy-response" type="button" title="Copiar respuesta" aria-label="Copiar respuesta">⧉</button>
-            <button id="editResponseBtn" class="icon-action" type="button" title="Editar respuesta" aria-label="Editar respuesta">✎</button>
-          </div>
-          <pre id="responseBox">Listo para consultar.</pre>
-          <small id="responseTime">Tiempo: --</small>
+        <div class="conversation-grid">
+          <article class="chat-message user">
+            <div class="bubble-head">
+              <span>Prompt</span>
+              <small id="promptMeta">Listo</small>
+            </div>
+            <div class="message-tools">
+              <button id="copyPromptBubbleBtn" class="icon-action" type="button" title="Copiar prompt" aria-label="Copiar prompt">⧉</button>
+            </div>
+            <pre id="promptBubble">Escribe una consulta para iniciar.</pre>
+          </article>
+          <article class="chat-message assistant">
+            <div class="bubble-head">
+              <span>Response</span>
+              <small id="responseTime">Tiempo: --</small>
+            </div>
+            <div class="message-tools">
+              <button class="icon-action copy-response" type="button" title="Copiar respuesta" aria-label="Copiar respuesta">⧉</button>
+              <button id="editResponseBtn" class="icon-action" type="button" title="Editar respuesta" aria-label="Editar respuesta">✎</button>
+            </div>
+            <pre id="responseBox">Listo para consultar.</pre>
+          </article>
         </div>
       </div>
       <form id="promptForm" class="chat-composer">
@@ -75,21 +90,26 @@
           <textarea id="prompt" rows="4" placeholder="Escribe tu consulta para el modelo local..."></textarea>
         </div>
         <div class="composer-bar">
-          <label>Tokens <input id="maxTokens" type="number" min="16" max="4096" step="16" value="384"></label>
-          <label>Temp
-            <select id="temperature">
-              <option value="0.2">0.2</option>
-              <option value="0.3">0.3</option>
-              <option value="0.4">0.4</option>
-              <option value="0.5">0.5</option>
-              <option value="0.7">0.7</option>
-              <option value="1">1.0</option>
-            </select>
-          </label>
-          <button id="loadModelBtn" class="secondary-action" type="button">Cargar modelo</button>
-          <button id="retryBtn" class="ghost-action icon-command" type="button" title="Reintentar" aria-label="Reintentar">↻</button>
-          <button id="stopBtn" class="danger-action icon-command" type="button" title="Detener" aria-label="Detener" disabled>■</button>
-          <button id="runBtn" type="submit">Enviar</button>
+          <div class="composer-settings">
+            <label>Tokens <input id="maxTokens" type="number" min="16" max="4096" step="16" value="384"></label>
+            <label>Temp
+              <select id="temperature">
+                <option value="0.2">0.2</option>
+                <option value="0.3">0.3</option>
+                <option value="0.4">0.4</option>
+                <option value="0.5">0.5</option>
+                <option value="0.7">0.7</option>
+                <option value="1">1.0</option>
+              </select>
+            </label>
+            <div class="active-model-pill"><span>Modelo activo</span><strong id="composerModelName">--</strong></div>
+            <button id="loadModelBtn" class="secondary-action" type="button">Cargar modelo</button>
+          </div>
+          <div class="composer-actions">
+            <button id="retryBtn" class="ghost-action icon-command" type="button" title="Reintentar" aria-label="Reintentar">↻</button>
+            <button id="stopBtn" class="danger-action icon-command" type="button" title="Detener" aria-label="Detener" disabled>■</button>
+            <button id="runBtn" class="send-action icon-command" type="submit" title="Enviar" aria-label="Enviar">➤</button>
+          </div>
         </div>
       </form>
     </section>
@@ -111,6 +131,6 @@
 </div>
 <script src="/dashboard/js/theme.js?v=20260531-theme-1"></script>
 <script src="/dashboard/js/platform-menu.js?v=20260531-logo-self"></script>
-<script src="./js/llm.js?v=20260531-llm-memory-1"></script>
+<script src="./js/llm.js?v=20260531-llm-chat-bubbles-1"></script>
 </body>
 </html>

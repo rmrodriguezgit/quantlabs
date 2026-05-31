@@ -22,13 +22,19 @@ function saveMemory(){
 }
 
 function renderMemory(){
-  const box=$('responseBox');
+  const box=$('responseBox'), promptBox=$('promptBubble'), promptMeta=$('promptMeta');
   if(!box)return;
   if(!chatMemory.length){
     box.textContent='Listo para consultar.';
+    if(promptBox)promptBox.textContent='Escribe una consulta para iniciar.';
+    if(promptMeta)promptMeta.textContent='Listo';
     return;
   }
-  box.textContent=chatMemory.map(item=>`${item.role==='user'?'Usuario':'LLM'}:\n${item.content}`).join('\n\n');
+  const lastUser=[...chatMemory].reverse().find(item=>item.role==='user');
+  const lastAssistant=[...chatMemory].reverse().find(item=>item.role==='assistant');
+  if(promptBox)promptBox.textContent=lastUser?.content||'Sin prompt reciente.';
+  if(promptMeta)promptMeta.textContent=lastUser?new Date(lastUser.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Listo';
+  box.textContent=lastAssistant?.content||chatMemory.map(item=>`${item.role==='user'?'Usuario':'LLM'}:\n${item.content}`).join('\n\n');
 }
 
 function pushMemory(role,content){
@@ -94,6 +100,7 @@ function renderModels(catalog){
   else if(activeModel&&filtered.some(item=>item.value===`ollama:${activeModel}`))select.value=`ollama:${activeModel}`;
   selectedRuntimeModel=select.value||activeModel||'';
   $('modelName').textContent=selectedRuntimeModel||activeModel||'--';
+  updateComposerModel();
   applyModelDefaults(select.value||activeModel);
   renderLoadButton();
 }
@@ -106,6 +113,40 @@ function applyModelDefaults(name){
   const specialistLabel=$('specialistSelect')?.selectedOptions?.[0]?.textContent||specialistName(d.specialist);
   const subtitle=` · ${backend} · ${specialistLabel}`;
   if($('modelName'))$('modelName').textContent=displayModelName(name||selectedRuntimeModel||activeModel||'--')+subtitle;
+  updateComposerModel(name);
+}
+
+function updateComposerModel(name){
+  const el=$('composerModelName');
+  if(!el)return;
+  const selected=name||$('modelSelect')?.value||selectedRuntimeModel||activeModel||'--';
+  el.textContent=displayModelName(selected)||'--';
+}
+
+function setRequestState(state){
+  const el=$('requestState');
+  if(!el)return;
+  const label=String(state||'LISTO').toUpperCase();
+  el.textContent=label;
+  el.classList.remove('state-ready','state-loading','state-error');
+  if(label==='LISTO')el.classList.add('state-ready');
+  else if(label==='ERROR')el.classList.add('state-error');
+  else el.classList.add('state-loading');
+}
+
+function setTokenUsage(text,ok=true){
+  const el=$('tokenUsage');
+  if(!el)return;
+  el.textContent=text;
+  el.classList.toggle('state-ok',Boolean(ok));
+}
+
+function setLlmStatus(text,state='loading'){
+  const el=$('llmStatus');
+  if(!el)return;
+  el.textContent=text;
+  el.classList.remove('status-ready','status-loading','status-error');
+  el.classList.add(state==='ready'?'status-ready':state==='error'?'status-error':'status-loading');
 }
 
 function isOllamaModel(value){ return /^ollama:/i.test(value||''); }
@@ -174,7 +215,7 @@ async function loadModels(){
     activeModel=active||modelList[0]?.value||'';
     if(!selectedRuntimeModel)selectedRuntimeModel=activeModel;
     renderModels(modelList.length?modelList:[activeModel].filter(Boolean).map(name=>({name,backend:'llama.cpp',value:name})));
-    $('llmStatus').textContent='LLM listo';
+    setLlmStatus('LLM listo','ready');
     $('serverBadge').textContent='OK';
     $('serverInfo').innerHTML=[
       row('Endpoint','/llm-api/v1/chat/completions'),
@@ -187,7 +228,7 @@ async function loadModels(){
       row('Backend','llama.cpp + Ollama')
     ].join('');
   }catch(error){
-    $('llmStatus').textContent='LLM no disponible';
+    setLlmStatus('LLM no disponible','error');
     $('serverBadge').textContent='ERROR';
     $('serverInfo').innerHTML=row('Error',error.message);
   }
@@ -204,15 +245,15 @@ async function switchModel(){
     applyModelDefaults(selected);
     renderLoadButton();
     renderMemory();
-    $('requestState').textContent='LISTO';
-    $('llmStatus').textContent='Ollama listo';
+    setRequestState('LISTO');
+    setLlmStatus('Ollama listo','ready');
     return;
   }
   if(!selected||selected===activeModel||modelBusy)return;
   modelBusy=true;
-  $('requestState').textContent='CARGANDO';
+  setRequestState('CARGANDO');
   $('serverBadge').textContent='LOAD';
-  $('llmStatus').textContent='Cargando modelo';
+  setLlmStatus('Cargando modelo','loading');
   $('responseBox').textContent=`Cargando ${selected}...\nEsto puede tardar mientras Docker recrea quantlab_llm y el modelo entra a GPU.`;
   renderLoadButton();
   try{
@@ -227,10 +268,10 @@ async function switchModel(){
     $('responseBox').textContent=modelState.readiness?.ready
       ? `Modelo cargado: ${activeModel}`
       : `Modelo solicitado: ${activeModel}\nEl contenedor reinicio, pero aun esta calentando. Espera unos segundos y prueba de nuevo.`;
-    $('requestState').textContent=modelState.readiness?.ready?'LISTO':'CARGANDO';
+    setRequestState(modelState.readiness?.ready?'LISTO':'CARGANDO');
   }catch(error){
     $('responseBox').textContent=`No fue posible cargar el modelo: ${error.message}`;
-    $('requestState').textContent='ERROR';
+    setRequestState('ERROR');
   }finally{
     modelBusy=false;
     renderLoadButton();
@@ -250,8 +291,10 @@ async function submitPrompt(event){
   currentController=new AbortController();
   btn.disabled=true;
   $('stopBtn').disabled=false;
-  $('requestState').textContent='GENERANDO';
-  $('responseBox').textContent=(chatMemory.length?chatMemory.map(item=>`${item.role==='user'?'Usuario':'LLM'}:\n${item.content}`).join('\n\n')+'\n\n':'')+'LLM:\nPensando...';
+  setRequestState('GENERANDO');
+  $('promptBubble').textContent=prompt;
+  $('promptMeta').textContent='Enviado ahora';
+  $('responseBox').textContent='Pensando...';
   $('responseTime').textContent='Tiempo: corriendo...';
   try{
     const payload=await jsonFetch(endpoint,{
@@ -276,12 +319,12 @@ async function submitPrompt(event){
     pushMemory('user',prompt);
     pushMemory('assistant',text);
     const usage=payload.usage;
-    $('tokenUsage').textContent=usage?`${usage.prompt_tokens||0}+${usage.completion_tokens||0} tokens`:'OK';
+    setTokenUsage(usage?`${usage.prompt_tokens||0}+${usage.completion_tokens||0} tokens`:'OK',true);
     $('responseTime').textContent=`Tiempo: ${((performance.now()-started)/1000).toFixed(2)} s`;
-    $('requestState').textContent='LISTO';
+    setRequestState('LISTO');
   }catch(error){
     $('responseBox').textContent=error.name==='AbortError'?'Petición detenida.':`No fue posible consultar el LLM: ${error.message}`;
-    $('requestState').textContent='ERROR';
+    setRequestState('ERROR');
     $('responseTime').textContent=`Tiempo: ${((performance.now()-started)/1000).toFixed(2)} s`;
   }finally{
     btn.disabled=false;
@@ -321,6 +364,7 @@ $('specialistSelect')?.addEventListener('change',()=>applyModelDefaults($('model
 $('stopBtn')?.addEventListener('click',()=>currentController?.abort());
 $('retryBtn')?.addEventListener('click',()=>{if(lastPrompt){$('prompt').value=lastPrompt;$('promptForm').requestSubmit();}});
 $('copyPromptBtn')?.addEventListener('click',()=>navigator.clipboard?.writeText($('prompt').value||''));
+$('copyPromptBubbleBtn')?.addEventListener('click',()=>navigator.clipboard?.writeText($('promptBubble')?.textContent||''));
 $('editPromptBtn')?.addEventListener('click',()=>$('prompt')?.focus());
 $('editResponseBtn')?.addEventListener('click',()=>{
   const box=$('responseBox');
@@ -333,5 +377,7 @@ document.addEventListener('click',e=>{if(e.target.classList.contains('copy-respo
 $('openServerModal')?.addEventListener('click',openServerModal);
 $('closeServerModal')?.addEventListener('click',closeServerModal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeServerModal();});
+setRequestState('LISTO');
+setLlmStatus('Conectando','loading');
 loadModels();
 loadMemory();
