@@ -596,19 +596,34 @@ class PaperTradingTool(BaseTool):
         client.set_api_creds(client.derive_api_key())
         tick_size = client.get_tick_size(token_id)
         neg_risk = client.get_neg_risk(token_id)
-        slippage = max(0, float(os.getenv('POLYMARKET_MARKET_BUY_SLIPPAGE', '0.05') or 0.05))
-        limit_price = min(0.99, max(0.01, worst_price + slippage))
-        response = client.create_and_post_market_order(
-            MarketOrderArgsV2(
-                token_id=token_id,
-                side=Side.BUY,
-                amount=round(amount_usdt, 2),
-                price=round(limit_price, 2),
-                order_type=OrderType.FAK,
-            ),
-            PartialCreateOrderOptions(tick_size=tick_size, neg_risk=bool(neg_risk)),
-            OrderType.FAK,
-        )
+        base_slippage = max(0, float(os.getenv('POLYMARKET_MARKET_BUY_SLIPPAGE', '0.05') or 0.05))
+        retry_slippage = max(base_slippage, float(os.getenv('POLYMARKET_MARKET_BUY_RETRY_SLIPPAGE', '0.20') or 0.20))
+        response = None
+        limit_price = None
+        last_exc = None
+        for slippage in dict.fromkeys([base_slippage, retry_slippage]):
+            limit_price = min(0.99, max(0.01, worst_price + slippage))
+            try:
+                response = client.create_and_post_market_order(
+                    MarketOrderArgsV2(
+                        token_id=token_id,
+                        side=Side.BUY,
+                        amount=round(amount_usdt, 2),
+                        price=round(limit_price, 2),
+                        order_type=OrderType.FAK,
+                    ),
+                    PartialCreateOrderOptions(tick_size=tick_size, neg_risk=bool(neg_risk)),
+                    OrderType.FAK,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                message = str(exc).lower()
+                retryable = 'no orders found to match' in message or 'orderbook' in message
+                if not retryable or slippage == retry_slippage:
+                    raise
+        if response is None:
+            raise last_exc or RuntimeError('Polymarket market buy failed')
         return {
             'order_id': response.get('orderID') or response.get('order_id'),
             'status': response.get('status'),
