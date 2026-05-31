@@ -26,7 +26,7 @@ class PaperTradingTool(BaseTool):
         'polymarket_btc_updown': {
             'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'confidence>=0.80', 'edge>=0.03', 'spread<=0.08', 'ask_size>=1', 'seconds_to_close>=60', 'one_trade_per_event_window'],
             'risk': ['stake fixed manually at 1/2/3 USDT', 'max one trade per 5m/15m window', 'live requires server flag plus UI enablement', 'price_to_beat=Chainlink candle open'],
-            'exit': ['stop_loss_when_position_value_drawdown<=-8.34pct (3.00 -> 2.75 USDT)', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
+            'exit': ['stop_loss_when_position_value_drawdown<=-8.34pct (3.00 -> 2.75 USDT)', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'time stop: after 75% of the window, liquidate if PnL remains negative', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
         },
         'modes': {
             'observe': 'analiza señales y registra transacciones observadas sin simular orden',
@@ -359,6 +359,8 @@ class PaperTradingTool(BaseTool):
                 exit_reason = 'take_profit'
             elif percent_pnl <= stop_loss_pct:
                 exit_reason = 'stop_loss'
+            elif self._polymarket_time_stop_loss(position, percent_pnl):
+                exit_reason = 'stop_loss_time_75'
             if not auto_liquidate or redeemable or exit_reason is None:
                 continue
             shares = self._float(position.get('size'))
@@ -369,7 +371,7 @@ class PaperTradingTool(BaseTool):
                     'action': f'liquidate_{exit_reason}',
                     'status': 'skipped_invalid_position_size_or_price',
                     'percent_pnl': round(percent_pnl, 4),
-                    'threshold_pct': round(take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct, 4),
+                    'threshold_pct': round(75 if exit_reason == 'stop_loss_time_75' else (take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct), 4),
                 })
                 continue
             try:
@@ -383,7 +385,7 @@ class PaperTradingTool(BaseTool):
                     'action': f'liquidate_{exit_reason}',
                     'status': f'{exit_reason}_order_sent',
                     'percent_pnl': round(percent_pnl, 4),
-                    'threshold_pct': round(take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct, 4),
+                    'threshold_pct': round(75 if exit_reason == 'stop_loss_time_75' else (take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct), 4),
                     'cash_pnl': round(cash_pnl, 4),
                     'execution_result': execution,
                 })
@@ -393,11 +395,31 @@ class PaperTradingTool(BaseTool):
                     'action': f'liquidate_{exit_reason}',
                     'status': f'{exit_reason}_order_failed',
                     'percent_pnl': round(percent_pnl, 4),
-                    'threshold_pct': round(take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct, 4),
+                    'threshold_pct': round(75 if exit_reason == 'stop_loss_time_75' else (take_profit_pct if exit_reason == 'take_profit' else stop_loss_pct), 4),
                     'cash_pnl': round(cash_pnl, 4),
                     'error': str(exc)[:300],
                 })
                 result['errors'].append({'venue': 'polymarket', 'error': f'{exit_reason} failed: {str(exc)[:240]}'})
+
+    def _polymarket_time_stop_loss(self, position: dict, percent_pnl) -> bool:
+        pnl = self._float(percent_pnl)
+        if pnl is None or pnl >= 0:
+            return False
+        slug = str(position.get('eventSlug') or position.get('slug') or '')
+        parts = slug.split('-')
+        if len(parts) < 2:
+            return False
+        try:
+            start_ts = int(parts[-1])
+        except ValueError:
+            return False
+        interval = 900 if '15m' in slug else 300 if '5m' in slug else 0
+        if interval <= 0:
+            return False
+        start = datetime.fromtimestamp(start_ts, UTC)
+        elapsed = (datetime.now(UTC) - start).total_seconds()
+        progress = elapsed / interval
+        return 0.75 <= progress <= 1.25
 
     def _fetch_polymarket_positions(self) -> list[dict]:
         user = settings.polymarket_funder_address or os.getenv('FUNDER_ADDRESS', '')
@@ -500,19 +522,32 @@ class PaperTradingTool(BaseTool):
         client.set_api_creds(client.derive_api_key())
         tick_size = client.get_tick_size(token_id)
         neg_risk = client.get_neg_risk(token_id)
-        slippage = max(0, float(os.getenv('POLYMARKET_MARKET_SELL_SLIPPAGE', '0.05') or 0.05))
-        limit_price = max(0.01, min(0.99, current_price - slippage))
-        response = client.create_and_post_market_order(
-            MarketOrderArgsV2(
-                token_id=token_id,
-                side=Side.SELL,
-                amount=round(shares, 6),
-                price=round(limit_price, 2),
-                order_type=OrderType.FAK,
-            ),
-            PartialCreateOrderOptions(tick_size=tick_size, neg_risk=bool(neg_risk)),
-            OrderType.FAK,
-        )
+        base_slippage = max(0, float(os.getenv('POLYMARKET_MARKET_SELL_SLIPPAGE', '0.05') or 0.05))
+        retry_slippage = max(base_slippage, float(os.getenv('POLYMARKET_MARKET_SELL_RETRY_SLIPPAGE', '0.20') or 0.20))
+        response = None
+        limit_price = None
+        last_exc = None
+        for slippage in dict.fromkeys([base_slippage, retry_slippage]):
+            limit_price = max(0.01, min(0.99, current_price - slippage))
+            try:
+                response = client.create_and_post_market_order(
+                    MarketOrderArgsV2(
+                        token_id=token_id,
+                        side=Side.SELL,
+                        amount=round(shares, 6),
+                        price=round(limit_price, 2),
+                        order_type=OrderType.FAK,
+                    ),
+                    PartialCreateOrderOptions(tick_size=tick_size, neg_risk=bool(neg_risk)),
+                    OrderType.FAK,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if 'no orders found to match' not in str(exc).lower() or slippage == retry_slippage:
+                    raise
+        if response is None:
+            raise last_exc or RuntimeError('Polymarket market sell failed')
         return {
             'order_id': response.get('orderID') or response.get('order_id'),
             'status': response.get('status'),

@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
         "polymarket_btc_updown": {
             "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
             "stake": ["manual fixed stake only: 1, 2 or 3 USDT"],
-            "exit": ["SL at -8.34% position value (3.00 -> 2.75 USDT)", "TP at +100% position value (3.00 -> 6.00 USDT)", "manual liquidation button per trade"],
+            "exit": ["SL at -8.34% position value (3.00 -> 2.75 USDT)", "TP at +100% position value (3.00 -> 6.00 USDT)", "manual liquidation button per trade", "time stop at 75% of window when PnL remains negative"],
             "modes": ["observe", "paper", "live"],
         },
     },

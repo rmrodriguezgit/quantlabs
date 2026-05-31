@@ -404,7 +404,7 @@ def _default_polymarket_rules() -> dict[str, Any]:
         "polymarket_btc_updown": {
             "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
             "stake": ["manual fixed stake only: 1, 2 or 3 USDT", "no martingale", "no averaging down"],
-            "exit": ["SL: liquidate when position value is down 8.34% or more, e.g. 3.00 -> 2.75 USDT", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade"],
+            "exit": ["SL: liquidate when position value is down 8.34% or more, e.g. 3.00 -> 2.75 USDT", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop: after 75% of the window, liquidate if PnL remains negative"],
         }
     }
 
