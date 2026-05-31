@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>QuantLabs AI - LLM Local</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/dashboard/css/style.css?v=20260528-command-center-1"/>
+  <link rel="stylesheet" href="/dashboard/css/theme.css?v=20260531-theme-1"/>
+  <link rel="stylesheet" href="./css/llm.css?v=20260531-llm-ui-1"/>
+</head>
+<body class="llm-page">
+<header>
+  <a href="/dashboard/" class="logo"><div class="logo-icon">QL</div><span class="logo-name">QuantLabs AI</span><span class="logo-badge">LLM</span></a>
+  <div class="header-right">
+    <div class="session-pill"><div class="session-dot"></div><span id="llmStatus">Conectando</span></div>
+    <a href="/dashboard/" class="session-pill">Dashboard</a>
+    <a href="/logout" class="btn-logout">Cerrar sesion</a>
+  </div>
+</header>
+<div class="layout">
+  <aside></aside>
+  <main class="llm-shell">
+    <section class="llm-hero fade">
+      <div>
+        <p class="eyebrow">LLM LOCAL</p>
+        <h1>Modelo privado en QuantLabs</h1>
+        <p>Consulta directa al servidor llama.cpp sin exponer la interfaz generada.</p>
+      </div>
+      <div class="llm-model-card">
+        <span>Modelo activo</span>
+        <strong id="modelName">--</strong>
+      </div>
+    </section>
+
+    <section class="llm-grid fade">
+      <article class="llm-panel prompt-panel">
+        <div class="panel-head"><div><p>PROMPT</p><h2>Consulta</h2></div><span id="requestState">LISTO</span></div>
+        <form id="promptForm" class="prompt-form">
+          <label>
+            <span>Modelo disponible</span>
+            <select id="modelSelect"></select>
+          </label>
+          <label>
+            <span>Instruccion</span>
+            <textarea id="prompt" rows="10" placeholder="Escribe aqui tu consulta para el modelo local..."></textarea>
+          </label>
+          <div class="prompt-options">
+            <label><span>Tokens</span><input id="maxTokens" type="number" min="16" max="2048" step="16" value="384"></label>
+            <label><span>Temperatura</span><input id="temperature" type="number" min="0" max="2" step="0.1" value="0.7"></label>
+            <button id="runBtn" type="submit">Enviar</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="llm-panel response-panel">
+        <div class="panel-head"><div><p>RESPUESTA</p><h2>Salida del modelo</h2></div><span id="tokenUsage">--</span></div>
+        <pre id="responseBox">Listo para consultar.</pre>
+      </article>
+
+      <article class="llm-panel health-panel">
+        <div class="panel-head"><div><p>SERVIDOR</p><h2>Estado</h2></div><span id="serverBadge">SYNC</span></div>
+        <div id="gpuControl" class="gpu-control-box"></div>
+        <div id="serverInfo" class="server-info"></div>
+      </article>
+    </section>
+  </main>
+</div>
+<script src="/dashboard/js/theme.js?v=20260531-theme-1"></script>
+<script src="/dashboard/js/platform-menu.js?v=20260531-theme-1"></script>
+<script src="./js/llm.js?v=20260531-llm-ui-1"></script>
+</body>
+</html>
