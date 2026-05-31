@@ -148,8 +148,20 @@ Reglas base: confidence >= 0.80, edge >= 0.03, spread <= 0.08, ask_size >= 1, se
         for item in (research.get('artifacts') or {}).values():
             if item and item not in ctx.state.artifacts:
                 ctx.state.artifacts.append(item)
-        final = self._format_signal_flow(signal, research, artifact)
+        if self._prefers_btc_updown_table(objective):
+            final = FinanceAgent()._format_btc_updown_response(signal)
+        else:
+            final = self._format_signal_flow(signal, research, artifact)
         return {'agent': self.name, 'objective': objective, 'result': final, 'events': events, 'usage': {}, 'last_usage': {}}
+
+    def _prefers_btc_updown_table(self, objective: str) -> bool:
+        text = str(objective or '').lower()
+        return (
+            'btc-updown-5m' in text
+            or 'btc-updown-15m' in text
+            or 'chainlink_1m_bounded_nowcast' in text
+            or 'mismo criterio del cron polymarket' in text
+        )
 
     def _write_signal_artifact(self, session_id: str, objective: str, signal: dict, research: dict, snapshot: dict) -> str:
         root = Path('storage/artifacts/polymrkt') / self._safe(session_id)

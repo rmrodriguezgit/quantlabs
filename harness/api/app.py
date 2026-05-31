@@ -43,9 +43,14 @@ def active_llm_model() -> str:
 
 
 def route_agent_for_model(agent: str) -> str:
-    if "qwen2.5-coder" in active_llm_model().lower():
+    requested = (agent or "planner").strip()
+    if "qwen2.5-coder" in active_llm_model().lower() and requested in {"coding", "codex4u"}:
         return "codex4u"
-    return agent
+    return requested
+
+
+def rag_enabled_for_agent(agent: str) -> bool:
+    return (agent or "").strip() not in {"polymrkt"}
 
 
 def rag_context(user_id: str, session_id: str, prompt: str) -> str:
@@ -446,8 +451,9 @@ def chat():
         context = uploads.context(request.identity['user_id'], file_ids)
         if context:
             prompt = f"{prompt}\n\n[Archivos adjuntos disponibles]\n{context}"
-        memory_context = rag_context(request.identity['user_id'], session_id, prompt)
-        if memory_context:
+        use_rag = rag_enabled_for_agent(agent)
+        memory_context = rag_context(request.identity['user_id'], session_id, prompt) if use_rag else ""
+        if use_rag and memory_context:
             prompt = f"{prompt}\n\n[Memoria RAG relevante]\n{memory_context}"
         result = engine.chat(
             session_id,
@@ -458,7 +464,7 @@ def chat():
         )
         result.setdefault("metadata", {})["active_model"] = active_llm_model()
         result["metadata"]["effective_agent"] = agent
-        result["metadata"]["rag_enabled"] = True
+        result["metadata"]["rag_enabled"] = use_rag
         remember_exchange(request.identity['user_id'], session_id, agent, prompt, result.get("response", ""))
         return jsonify(result)
     except PermissionError as exc:
