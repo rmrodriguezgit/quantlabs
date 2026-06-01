@@ -10,7 +10,7 @@ const el={
   responseStatus:document.getElementById('responseStatus'), tokenUsage:document.getElementById('tokenUsage'), diagnosticPanel:document.getElementById('diagnosticPanel'),
   searchNav:document.getElementById('searchNav'), pluginsNav:document.getElementById('pluginsNav'), automationsNav:document.getElementById('automationsNav'), artifactsNav:document.getElementById('artifactsNav'), projectNav:document.getElementById('projectNav'),
   chatSearch:document.getElementById('chatSearch'), sidePanel:document.getElementById('sidePanel'), sidePanelTitle:document.getElementById('sidePanelTitle'), sidePanelKicker:document.getElementById('sidePanelKicker'), sidePanelBody:document.getElementById('sidePanelBody'), closeSidePanel:document.getElementById('closeSidePanel'), panelBackdrop:document.getElementById('panelBackdrop'),
-  showRag:document.getElementById('showRag'), modelStatusPill:document.getElementById('modelStatusPill')
+  modelStatusPill:document.getElementById('modelStatusPill')
 };
 const AGENTS={
   planner:{icon:'🧭',label:'Planner',className:'agent-planner'},
@@ -264,9 +264,10 @@ async function copyText(text){
   const area=document.createElement('textarea');
   area.value=text;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();document.execCommand('copy');area.remove();
 }
-function messageActions(role){
+function messageActions(role,hasRag=false){
   if(role==='user'){
-    return '<div class="msg-actions"><button class="msg-action copy-message" title="Copiar petición" aria-label="Copiar petición">⧉</button><button class="msg-action retry-message" title="Volver a ejecutar" aria-label="Volver a ejecutar">↻</button><button class="msg-action edit-message" title="Editar prompt" aria-label="Editar prompt">✎</button></div>';
+    const rag=hasRag?'<button class="msg-action rag-toggle-message" title="Mostrar/ocultar memoria RAG" aria-label="Mostrar/ocultar memoria RAG">◫</button>':'';
+    return `<div class="msg-actions">${rag}<button class="msg-action copy-message" title="Copiar petición" aria-label="Copiar petición">⧉</button><button class="msg-action retry-message" title="Volver a ejecutar" aria-label="Volver a ejecutar">↻</button><button class="msg-action edit-message" title="Editar prompt" aria-label="Editar prompt">✎</button></div>`;
   }
   return '<div class="msg-actions"><button class="msg-action copy-message" title="Copiar respuesta" aria-label="Copiar respuesta">⧉</button></div>';
 }
@@ -279,14 +280,14 @@ function addMessage(role,body,{autoScroll=true,duration='',ragContext=''}={}){
   item.dataset.role=role;
   const label=role==='user'?'Tu petición':`${meta.icon} ${meta.label}${duration?` · ${duration}`:''}`;
   const ragHtml=role==='user'&&ragContext?renderRagContext(ragContext):'';
-  item.innerHTML=`<div class="msg-top"><span class="msg-label">${label}</span>${messageActions(role)}</div><div class="msg-body">${renderMessageBody(body)}${ragHtml}</div>`;
+  item.innerHTML=`<div class="msg-top"><span class="msg-label">${label}</span>${messageActions(role,Boolean(ragContext))}</div><div class="msg-body">${renderMessageBody(body)}${ragHtml}</div>`;
   el.messages.appendChild(item);
   if(autoScroll)scrollMessagesToBottom();
   return item;
 }
 function renderRagContext(ragContext=''){
   if(!ragContext)return '';
-  return `<details class="rag-context user-rag"><summary>Memoria RAG relevante</summary><pre>${esc(ragContext)}</pre></details>`;
+  return `<details class="rag-context user-rag" hidden><summary>Memoria RAG relevante</summary><pre>${esc(ragContext)}</pre></details>`;
 }
 function attachRagToUserMessage(item,ragContext=''){
   if(!item||!ragContext)return;
@@ -542,6 +543,11 @@ el.chatList.onclick=async e=>{
 el.messages.onclick=async e=>{
   const msg=e.target.closest('.msg'); if(!msg) return;
   const raw=msg.dataset.raw||'';
+  if(e.target.closest('.rag-toggle-message')){
+    const rag=msg.querySelector('.rag-context');
+    if(rag){rag.hidden=!rag.hidden; if(!rag.hidden)rag.open=true;}
+    return;
+  }
   if(e.target.closest('.copy-message')){
     await copyText(raw);
     const btn=e.target.closest('.copy-message'); if(btn){const original=btn.textContent;btn.textContent='✓';setTimeout(()=>btn.textContent=original,900)}
@@ -570,7 +576,7 @@ async function sendPrompt(message){
   setRunningState(true);
   setResponseStatus('request','Request','Prompt recibido, esperando al LLM');
   try{
-    const data=await api('/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:currentChatController.signal,body:JSON.stringify({session_id:currentSessionId,message:outboundMessage,agent:selectedAgent,file_ids:[...activeFileIds],show_rag:Boolean(el.showRag?.checked)})});
+    const data=await api('/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:currentChatController.signal,body:JSON.stringify({session_id:currentSessionId,message:outboundMessage,agent:selectedAgent,file_ids:[...activeFileIds],show_rag:true})});
     const latestTask=(data.tasks||[]).at(-1)||{};
     attachRagToUserMessage(userMessageEl,data.metadata?.rag_context||'');
     addMessage('assistant',data.response||data.final||JSON.stringify(data),{autoScroll:true,duration:taskDuration(latestTask)});
