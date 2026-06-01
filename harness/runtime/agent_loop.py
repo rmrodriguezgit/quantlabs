@@ -133,6 +133,7 @@ class AgentLoop:
         lines = ["Señal operativa Polymarket BTC:"]
         for signal in signals[:4]:
             prophet = signal.get("prophet") or {}
+            model = signal.get("model") or prophet.get("model") or prophet.get("status") or "n/d"
             confidence = signal.get("confidence")
             confidence_text = f"{confidence:.1%}" if isinstance(confidence, int | float) else "sin probabilidad"
             decision = self._trade_decision(signal)
@@ -143,7 +144,7 @@ class AgentLoop:
                 f"confianza {confidence_text}, "
                 f"umbral 80% {'sí' if signal.get('meets_threshold') else 'no'}, "
                 f"precio {signal.get('current_price_reference')} vs inicio {signal.get('start_price_reference')}, "
-                f"modelo {prophet.get('status') or prophet.get('model') or 'n/d'}."
+                f"modelo {model}."
             )
         return "\n".join(lines)
 

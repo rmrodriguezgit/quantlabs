@@ -783,7 +783,7 @@ Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, sprea
             f'Decisión: {decision}',
             '',
             f'Actualización: {now_cdmx} / {now_et}',
-            'Modelo: señal coordinada BTC Up/Down 5m + 15m; predicción chainlink_1m_bounded_nowcast contra Precio a superar fijo de Polymarket.',
+            'Modelo: señal coordinada BTC Up/Down 5m + 15m; predicción híbrida Chainlink nowcast + score técnico contra Precio a superar fijo de Polymarket.',
             'Sizing: Kelly fraccional conservador; no ejecuta órdenes.',
             '',
             '| Mercado | Intervalo | Ventana ET | Countdown | Precio a superar | Cotización actual | Predicción cierre | Delta | Bid Up | Ask Up | Bid Down | Ask Down | Probabilidad | Certeza | Trade | Kelly | Stake Máx | Liquidez | Riesgo |',

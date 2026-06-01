@@ -332,3 +332,39 @@ def test_short_window_prediction_is_anchored_to_latest_price():
     assert result["model"] == "chainlink_1m_bounded_nowcast"
     assert abs(result["forecast_price_at_close"] - klines[-1]["close"]) < 10
     assert 0 <= result["up_probability"] <= 1
+
+
+def test_technical_probability_targets_price_to_beat():
+    tool = PolymarketTool()
+    base = 1_779_572_100_000
+    klines = [
+        {
+            "timestamp_ms": base + i * 60_000,
+            "open": 100 + i * 0.11,
+            "high": 100 + i * 0.11 + 0.18,
+            "low": 100 + i * 0.11 - 0.12,
+            "close": 100 + i * 0.11,
+        }
+        for i in range(90)
+    ]
+
+    result = tool._technical_probability(klines, 107.0, "2026-05-23T21:40:00Z", model_path="/missing/model.joblib")
+
+    assert result["model"] == "chainlink_technical_score"
+    assert result["status"] == "ok_rules_only"
+    assert 0 <= result["up_probability"] <= 1
+    assert result["features"]["target_price"] == 107.0
+    assert result["trained_model_status"] == "missing_model"
+
+
+def test_hybrid_probability_falls_back_to_nowcast_when_technical_missing():
+    tool = PolymarketTool()
+
+    result = tool._hybrid_probability(
+        {"model": "chainlink_1m_bounded_nowcast", "up_probability": 0.83, "forecast_price_at_close": 101.0},
+        {"status": "insufficient_data", "up_probability": None},
+    )
+
+    assert result["model"] == "chainlink_1m_bounded_nowcast"
+    assert result["up_probability"] == 0.83
+    assert result["components"]["technical_weight"] == 0.0

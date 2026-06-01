@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import UTC, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 import math
 import json
@@ -11,6 +12,7 @@ from .base import BaseTool
 MEXC_BASE_URL = "https://api.mexc.com"
 POLYMARKET_WEB_BASE_URL = "https://polymarket.com"
 POLYMARKET_TIMEZONE = ZoneInfo("America/New_York")
+TECHNICAL_MODEL_PATH = Path("storage/artifacts/models/polymarket_btc_updown_technical.joblib")
 
 class PolymarketTool(BaseTool):
     name = 'polymarket'
@@ -148,8 +150,15 @@ class PolymarketTool(BaseTool):
             target = market.get('price_to_beat_reference') or market.get('start_price_reference')
             end_time = market.get('end_time')
             prophet = self._prophet_probability(klines, target, end_time)
+            technical = self._technical_probability(
+                klines,
+                target,
+                end_time,
+                model_path=kwargs.get('technical_model_path') or TECHNICAL_MODEL_PATH,
+            )
+            hybrid = self._hybrid_probability(prophet, technical)
             orderbook = self._orderbook_probability(market)
-            up_probability = prophet.get('up_probability')
+            up_probability = hybrid.get('up_probability')
             down_probability = 1 - up_probability if up_probability is not None else None
             preferred = None
             confidence = None
@@ -171,13 +180,17 @@ class PolymarketTool(BaseTool):
                 'price_delta_reference': market.get('price_delta_reference'),
                 'side_now_reference': market.get('side_now_reference'),
                 'prophet': prophet,
-                'forecast_price_at_close': prophet.get('forecast_price_at_close'),
+                'nowcast': prophet,
+                'technical': technical,
+                'model_components': hybrid.get('components') or {},
+                'model': hybrid.get('model'),
+                'forecast_price_at_close': hybrid.get('forecast_price_at_close') or prophet.get('forecast_price_at_close'),
                 'prediction_candle_interval': prediction_interval,
                 'prediction_lookback': prediction_lookback,
                 'prediction_lookback_label': kwargs.get('lookback_window') or f'{lookback} candles',
                 'lstm': {
                     'status': 'not_configured',
-                    'reason': 'LSTM requires an isolated TensorFlow/PyTorch runtime before enabling live inference.',
+                    'reason': 'Replaced by lightweight Chainlink technical hybrid; no TensorFlow runtime required for live inference.',
                 },
                 'orderbook_probability': orderbook,
                 'preferred_side': preferred,
@@ -241,6 +254,10 @@ class PolymarketTool(BaseTool):
                 'price_to_beat_reference': signal.get('price_to_beat_reference'),
                 'current_price_reference': signal.get('current_price_reference'),
                 'forecast_price_at_close': signal.get('forecast_price_at_close'),
+                'model': signal.get('model'),
+                'model_components': signal.get('model_components') or {},
+                'nowcast_probability': ((signal.get('nowcast') or signal.get('prophet') or {}).get('up_probability')),
+                'technical_probability': ((signal.get('technical') or {}).get('up_probability')),
                 'window_et': f"{signal.get('start_time_et')} - {signal.get('end_time_et')}",
                 'passes_filters': not reasons,
                 'reasons': reasons,
@@ -366,9 +383,17 @@ class PolymarketTool(BaseTool):
         deduped = {int(row['time']): row for row in rows if row.get('time') is not None}
         out = []
         for ts in sorted(deduped)[-limit:]:
+            row = deduped[ts]
             close = self._float_or_none(deduped[ts].get('close'))
             if close is not None:
-                out.append({'timestamp_ms': ts * 1000, 'close': close})
+                out.append({
+                    'timestamp_ms': ts * 1000,
+                    'open': self._float_or_none(row.get('open')) or close,
+                    'high': self._float_or_none(row.get('high')) or close,
+                    'low': self._float_or_none(row.get('low')) or close,
+                    'close': close,
+                    'volume': self._float_or_none(row.get('volume')) or 0.0,
+                })
         return out
 
     def _chainlink_candles(self, interval: str, limit: int = 60, end_time_ms: int | None = None):
@@ -520,6 +545,331 @@ class PolymarketTool(BaseTool):
             'residual_sigma': round(sigma, 4),
             'up_probability': round(max(0, min(1, up_probability)), 4),
         }
+
+    def _technical_probability(self, klines: list[dict], target: float | None, end_time: str | None, model_path: str | Path | None = None):
+        """Technical Chainlink score inspired by the notebook, safe for live fallback.
+
+        It uses only already-fetched Chainlink 1m candles and targets the actual
+        Polymarket question: close above/below the fixed price_to_beat.
+        """
+        features = self._technical_feature_frame(klines, target, end_time)
+        if features.get('status') != 'ok':
+            return {
+                'status': features.get('status') or 'insufficient_data',
+                'model': 'chainlink_technical_score',
+                'up_probability': None,
+                'reason': features.get('reason'),
+            }
+
+        deterministic = self._technical_rule_probability(features)
+        model_payload = self._technical_model_probability(features, model_path)
+        model_probability = model_payload.get('up_probability')
+        if model_probability is not None:
+            up_probability = 0.65 * deterministic + 0.35 * model_probability
+            status = 'ok_model_blend'
+        else:
+            up_probability = deterministic
+            status = 'ok_rules_only'
+
+        return {
+            'status': status,
+            'model': 'chainlink_technical_score',
+            'up_probability': round(max(0.02, min(0.98, up_probability)), 4),
+            'rule_probability_up': round(deterministic, 4),
+            'trained_model_probability_up': round(model_probability, 4) if model_probability is not None else None,
+            'trained_model_status': model_payload.get('status'),
+            'feature_count': len(self._technical_feature_names()),
+            'features': {key: round(value, 6) for key, value in features.items() if isinstance(value, int | float)},
+        }
+
+    def _hybrid_probability(self, nowcast: dict, technical: dict):
+        nowcast_probability = nowcast.get('up_probability')
+        technical_probability = technical.get('up_probability')
+        forecast = nowcast.get('forecast_price_at_close')
+        if nowcast_probability is None:
+            return {
+                'status': 'no_nowcast',
+                'model': 'hybrid_chainlink_technical_nowcast',
+                'up_probability': technical_probability,
+                'forecast_price_at_close': forecast,
+                'components': {
+                    'nowcast_probability_up': None,
+                    'technical_probability_up': technical_probability,
+                    'technical_weight': 1.0 if technical_probability is not None else 0.0,
+                    'reason': 'nowcast_unavailable',
+                },
+            }
+        if technical_probability is None:
+            return {
+                'status': 'nowcast_only',
+                'model': nowcast.get('model') or 'chainlink_1m_bounded_nowcast',
+                'up_probability': nowcast_probability,
+                'forecast_price_at_close': forecast,
+                'components': {
+                    'nowcast_probability_up': nowcast_probability,
+                    'technical_probability_up': None,
+                    'technical_weight': 0.0,
+                    'reason': technical.get('status') or 'technical_unavailable',
+                },
+            }
+
+        trained = technical.get('trained_model_probability_up') is not None
+        technical_weight = 0.35 if trained else 0.22
+        feature_payload = technical.get('features') or {}
+        if not trained and not feature_payload.get('vol_30') and not feature_payload.get('range_15'):
+            technical_weight = 0.0
+        minutes_to_close = self._float_or_none((technical.get('features') or {}).get('minutes_to_close'))
+        if minutes_to_close is not None and minutes_to_close <= 1.0:
+            technical_weight *= 0.5
+        up_probability = (1 - technical_weight) * float(nowcast_probability) + technical_weight * float(technical_probability)
+        return {
+            'status': 'ok',
+            'model': 'hybrid_chainlink_technical_nowcast',
+            'up_probability': round(max(0.02, min(0.98, up_probability)), 4),
+            'forecast_price_at_close': forecast,
+            'components': {
+                'nowcast_probability_up': nowcast_probability,
+                'technical_probability_up': technical_probability,
+                'technical_weight': round(technical_weight, 4),
+                'technical_status': technical.get('status'),
+                'trained_model_probability_up': technical.get('trained_model_probability_up'),
+            },
+        }
+
+    def _technical_feature_frame(self, klines: list[dict], target: float | None, end_time: str | None):
+        try:
+            import numpy as np
+        except Exception as exc:
+            return {'status': 'unavailable', 'reason': str(exc)[:160]}
+        if target is None or not end_time or len(klines) < 30:
+            return {'status': 'insufficient_data', 'reason': 'target/end_time/30_candles_required'}
+
+        closes = np.array([self._float_or_none(row.get('close')) for row in klines], dtype=float)
+        highs = np.array([self._float_or_none(row.get('high')) for row in klines], dtype=float)
+        lows = np.array([self._float_or_none(row.get('low')) for row in klines], dtype=float)
+        opens = np.array([self._float_or_none(row.get('open')) for row in klines], dtype=float)
+        times = np.array([self._float_or_none(row.get('timestamp_ms')) for row in klines], dtype=float) / 1000
+        valid = np.isfinite(closes) & np.isfinite(times)
+        closes = closes[valid]
+        highs = highs[valid]
+        lows = lows[valid]
+        opens = opens[valid]
+        times = times[valid]
+        if len(closes) < 30:
+            return {'status': 'insufficient_data', 'reason': 'not_enough_valid_closes'}
+        highs = np.where(np.isfinite(highs), highs, closes)
+        lows = np.where(np.isfinite(lows), lows, closes)
+        opens = np.where(np.isfinite(opens), opens, closes)
+
+        end_dt = self._parse_dt(end_time)
+        if not end_dt:
+            return {'status': 'insufficient_data', 'reason': 'invalid_end_time'}
+        minutes_to_close = max(0.0, min(15.0, (end_dt.timestamp() - float(times[-1])) / 60.0))
+        current = float(closes[-1])
+        diffs = np.diff(closes)
+        returns = np.diff(np.log(np.maximum(closes, 1e-9)))
+        range_last = max(1e-9, float(highs[-1] - lows[-1]))
+        body = abs(float(closes[-1] - opens[-1])) / range_last
+        upper_wick = (float(highs[-1]) - max(float(closes[-1]), float(opens[-1]))) / range_last
+        lower_wick = (min(float(closes[-1]), float(opens[-1])) - float(lows[-1])) / range_last
+        close_pos = (float(closes[-1]) - float(lows[-1])) / range_last
+        close_pos = max(0.0, min(1.0, close_pos))
+
+        return {
+            'status': 'ok',
+            'current_price': current,
+            'target_price': float(target),
+            'minutes_to_close': minutes_to_close,
+            'distance_to_target': current - float(target),
+            'rsi_14': self._rsi(closes, 14),
+            'rsi_7': self._rsi(closes, 7),
+            'ema_cross': self._ema_cross(closes, 9, 21),
+            'ema_trend': self._ema_cross(closes, 21, 50),
+            'macd_hist': self._macd_hist(closes),
+            'bb_pct': self._bb_pct(closes),
+            'bb_width': self._bb_width(closes),
+            'atr_pct': self._atr_pct(highs, lows, closes),
+            'ret_1': float(returns[-1]) if len(returns) >= 1 else 0.0,
+            'ret_3': float(np.sum(returns[-3:])) if len(returns) >= 3 else 0.0,
+            'ret_6': float(np.sum(returns[-6:])) if len(returns) >= 6 else 0.0,
+            'momentum_3': float(np.mean(diffs[-3:])) if len(diffs) >= 3 else 0.0,
+            'momentum_6': float(np.mean(diffs[-6:])) if len(diffs) >= 6 else 0.0,
+            'momentum_12': float(np.mean(diffs[-12:])) if len(diffs) >= 12 else 0.0,
+            'vol_30': float(np.std(diffs[-30:])) if len(diffs) >= 2 else 0.0,
+            'range_15': float(np.max(closes[-15:]) - np.min(closes[-15:])),
+            'close_pos': close_pos,
+            'body': min(2.0, body),
+            'upper_wick': min(2.0, upper_wick),
+            'lower_wick': min(2.0, lower_wick),
+            'bullish_candle': 1.0 if closes[-1] > opens[-1] else 0.0,
+            'strong_bull': 1.0 if body > 0.6 and closes[-1] > opens[-1] else 0.0,
+            'strong_bear': 1.0 if body > 0.6 and closes[-1] <= opens[-1] else 0.0,
+        }
+
+    def _technical_rule_probability(self, features: dict) -> float:
+        distance = float(features.get('distance_to_target') or 0.0)
+        minutes = max(0.25, float(features.get('minutes_to_close') or 0.25))
+        momentum = (
+            0.50 * float(features.get('momentum_3') or 0.0)
+            + 0.30 * float(features.get('momentum_6') or 0.0)
+            + 0.20 * float(features.get('momentum_12') or 0.0)
+        )
+        projected_distance = distance + momentum * minutes
+        sigma = max(
+            3.0,
+            float(features.get('vol_30') or 0.0) * math.sqrt(minutes),
+            float(features.get('range_15') or 0.0) / 4.0,
+        )
+        z = projected_distance / sigma
+        probability = 0.5 * (1 + math.erf(z / math.sqrt(2)))
+
+        rsi = float(features.get('rsi_14') or 50.0)
+        macd_hist = float(features.get('macd_hist') or 0.0)
+        ema_cross = float(features.get('ema_cross') or 0.0)
+        bb_pct = float(features.get('bb_pct') or 0.5)
+        candle_bias = 0.0
+        candle_bias += 0.018 if features.get('strong_bull') else 0.0
+        candle_bias -= 0.018 if features.get('strong_bear') else 0.0
+        candle_bias += 0.012 if features.get('lower_wick', 0) > 1.5 * max(features.get('body', 0), 0.05) else 0.0
+        candle_bias -= 0.012 if features.get('upper_wick', 0) > 1.5 * max(features.get('body', 0), 0.05) else 0.0
+
+        adjustment = 0.0
+        adjustment += max(-0.04, min(0.04, ema_cross / 200.0))
+        adjustment += max(-0.035, min(0.035, macd_hist / max(20.0, sigma * 3.0)))
+        if rsi >= 72:
+            adjustment -= min(0.035, (rsi - 72) / 600.0)
+        elif rsi <= 28:
+            adjustment += min(0.035, (28 - rsi) / 600.0)
+        if bb_pct >= 0.95:
+            adjustment -= 0.018
+        elif bb_pct <= 0.05:
+            adjustment += 0.018
+        adjustment += candle_bias
+        return max(0.02, min(0.98, probability + adjustment))
+
+    def _technical_model_probability(self, features: dict, model_path: str | Path | None):
+        if not model_path:
+            return {'status': 'not_configured', 'up_probability': None}
+        path = Path(model_path)
+        if not path.exists():
+            return {'status': 'missing_model', 'up_probability': None}
+        try:
+            import joblib
+            import numpy as np
+        except Exception as exc:
+            return {'status': f'unavailable: {str(exc)[:120]}', 'up_probability': None}
+        try:
+            artifact = joblib.load(path)
+            names = artifact.get('feature_names') or self._technical_feature_names()
+            row = np.array([[float(features.get(name) or 0.0) for name in names]], dtype=float)
+            scaler = artifact.get('scaler')
+            if scaler is not None:
+                row = scaler.transform(row)
+            model = artifact.get('model')
+            if not model or not hasattr(model, 'predict_proba'):
+                return {'status': 'invalid_model', 'up_probability': None}
+            proba = model.predict_proba(row)
+            classes = list(getattr(model, 'classes_', []))
+            idx = classes.index(1) if 1 in classes else -1
+            if idx < 0:
+                return {'status': 'missing_up_class', 'up_probability': None}
+            return {'status': 'ok', 'up_probability': float(proba[0][idx])}
+        except Exception as exc:
+            return {'status': f'error: {str(exc)[:120]}', 'up_probability': None}
+
+    def _technical_feature_names(self):
+        return [
+            'distance_to_target', 'minutes_to_close',
+            'rsi_14', 'rsi_7',
+            'ema_cross', 'ema_trend',
+            'macd_hist', 'bb_pct', 'bb_width', 'atr_pct',
+            'ret_1', 'ret_3', 'ret_6',
+            'momentum_3', 'momentum_6', 'momentum_12',
+            'vol_30', 'range_15',
+            'close_pos', 'body', 'upper_wick', 'lower_wick',
+            'bullish_candle', 'strong_bull', 'strong_bear',
+        ]
+
+    def _ema(self, values, span: int):
+        try:
+            import numpy as np
+        except Exception:
+            return []
+        arr = np.asarray(values, dtype=float)
+        if len(arr) == 0:
+            return arr
+        alpha = 2.0 / (span + 1.0)
+        out = np.empty_like(arr, dtype=float)
+        out[0] = arr[0]
+        for idx in range(1, len(arr)):
+            out[idx] = alpha * arr[idx] + (1 - alpha) * out[idx - 1]
+        return out
+
+    def _ema_cross(self, closes, fast: int, slow: int) -> float:
+        if len(closes) < max(fast, slow):
+            return 0.0
+        fast_value = float(self._ema(closes, fast)[-1])
+        slow_value = float(self._ema(closes, slow)[-1])
+        return (fast_value - slow_value) / slow_value * 100.0 if slow_value else 0.0
+
+    def _macd_hist(self, closes) -> float:
+        if len(closes) < 26:
+            return 0.0
+        macd = self._ema(closes, 12) - self._ema(closes, 26)
+        signal = self._ema(macd, 9)
+        return float(macd[-1] - signal[-1])
+
+    def _rsi(self, closes, window: int) -> float:
+        try:
+            import numpy as np
+        except Exception:
+            return 50.0
+        if len(closes) <= window:
+            return 50.0
+        diffs = np.diff(closes)
+        recent = diffs[-window:]
+        gains = np.maximum(recent, 0.0)
+        losses = np.maximum(-recent, 0.0)
+        avg_gain = float(np.mean(gains))
+        avg_loss = float(np.mean(losses))
+        if avg_loss == 0:
+            return 100.0 if avg_gain > 0 else 50.0
+        rs = avg_gain / avg_loss
+        return float(100.0 - (100.0 / (1.0 + rs)))
+
+    def _bb_pct(self, closes) -> float:
+        try:
+            import numpy as np
+        except Exception:
+            return 0.5
+        window = closes[-20:] if len(closes) >= 20 else closes
+        mid = float(np.mean(window))
+        std = float(np.std(window))
+        upper = mid + 2 * std
+        lower = mid - 2 * std
+        return float((closes[-1] - lower) / (upper - lower)) if upper > lower else 0.5
+
+    def _bb_width(self, closes) -> float:
+        try:
+            import numpy as np
+        except Exception:
+            return 0.0
+        window = closes[-20:] if len(closes) >= 20 else closes
+        mid = float(np.mean(window))
+        std = float(np.std(window))
+        return float((4 * std) / mid * 100.0) if mid else 0.0
+
+    def _atr_pct(self, highs, lows, closes) -> float:
+        try:
+            import numpy as np
+        except Exception:
+            return 0.0
+        if len(closes) < 2:
+            return 0.0
+        prev_close = np.roll(closes, 1)
+        tr = np.maximum(highs - lows, np.maximum(np.abs(highs - prev_close), np.abs(lows - prev_close)))
+        atr = float(np.mean(tr[-14:])) if len(tr) >= 14 else float(np.mean(tr[1:]))
+        return atr / float(closes[-1]) * 100.0 if closes[-1] else 0.0
 
     def _trend_probability(self, klines: list[dict], target: float, end_time: str):
         try:
