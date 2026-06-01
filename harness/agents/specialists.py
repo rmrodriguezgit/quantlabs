@@ -148,11 +148,21 @@ Reglas base: confidence >= 0.80, edge >= 0.03, spread <= 0.08, ask_size >= 1, se
         for item in (research.get('artifacts') or {}).values():
             if item and item not in ctx.state.artifacts:
                 ctx.state.artifacts.append(item)
-        if self._prefers_btc_updown_table(objective):
+        if self._prefers_hybrid_prediction_simulation(objective):
+            final = self._format_hybrid_prediction_simulation(signal, artifact)
+        elif self._prefers_btc_updown_table(objective):
             final = FinanceAgent()._format_btc_updown_response(signal)
         else:
             final = self._format_signal_flow(signal, research, artifact)
         return {'agent': self.name, 'objective': objective, 'result': final, 'events': events, 'usage': {}, 'last_usage': {}}
+
+    def _prefers_hybrid_prediction_simulation(self, objective: str) -> bool:
+        text = str(objective or '').lower()
+        return (
+            ('simula' in text or 'simulación' in text or 'simulacion' in text)
+            and ('predicción' in text or 'prediccion' in text or 'predictor' in text or 'modelo híbrido' in text or 'modelo hibrido' in text)
+            and ('polymarket' in text or 'btc' in text or 'bitcoin' in text)
+        )
 
     def _prefers_btc_updown_table(self, objective: str) -> bool:
         text = str(objective or '').lower()
@@ -162,6 +172,55 @@ Reglas base: confidence >= 0.80, edge >= 0.03, spread <= 0.08, ask_size >= 1, se
             or 'chainlink_1m_bounded_nowcast' in text
             or 'mismo criterio del cron polymarket' in text
         )
+
+    def _format_hybrid_prediction_simulation(self, signal: dict, artifact: str) -> str:
+        decision = signal.get('side') if signal.get('action') == 'TRADE' else 'NO TRADE'
+        lines = [
+            f'Decisión simulada: {decision}',
+            '',
+            'Simulación predictiva Polymarket BTC Up/Down',
+            '',
+            'Modelo activo: hybrid_chainlink_technical_nowcast',
+            'Alcance: solo predicción y filtros; no ejecuta órdenes, no firma CLOB, no toca posiciones abiertas.',
+            '',
+            '| Intervalo | Ventana ET | Countdown | Lado predicho | Prob final | Nowcast UP | Técnico UP | Peso técnico | Modelo técnico | Ask | Edge | Pasa filtros | Riesgo |',
+            '|---|---|---:|---|---:|---:|---:|---:|---|---:|---:|---|---|',
+        ]
+        candidates = signal.get('candidates') or []
+        signals_by_interval = {item.get('interval'): item for item in signal.get('signals') or []}
+        for candidate in candidates:
+            interval = candidate.get('interval')
+            raw_signal = signals_by_interval.get(interval) or {}
+            components = candidate.get('model_components') or raw_signal.get('model_components') or {}
+            technical = raw_signal.get('technical') or {}
+            micro = candidate.get('microstructure') or {}
+            lines.append(
+                f"| {self._cell(interval)} | "
+                f"{self._cell(candidate.get('window_et'))} | "
+                f"{self._cell(candidate.get('countdown'))} | "
+                f"{self._cell(candidate.get('preferred_side'))} | "
+                f"{self._pct(candidate.get('probability'))} | "
+                f"{self._pct(components.get('nowcast_probability_up'))} | "
+                f"{self._pct(components.get('technical_probability_up'))} | "
+                f"{self._pct(components.get('technical_weight'))} | "
+                f"{self._cell(technical.get('status') or components.get('technical_status'))} | "
+                f"{self._num(micro.get('ask'))} | "
+                f"{self._num(candidate.get('edge'))} | "
+                f"{'sí' if candidate.get('passes_filters') else 'no'} | "
+                f"{self._cell(', '.join(candidate.get('reasons') or []) or 'sin bloqueo')} |"
+            )
+        if not candidates:
+            lines.append('| — | — | — | — | — | — | — | — | — | — | — | no | sin candidatos |')
+        lines.extend([
+            '',
+            'Lectura:',
+            '- Prob final combina nowcast Chainlink 1m con score técnico inspirado en el notebook.',
+            '- El modelo técnico entrenado es secundario; si falta o falla, el sistema usa reglas técnicas y fallback al nowcast.',
+            '- TRADE simulado solo aparece si pasa confianza, edge, spread, profundidad y tiempo al cierre.',
+            '',
+            f"Artefacto auditoría: {artifact}",
+        ])
+        return '\n'.join(lines)
 
     def _write_signal_artifact(self, session_id: str, objective: str, signal: dict, research: dict, snapshot: dict) -> str:
         root = Path('storage/artifacts/polymrkt') / self._safe(session_id)
