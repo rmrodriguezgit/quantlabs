@@ -431,8 +431,8 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "max_stake_pct": latest.get("max_stake_pct") or config.get("max_stake_pct"),
         "polymarket_stake_usdt": config.get("polymarket_stake_usdt", latest.get("polymarket_stake_usdt", 1)),
         "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", latest.get("polymarket_auto_liquidate_enabled", True)),
-        "polymarket_time_stop_pct": config.get("polymarket_time_stop_pct", latest.get("polymarket_time_stop_pct", 75)),
-        "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", latest.get("polymarket_take_profit_pct", 100)),
+        "polymarket_time_stop_pct": _bounded_percent(config.get("polymarket_time_stop_pct", latest.get("polymarket_time_stop_pct", 75)), 75, 10, 99),
+        "polymarket_take_profit_pct": _bounded_percent(config.get("polymarket_take_profit_pct", latest.get("polymarket_take_profit_pct", 100)), 100, 10, 500),
         "polymarket_invert_prediction_enabled": config.get("polymarket_invert_prediction_enabled", latest.get("polymarket_invert_prediction_enabled", False)),
         "orders": orders,
         "observations": observations,
@@ -460,6 +460,16 @@ def _paper_trading_config_path() -> Path:
 
 
 POLYMARKET_STAKE_CHOICES = {1.0, 2.0, 3.0}
+
+
+def _bounded_percent(value: Any, default: float, minimum: float, maximum: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = default
+    if number < minimum:
+        number = default
+    return max(minimum, min(maximum, float(number)))
 
 
 def _load_paper_trading_config() -> dict[str, Any]:
@@ -508,9 +518,9 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
     if "polymarket_auto_liquidate_enabled" in data or "auto_liquidate" in data:
         config["polymarket_auto_liquidate_enabled"] = bool(data.get("polymarket_auto_liquidate_enabled", data.get("auto_liquidate")))
     if "polymarket_time_stop_pct" in data:
-        config["polymarket_time_stop_pct"] = max(1.0, min(99.0, float(data["polymarket_time_stop_pct"])))
+        config["polymarket_time_stop_pct"] = _bounded_percent(data["polymarket_time_stop_pct"], 75, 10, 99)
     if "polymarket_take_profit_pct" in data:
-        config["polymarket_take_profit_pct"] = max(1.0, min(500.0, float(data["polymarket_take_profit_pct"])))
+        config["polymarket_take_profit_pct"] = _bounded_percent(data["polymarket_take_profit_pct"], 100, 10, 500)
     if "polymarket_invert_prediction_enabled" in data:
         config["polymarket_invert_prediction_enabled"] = bool(data.get("polymarket_invert_prediction_enabled"))
     if "live_execution_enabled" in data:
@@ -524,8 +534,8 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
     config.setdefault("venues", ["polymarket"])
     config.setdefault("polymarket_stake_usdt", 1)
     config.setdefault("polymarket_auto_liquidate_enabled", True)
-    config.setdefault("polymarket_time_stop_pct", 75)
-    config.setdefault("polymarket_take_profit_pct", 100)
+    config["polymarket_time_stop_pct"] = _bounded_percent(config.get("polymarket_time_stop_pct"), 75, 10, 99)
+    config["polymarket_take_profit_pct"] = _bounded_percent(config.get("polymarket_take_profit_pct"), 100, 10, 500)
     config.setdefault("polymarket_invert_prediction_enabled", False)
     config.setdefault("live_execution_enabled", False)
     return config
@@ -541,8 +551,8 @@ def paper_trading_rules_payload() -> dict[str, Any]:
         "mode": config.get("mode", "observe"),
         "polymarket_stake_usdt": config.get("polymarket_stake_usdt", 1),
         "polymarket_auto_liquidate_enabled": config.get("polymarket_auto_liquidate_enabled", True),
-        "polymarket_time_stop_pct": config.get("polymarket_time_stop_pct", 75),
-        "polymarket_take_profit_pct": config.get("polymarket_take_profit_pct", 100),
+        "polymarket_time_stop_pct": _bounded_percent(config.get("polymarket_time_stop_pct"), 75, 10, 99),
+        "polymarket_take_profit_pct": _bounded_percent(config.get("polymarket_take_profit_pct"), 100, 10, 500),
         "polymarket_invert_prediction_enabled": config.get("polymarket_invert_prediction_enabled", False),
         "rules": rules,
         "config_path": str(config_path),

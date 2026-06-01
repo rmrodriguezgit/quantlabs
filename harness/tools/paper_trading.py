@@ -78,8 +78,8 @@ class PaperTradingTool(BaseTool):
             'polymarket_stake_usdt': polymarket_stake_usdt,
             'kelly_fraction': kelly_fraction,
             'polymarket_auto_liquidate_enabled': self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True),
-            'polymarket_time_stop_pct': float(kwargs.get('polymarket_time_stop_pct') or os.getenv('POLYMARKET_TIME_STOP_PCT', '75') or 75),
-            'polymarket_take_profit_pct': float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100),
+            'polymarket_time_stop_pct': self._percent_setting(kwargs.get('polymarket_time_stop_pct') or os.getenv('POLYMARKET_TIME_STOP_PCT'), 75, 10, 99),
+            'polymarket_take_profit_pct': self._percent_setting(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT'), 100, 10, 500),
             'polymarket_invert_prediction_enabled': self._bool_setting(kwargs.get('polymarket_invert_prediction_enabled'), False),
             'rules': kwargs.get('rules') or self.default_rules,
             'transactions': [],
@@ -309,6 +309,13 @@ class PaperTradingTool(BaseTool):
                     'forecast_price_at_close': candidate.get('forecast_price_at_close'),
                     'full_kelly': round(full_kelly, 6),
                 },
+                token_id=order.get('token_id'),
+                shares=(order.get('execution_result') or {}).get('shares'),
+                current_price=ask,
+                edge=round(edge, 4) if edge is not None else None,
+                full_kelly=round(full_kelly, 6),
+                execution_result=order.get('execution_result'),
+                execution_error=order.get('execution_error'),
             ))
 
 
@@ -348,8 +355,8 @@ class PaperTradingTool(BaseTool):
             return
         auto_liquidate = self._bool_setting(kwargs.get('polymarket_auto_liquidate_enabled'), True)
         auto_claim = self._bool_setting(kwargs.get('polymarket_auto_claim_enabled'), True)
-        take_profit_pct = float(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT', '100') or 100)
-        time_stop_pct = float(kwargs.get('polymarket_time_stop_pct') or os.getenv('POLYMARKET_TIME_STOP_PCT', '75') or 75)
+        take_profit_pct = self._percent_setting(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT'), 100, 10, 500)
+        time_stop_pct = self._percent_setting(kwargs.get('polymarket_time_stop_pct') or os.getenv('POLYMARKET_TIME_STOP_PCT'), 75, 10, 99)
         try:
             positions = self._fetch_polymarket_positions()
         except Exception as exc:
@@ -757,7 +764,9 @@ class PaperTradingTool(BaseTool):
                         continue
                     if str(tx.get('side') or '').upper() not in {'UP', 'DOWN'}:
                         continue
-                    if str(tx.get('status') or '').lower() in {'rejected', 'error', 'no_trade'}:
+                    if str(tx.get('status') or '').lower() in {'rejected', 'error', 'no_trade', 'won', 'lost', 'closed', 'liquidated', 'claimed', 'redeemed'}:
+                        continue
+                    if self._polymarket_window_expired(tx.get('window') or tx.get('window_et')):
                         continue
                     if float(tx.get('stake_usdt') or 0) <= 0:
                         continue
@@ -782,8 +791,15 @@ class PaperTradingTool(BaseTool):
             'stake_usdt': round(float(kwargs.get('stake_usdt') or 0), 2),
             'confidence': self._confidence_percent(kwargs.get('confidence')),
             'kelly': self._float(kwargs.get('kelly')) or 0,
+            'full_kelly': self._float(kwargs.get('full_kelly')) or 0,
+            'edge': self._float(kwargs.get('edge')),
             'pnl': 0,
             'execution': kwargs.get('execution') or self._execution_label(result.get('mode', 'paper')),
+            'execution_result': kwargs.get('execution_result'),
+            'execution_error': kwargs.get('execution_error'),
+            'token_id': kwargs.get('token_id'),
+            'shares': self._float(kwargs.get('shares')) or 0,
+            'current_price': self._float(kwargs.get('current_price')) or 0,
             'risk': kwargs.get('risk'),
             'interval': kwargs.get('interval'),
             'window': kwargs.get('window'),
@@ -828,6 +844,25 @@ class PaperTradingTool(BaseTool):
     def _confidence_percent(self, value):
         number = self._float(value) or 0
         return round(number * 100, 2) if 0 < number <= 1 else round(number, 2)
+
+    def _percent_setting(self, value, default: float, minimum: float, maximum: float) -> float:
+        number = self._float(value)
+        if number is None or number < minimum:
+            number = default
+        return max(minimum, min(maximum, float(number)))
+
+    def _polymarket_window_expired(self, value) -> bool:
+        if not value:
+            return False
+        parts = str(value).split(' - ')
+        if len(parts) != 2:
+            return False
+        try:
+            end_text = parts[1].replace(' EDT', '-0400').replace(' EST', '-0500')
+            end = datetime.strptime(end_text, '%Y-%m-%d %H:%M:%S%z').astimezone(UTC)
+        except ValueError:
+            return False
+        return datetime.now(UTC) > end
 
     def _polymarket_trade(self, signal: dict, market: dict, threshold: float, invert_prediction: bool = False):
         confidence = signal.get('confidence')

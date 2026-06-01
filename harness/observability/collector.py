@@ -454,6 +454,11 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
                         "status": linked_order.get("transaction_status") or tx.get("status"),
                         "execution": linked_order.get("execution") or tx.get("execution"),
                         "execution_error": linked_order.get("execution_error") or tx.get("execution_error"),
+                        "execution_result": linked_order.get("execution_result") or tx.get("execution_result"),
+                        "token_id": linked_order.get("token_id") or tx.get("token_id"),
+                        "edge": linked_order.get("edge") if linked_order.get("edge") is not None else tx.get("edge"),
+                        "full_kelly": linked_order.get("full_kelly") or tx.get("full_kelly"),
+                        "current_price": linked_order.get("price") or tx.get("current_price"),
                         "indicators": merged_indicators,
                     }
                 if str(tx.get("venue") or "").lower() == "polymarket" and str(tx.get("side") or "").upper() == "NONE":
@@ -504,8 +509,14 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
                             "stake_usdt": order.get("stake_usdt"),
                             "confidence": order.get("probability"),
                             "kelly": order.get("fractional_kelly") or order.get("full_kelly"),
+                            "full_kelly": order.get("full_kelly"),
+                            "edge": order.get("edge"),
                             "pnl": order.get("pnl", 0),
                             "execution": order.get("execution") or "simulated_only",
+                            "execution_result": order.get("execution_result"),
+                            "execution_error": order.get("execution_error"),
+                            "token_id": order.get("token_id"),
+                            "current_price": order.get("price"),
                             "risk": order.get("risk") or order.get("reason"),
                             "interval": order.get("interval"),
                             "window": order.get("window_et"),
@@ -565,6 +576,11 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
         confidence = self._number(tx.get("confidence"), 0)
         if confidence <= 1 and confidence > 0:
             confidence *= 100
+        indicators = tx.get("indicators") or {}
+        candidate = indicators.get("candidate") or {}
+        edge = tx.get("edge")
+        if edge is None:
+            edge = candidate.get("edge")
         normalized = {
             "id": str(tx.get("id") or tx.get("transaction_id") or f"{defaults.get('agent')}-{tx.get('timestamp', self._now())}"),
             "timestamp": tx.get("timestamp") or tx.get("created_at") or tx.get("time") or self._now(),
@@ -580,13 +596,19 @@ h1{{margin:0;font-size:28px}} small{{color:#8ea0ba;text-transform:uppercase;lett
             "stake_usdt": self._number(tx.get("stake_usdt") or tx.get("notional") or tx.get("amount"), 0),
             "confidence": round(confidence, 2),
             "kelly": self._number(tx.get("kelly"), 0),
+            "full_kelly": self._number(tx.get("full_kelly"), 0),
+            "edge": self._number(edge, 0),
             "pnl": self._number(tx.get("pnl"), 0),
             "execution": tx.get("execution") or ("simulated_only" if str(tx.get("mode") or defaults.get("mode")) == "paper" else "unknown"),
-            "execution_error": tx.get("execution_error") or (tx.get("indicators") or {}).get("execution_error"),
+            "execution_result": tx.get("execution_result"),
+            "execution_error": tx.get("execution_error") or indicators.get("execution_error"),
+            "token_id": tx.get("token_id") or candidate.get("microstructure", {}).get("token_id"),
+            "shares": self._number(tx.get("shares"), 0),
+            "current_price": self._number(tx.get("current_price") or tx.get("price"), 0),
             "risk": tx.get("risk") or tx.get("reason") or "",
             "interval": tx.get("interval") or tx.get("timeframe") or "",
             "window": tx.get("window") or tx.get("window_et") or "",
-            "indicators": tx.get("indicators") or {},
+            "indicators": indicators,
             "rule_evaluation": tx.get("rule_evaluation") or {},
         }
         return self._resolve_polymarket_transaction(normalized)
