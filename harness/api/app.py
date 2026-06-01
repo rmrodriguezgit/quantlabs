@@ -580,12 +580,17 @@ def chat():
         memory_context = rag_context(request.identity['user_id'], session_id, agent, prompt) if use_rag else ""
         if use_rag and memory_context:
             prompt = f"{prompt}\n\n[Memoria RAG relevante]\n{memory_context}"
+        user_message_metadata = {}
+        if show_rag and memory_context:
+            user_message_metadata["rag_context"] = memory_context
         result = engine.chat(
             session_id,
             prompt,
             agent,
             request.identity['user_id'],
             request.identity.get('role'),
+            display_prompt=original_prompt,
+            user_message_metadata=user_message_metadata,
         )
         result.setdefault("metadata", {})["active_model"] = active_llm_model()
         result["metadata"]["effective_agent"] = agent

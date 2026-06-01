@@ -12,6 +12,7 @@ class Message(BaseModel):
     content: str
     name: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 class ToolCall(BaseModel):
     name: str

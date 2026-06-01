@@ -34,16 +34,31 @@ class HarnessEngine:
         self.context = ContextManager()
         self.guard = PromptInjectionGuard()
 
-    def chat(self, session_id: str, prompt: str, agent: str = "planner", user_id="shared", role=None):
+    def chat(
+        self,
+        session_id: str,
+        prompt: str,
+        agent: str = "planner",
+        user_id="shared",
+        role=None,
+        display_prompt: str | None = None,
+        user_message_metadata: dict | None = None,
+    ):
         if self.guard.flagged(prompt):
             raise PermissionError("prompt injection pattern detected")
 
+        display_prompt = display_prompt or prompt
+        user_message_metadata = user_message_metadata or {}
         state = self.sessions.load(session_id, user_id)
         ACTIVE_SESSIONS.inc()
-        state.messages.append(Message(role=Role.user, content=prompt))
-        self.sessions.maybe_title_from_first_prompt(state, prompt)
-        task = AgentTask(id=str(uuid.uuid4()), objective=prompt, agent=agent, status=TaskStatus.running)
+        state.messages.append(
+            Message(role=Role.user, content=display_prompt, metadata=user_message_metadata)
+        )
+        self.sessions.maybe_title_from_first_prompt(state, display_prompt)
+        task = AgentTask(id=str(uuid.uuid4()), objective=display_prompt, agent=agent, status=TaskStatus.running)
         task.metadata["started_at"] = utc_now()
+        if prompt != display_prompt:
+            task.metadata["context_enriched"] = True
         state.tasks.append(task)
         self.sessions.save(state, user_id)
         ctx = AgentContext(state=state, tools=self.tools, role=role)
@@ -95,7 +110,7 @@ class HarnessEngine:
                     "agent": agent,
                     "role": role,
                     "status": task.status.value,
-                    "objective": prompt,
+                    "objective": display_prompt,
                     "response": response,
                     "events": task.metadata["events"],
                     "usage": usage,

@@ -293,6 +293,10 @@ function attachRagToUserMessage(item,ragContext=''){
   if(!item||!ragContext)return;
   const body=item.querySelector('.msg-body');
   if(!body||body.querySelector('.rag-context'))return;
+  const actions=item.querySelector('.msg-actions');
+  if(actions&&!actions.querySelector('.rag-toggle-message')){
+    actions.insertAdjacentHTML('afterbegin','<button class="msg-action rag-toggle-message" title="Mostrar/ocultar memoria RAG" aria-label="Mostrar/ocultar memoria RAG">◫</button>');
+  }
   body.insertAdjacentHTML('beforeend',renderRagContext(ragContext));
 }
 
@@ -315,7 +319,8 @@ function renderHistory(items=[],{preserveScroll=true}={}){
   items.forEach(m=>{
     const role=m.role==='user'?'user':'assistant';
     const duration=role==='assistant'?taskDurations[assistantIndex++]||'':'';
-    addMessage(role,m.content,{autoScroll:false,duration});
+    const ragContext=role==='user'?(m.metadata?.rag_context||m.rag_context||''):'';
+    addMessage(role,m.content,{autoScroll:false,duration,ragContext});
   });
   restoreTableScrollPositions(tableScrolls);
   if(shouldStick)scrollMessagesToBottom();
