@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     llama_base_url: str = "http://llm:8080"
     quantlab_api_base_url: str = "http://flask:5000"
+    file_analyst_url: str = "http://file_analyst:8010"
     allowed_origins: str = "*"
     shell_workdir: str = "/tmp"
     artifact_root: str = "./storage/artifacts"

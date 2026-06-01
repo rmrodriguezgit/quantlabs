@@ -99,6 +99,76 @@ Prioriza diagnostico reproducible, cambios pequenos, comandos no destructivos, p
 Cuando el modelo activo sea Qwen Coder, eres el especialista preferido para implementacion. Antes de editar revisa archivos reales, estado del servicio y dependencias. Despues valida con pruebas, sintaxis, logs o healthchecks. No expongas secretos, no rompas .env y no reinicies servicios criticos sin razon operativa.'''
 
 
+class FileAnalystAgent(BaseAgent):
+    name='file_analyst'
+    workflow='private_document_analysis'
+    instructions='''Rol: FILE_ANALYST.
+Analizas archivos privados con el microservicio local file_analyst. No uses APIs externas de IA.
+Prioriza resumen ejecutivo, interpretación, riesgos, conclusiones y plan de acción.'''
+
+    def act(self, objective: str, ctx) -> dict:
+        file_id = self._extract_file_id(objective)
+        mode = 'specialist' if any(token in str(objective).lower() for token in ['profundo', 'specialist', 'contrato', 'legal', 'riesgo', 'auditoria', 'auditoría']) else 'chatbot'
+        result = ctx.tools.execute(
+            'file_analyst',
+            role=ctx.role,
+            user_id=(ctx.state.metadata or {}).get('owner_id') or 'shared',
+            action='analyze_file' if file_id else 'analyze_text',
+            file_id=file_id,
+            text=None if file_id else objective,
+            mode=mode,
+            language='es',
+        ).model_dump()
+        output = result.get('output') or {}
+        final = self._format_file_analysis(output) if result.get('ok') else f"File Analyst no pudo analizar: {result.get('error')}"
+        return {
+            'agent': self.name,
+            'objective': objective,
+            'result': final,
+            'events': [{
+                'step': 1,
+                'decision': {'action': 'tool', 'tool': 'file_analyst', 'arguments': {'file_id': file_id, 'mode': mode}},
+                'result': result,
+            }],
+            'usage': {},
+            'last_usage': {},
+        }
+
+    def _extract_file_id(self, objective: str) -> str | None:
+        text = str(objective or '')
+        match = re.search(r'\bfile[_ -]?id\s*[:=]\s*([0-9a-fA-F-]{24,})', text)
+        if match:
+            return match.group(1)
+        match = re.search(r'\barchivo\s+([0-9a-fA-F-]{24,})', text)
+        return match.group(1) if match else None
+
+    def _format_file_analysis(self, output: dict) -> str:
+        lines = [
+            'File Analyst completado.',
+            '',
+            f"Resumen: {output.get('summary','sin resumen')}",
+            '',
+            f"Interpretación: {output.get('interpretation','sin interpretación')}",
+            '',
+            'Observaciones:',
+        ]
+        for item in (output.get('observations') or [])[:8]:
+            lines.append(f"- [{item.get('severity','info')}] {item.get('detail','')}")
+        lines.extend(['', 'Conclusiones:'])
+        for item in (output.get('conclusions') or [])[:8]:
+            lines.append(f"- {item}")
+        lines.extend(['', 'Plan de acción:'])
+        for item in (output.get('action_plan') or [])[:8]:
+            suffix = f" · Responsable: {item.get('responsible')}" if item.get('responsible') else ''
+            lines.append(f"{item.get('priority','-')}. {item.get('action','')}{suffix}")
+        metadata = output.get('metadata') or {}
+        lines.extend([
+            '',
+            f"Motor: {metadata.get('analysis_engine','n/d')} · Modelo: {metadata.get('model','n/d')} · Palabras: {metadata.get('word_count','n/d')}",
+        ])
+        return '\n'.join(lines)
+
+
 class PolymrktAgent(BaseAgent):
     name='polymrkt'
     workflow='polymarket_signal_flow'

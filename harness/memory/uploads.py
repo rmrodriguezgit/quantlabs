@@ -10,7 +10,7 @@ import pytesseract
 from werkzeug.utils import secure_filename
 from config import settings
 
-ALLOWED_EXTENSIONS = {"pdf","csv","xlsx","txt","md","json","ipynb","png","jpg","jpeg"}
+ALLOWED_EXTENSIONS = {"pdf","docx","csv","xls","xlsx","txt","md","json","ipynb","png","jpg","jpeg"}
 _SAFE_USER_RE = re.compile(r'[^A-Za-z0-9_.-]+')
 def user_key(user_id):
     value=str(user_id or 'anonymous').strip() or 'anonymous'
@@ -60,6 +60,10 @@ class UploadStore:
                 for sheet in xl.sheet_names[:3]:
                     parts.append(f"Hoja {sheet}:\n"+self._frame_summary(pd.read_excel(path,sheet_name=sheet)))
                 return '\n'.join(parts)
+            if ext=='xls':
+                return 'Archivo Excel legacy almacenado. Usa File Analyst para extracción profunda.'
+            if ext=='docx':
+                return 'Documento Word almacenado. Usa File Analyst para extracción profunda.'
             if ext=='pdf':
                 reader=PdfReader(str(path)); text='\n'.join((page.extract_text() or '') for page in reader.pages[:10])[:8000]
                 return f"PDF: {len(reader.pages)} páginas. Texto extraído inicial:\n{text}" if text else f"PDF: {len(reader.pages)} páginas. No se pudo extraer texto legible."

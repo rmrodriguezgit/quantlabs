@@ -148,6 +148,27 @@ services:
       - llm
       - market_gpu
 
+  # =========================
+  # FILE ANALYST (documentos privados)
+  # =========================
+  file_analyst:
+    logging: *default-logging
+    build: /home/quantlab/quantlab-ai-capital/file_analyst
+    container_name: quantlab_file_analyst
+    restart: unless-stopped
+    expose:
+      - "8010"
+    environment:
+      - LLM_API_URL=http://llm:8080/v1/chat/completions
+      - MODEL_NAME=${LLM_MODEL}
+      - MAX_TOKENS=1600
+      - TEMPERATURE=0.1
+      - LLM_ENABLED=true
+      - LLM_TIMEOUT_SECONDS=45
+      - MAX_UPLOAD_MB=50
+    depends_on:
+      - llm
+
 
   # =========================
   # MARKET GPU WORKER
@@ -193,10 +214,12 @@ services:
     environment:
       - LLAMA_BASE_URL=http://llm:8080
       - QUANTLAB_API_BASE_URL=http://flask:5000
+      - FILE_ANALYST_URL=http://file_analyst:8010
     depends_on:
       - auth
       - llm
       - flask
+      - file_analyst
 
   # =========================
   # JUPYTER LITE (uso diario)
