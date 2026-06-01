@@ -278,11 +278,23 @@ function addMessage(role,body,{autoScroll=true,duration='',ragContext=''}={}){
   item.dataset.raw=body;
   item.dataset.role=role;
   const label=role==='user'?'Tu petición':`${meta.icon} ${meta.label}${duration?` · ${duration}`:''}`;
-  const ragHtml=role==='assistant'&&ragContext?`<details class="rag-context"><summary>Memoria RAG usada</summary><pre>${esc(ragContext)}</pre></details>`:'';
+  const ragHtml=role==='user'&&ragContext?renderRagContext(ragContext):'';
   item.innerHTML=`<div class="msg-top"><span class="msg-label">${label}</span>${messageActions(role)}</div><div class="msg-body">${renderMessageBody(body)}${ragHtml}</div>`;
   el.messages.appendChild(item);
   if(autoScroll)scrollMessagesToBottom();
+  return item;
 }
+function renderRagContext(ragContext=''){
+  if(!ragContext)return '';
+  return `<details class="rag-context user-rag"><summary>Memoria RAG relevante</summary><pre>${esc(ragContext)}</pre></details>`;
+}
+function attachRagToUserMessage(item,ragContext=''){
+  if(!item||!ragContext)return;
+  const body=item.querySelector('.msg-body');
+  if(!body||body.querySelector('.rag-context'))return;
+  body.insertAdjacentHTML('beforeend',renderRagContext(ragContext));
+}
+
 function tableScrollPositions(){
   return [...el.messages.querySelectorAll('.md-table-wrap')].map(table=>table.scrollLeft);
 }
@@ -553,14 +565,15 @@ async function sendPrompt(message){
   const outboundMessage=route.message;
   currentChatController=new AbortController();
   el.promptInput.value='';
-  addMessage('user',message,{autoScroll:true});
+  const userMessageEl=addMessage('user',message,{autoScroll:true});
   await autoTitleFromFirstPrompt(message);
   setRunningState(true);
   setResponseStatus('request','Request','Prompt recibido, esperando al LLM');
   try{
     const data=await api('/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:currentChatController.signal,body:JSON.stringify({session_id:currentSessionId,message:outboundMessage,agent:selectedAgent,file_ids:[...activeFileIds],show_rag:Boolean(el.showRag?.checked)})});
     const latestTask=(data.tasks||[]).at(-1)||{};
-    addMessage('assistant',data.response||data.final||JSON.stringify(data),{autoScroll:true,duration:taskDuration(latestTask),ragContext:data.metadata?.rag_context||''});
+    attachRagToUserMessage(userMessageEl,data.metadata?.rag_context||'');
+    addMessage('assistant',data.response||data.final||JSON.stringify(data),{autoScroll:true,duration:taskDuration(latestTask)});
     renderContext(data.metadata||{});
     updateTokenUsage(data.metadata||{});
     setResponseStatus('response','Response','Respuesta recibida correctamente');
