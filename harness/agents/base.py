@@ -30,7 +30,16 @@ class BaseAgent:
         mode: str = 'analysis',
         preserve_evidence: bool = True,
         max_evidence_chars: int = 9000,
+        skip_llm: bool = False,
+        skip_reason: str | None = None,
     ) -> dict:
+        if skip_llm:
+            return {
+                'result': draft,
+                'usage': {},
+                'last_usage': {},
+                'event': {'step': 'llm_synthesis', 'decision': {'action': 'llm_local_synthesis', 'mode': mode, 'skipped': True, 'reason': skip_reason or 'deterministic_response_complete'}, 'result': {'name': 'llm_local', 'ok': True, 'skipped': True}},
+            }
         evidence_text = json.dumps(evidence, ensure_ascii=False, default=str)[:max_evidence_chars]
         system = (
             'Eres la capa de síntesis LLM Local de QuantLabs Harness. '
@@ -53,11 +62,7 @@ class BaseAgent:
                 {'role': 'user', 'content': user},
             ], temperature=0.2)
             raw = completion.get('content') or ''
-            try:
-                parsed = json.loads(raw)
-                final = str(parsed.get('final') or '').strip()
-            except json.JSONDecodeError:
-                final = raw.strip()
+            final = self._coerce_llm_final(raw)
             if not final:
                 final = draft
             if preserve_evidence and draft and draft not in final:
@@ -76,3 +81,44 @@ class BaseAgent:
                 'last_usage': {},
                 'event': {'step': 'llm_synthesis', 'decision': {'action': 'llm_local_synthesis', 'mode': mode}, 'result': {'name': 'llm_local', 'ok': False, 'error': str(exc)[:240]}},
             }
+
+    def _coerce_llm_final(self, raw: str) -> str:
+        text = str(raw or '').strip()
+        if not text:
+            return ''
+        if text.startswith('```'):
+            text = text.strip('`').strip()
+            if text.lower().startswith('json'):
+                text = text[4:].strip()
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return str(parsed.get('final') or parsed.get('response') or '').strip()
+        except json.JSONDecodeError:
+            pass
+        marker = '"final"'
+        if marker in text:
+            try:
+                start = text.index(marker)
+                colon = text.index(':', start)
+                quote = text.index('"', colon + 1)
+                pos = quote + 1
+                chars = []
+                escaped = False
+                while pos < len(text):
+                    ch = text[pos]
+                    if escaped:
+                        chars.append('\\' + ch)
+                        escaped = False
+                    elif ch == '\\':
+                        escaped = True
+                    elif ch == '"':
+                        break
+                    else:
+                        chars.append(ch)
+                    pos += 1
+                value = ''.join(chars)
+                return bytes(value, 'utf-8').decode('unicode_escape').strip()
+            except Exception:
+                pass
+        return text

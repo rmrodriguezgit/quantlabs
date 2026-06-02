@@ -224,13 +224,25 @@ Reglas base: confidence >= 0.80, edge >= 0.03, spread <= 0.08, ask_size >= 1, se
         for item in (research.get('artifacts') or {}).values():
             if item and item not in ctx.state.artifacts:
                 ctx.state.artifacts.append(item)
+        skip_llm = False
+        skip_reason = None
         if self._prefers_hybrid_prediction_simulation(objective):
             final = self._format_hybrid_prediction_simulation(signal, artifact)
+            skip_llm = True
+            skip_reason = 'polymarket_prediction_simulation_table_complete'
         elif self._prefers_btc_updown_table(objective):
             final = FinanceAgent()._format_btc_updown_response(signal)
         else:
             final = self._format_signal_flow(signal, research, artifact)
-        hybrid = self.hybrid_finalize(objective, final, {'signal': signal, 'research': research, 'artifact': artifact}, mode='polymarket_signal_risk', preserve_evidence=True)
+        hybrid = self.hybrid_finalize(
+            objective,
+            final,
+            {'signal': signal, 'research': research, 'artifact': artifact},
+            mode='polymarket_signal_risk',
+            preserve_evidence=True,
+            skip_llm=skip_llm,
+            skip_reason=skip_reason,
+        )
         events.append(hybrid['event'])
         return {'agent': self.name, 'objective': objective, 'result': hybrid['result'], 'events': events, 'usage': hybrid['usage'], 'last_usage': hybrid['last_usage']}
 

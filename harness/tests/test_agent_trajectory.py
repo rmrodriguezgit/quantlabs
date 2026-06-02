@@ -190,3 +190,12 @@ def test_engine_titles_new_conversation_from_first_prompt(tmp_path, monkeypatch)
     saved = engine.sessions.load(created.session_id, "user-1")
 
     assert saved.metadata["title"] == "MEXC Spot BTCUSDT, ETHUSDT"
+
+
+
+def test_base_agent_coerces_final_from_json_text():
+    from agents.base import BaseAgent
+
+    raw = '{"final":"Respuesta limpia\\n\\n| A | B |\\n|---|---|\\n| 1 | 2 |"}'
+    assert BaseAgent()._coerce_llm_final(raw).startswith("Respuesta limpia")
+    assert "{\"final\"" not in BaseAgent()._coerce_llm_final(raw)
