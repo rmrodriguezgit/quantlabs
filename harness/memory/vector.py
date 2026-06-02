@@ -28,6 +28,8 @@ class VectorMemory:
                 continue
             if expected.get('agent') and meta.get('agent') != expected.get('agent'):
                 continue
+            if expected.get('project_id') and meta.get('project_id') != expected.get('project_id'):
+                continue
             return True
         return False
 
@@ -52,6 +54,30 @@ class VectorMemory:
         for line in self.path.read_text().splitlines():
             item=json.loads(line); rows.append((self._cos(query,item['embedding']),item))
         return [item for _,item in sorted(rows,key=lambda x:x[0], reverse=True)[:top_k]]
+    def iter_items(self, metadata: dict | None=None):
+        expected=metadata or {}
+        if not self.path.exists(): return []
+        rows=[]
+        for line in self.path.read_text().splitlines():
+            try: item=json.loads(line); meta=item.get('metadata') or {}
+            except Exception: continue
+            ok=True
+            for key,value in expected.items():
+                if value is not None and meta.get(key)!=value:
+                    ok=False; break
+            if ok: rows.append(item)
+        return rows
+    def stats(self, metadata: dict | None=None):
+        rows=self.iter_items(metadata)
+        by_agent={}
+        by_project={}
+        for item in rows:
+            meta=item.get('metadata') or {}
+            agent=meta.get('agent') or 'unknown'
+            project=meta.get('project_id') or 'legacy'
+            by_agent[agent]=by_agent.get(agent,0)+1
+            by_project[project]=by_project.get(project,0)+1
+        return {'items':len(rows),'by_agent':by_agent,'by_project':by_project,'path':str(self.path)}
     def _cos(self,a,b):
         denom=(math.sqrt(sum(x*x for x in a))*math.sqrt(sum(x*x for x in b))) or 1
         return sum(x*y for x,y in zip(a,b))/denom

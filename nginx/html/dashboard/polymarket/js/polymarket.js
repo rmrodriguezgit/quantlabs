@@ -25,6 +25,9 @@ let controlState = {
 };
 let controlDirty = false;
 let controlsBound = false;
+let openPositionByAsset = new Map();
+let resolvedPositionByAsset = new Map();
+let openPositionsLoaded = false;
 
 async function api(path, opts = {}) {
   const response = await fetch(`${apiBase}${path}`, {
@@ -58,6 +61,26 @@ function intervalOf(row) {
 }
 function statusOf(row) {
   return String(row?.status || row?.transaction_status || row?.execution || 'pending').toLowerCase();
+}
+function labelForStatus(value) {
+  const st = String(value || 'pending').toLowerCase();
+  const labels = {
+    accepted:'aceptada',
+    open:'abierta',
+    filled:'abierta',
+    won:'ganada',
+    lost:'perdida',
+    rejected:'rechazada',
+    no_trade:'sin trade',
+    liquidated:'liquidada',
+    closed:'cerrada',
+    claimed:'cobrada',
+    redeemed:'cobrada',
+    resuelto:'resuelta',
+    liquidado:'liquidada',
+    sin_posicion:'sin posicion'
+  };
+  return labels[st] || st.replaceAll('_', ' ');
 }
 function asConfidence(row) {
   let v = num(row?.probability ?? row?.confidence ?? row?.indicators?.candidate?.probability ?? row?.indicators?.candidate?.confidence, 0);
@@ -96,14 +119,33 @@ function isResolved(row) {
   const st = statusOf(row);
   return ['won', 'lost', 'closed', 'liquidated', 'claimed', 'redeemed'].includes(st);
 }
+function assetOf(row) {
+  const c = (row?.indicators || {}).candidate || {};
+  const m = c.microstructure || {};
+  return String(row?.token_id || row?.asset || m.token_id || '').trim();
+}
+function positionFor(row) {
+  const asset = assetOf(row);
+  return asset ? openPositionByAsset.get(asset) : null;
+}
+function resolvedPositionFor(row) {
+  const asset = assetOf(row);
+  return asset ? resolvedPositionByAsset.get(asset) : null;
+}
+function hasOpenPosition(row) {
+  const position = positionFor(row);
+  return !!position && num(position.size, 0) > 0;
+}
 function isOpenTrade(row) {
-  return hasLiveSide(row) && ['accepted', 'open', 'filled'].includes(statusOf(row)) && !isWindowExpired(row);
+  return hasLiveSide(row) && ['accepted', 'open', 'filled'].includes(statusOf(row)) && !isWindowExpired(row) && hasOpenPosition(row);
 }
 function displayStatus(row) {
   if (isOpenTrade(row)) return 'abierta';
   if (isResolved(row)) return statusOf(row);
   if (isRejected(row)) return 'rechazada';
+  if (hasLiveSide(row) && resolvedPositionFor(row)) return 'resuelto';
   if (hasLiveSide(row) && isWindowExpired(row)) return 'liquidado';
+  if (hasLiveSide(row) && openPositionsLoaded && !hasOpenPosition(row)) return 'sin_posicion';
   return statusOf(row);
 }
 function statusLabel(auto) {
@@ -267,29 +309,29 @@ function getCandidateRows(auto) {
   }
   return rows.filter(r => r.interval || r._order?.interval);
 }
-function latestByInterval(auto, txs) {
+function hasFreshAutomationCycle(auto) {
+  const age = num(auto?.last_age_seconds, 999999);
+  const status = String(auto?.status || '').toLowerCase();
+  return auto?.enabled !== false && status !== 'stopped' && age <= 300;
+}
+function latestByInterval(auto) {
+  if (!hasFreshAutomationCycle(auto)) {
+    return ['5m','15m'].map(key => ({
+      interval:key,
+      preferred_side:'NONE',
+      confidence:0,
+      probability:0,
+      passes_filters:false,
+      reason:'Automatizacion detenida o sin ciclo vigente',
+      window_et:''
+    }));
+  }
   const map = {};
   for (const c of getCandidateRows(auto)) {
     const key = intervalOf(c);
     if (key === '5m' || key === '15m') map[key] = c;
   }
-  for (const tx of txs) {
-    const key = intervalOf(tx);
-    if ((key === '5m' || key === '15m') && !map[key]) {
-      map[key] = {
-        _order:tx,
-        interval:key,
-        preferred_side:sideOf(tx),
-        confidence:asConfidence(tx) / 100,
-        probability:asConfidence(tx) / 100,
-        passes_filters:hasLiveSide(tx) && !isRejected(tx),
-        window_et:tx.window,
-        reason:tx.risk,
-        status:tx.status
-      };
-    }
-  }
-  return ['5m','15m'].map(key => map[key] || {interval:key, preferred_side:'NONE', confidence:0, probability:0, passes_filters:false, reason:'Esperando lectura del siguiente ciclo'});
+  return ['5m','15m'].map(key => map[key] || {interval:key, preferred_side:'NONE', confidence:0, probability:0, passes_filters:false, reason:'Sin lectura vigente del ultimo ciclo', window_et:''});
 }
 function windowCard(row) {
   const order = row._order || {};
@@ -302,6 +344,7 @@ function windowCard(row) {
   const ask = num(micro.ask ?? order.price, 0);
   const spread = Number.isFinite(Number(micro.spread)) ? Number(micro.spread) * 100 : null;
   const status = row.passes_filters ? 'trade' : 'no-trade';
+  const hasSignal = Boolean(row.window_et || order.window_et || order.window || row.reason || order.reason);
   const reason = (row.reasons && row.reasons.join(', ')) || order.reason || row.reason || order.risk || (row.passes_filters ? 'Pasa filtros de confianza, edge y microestructura' : 'No cumple filtros del ciclo');
   const model = row.model || order.indicators?.candidate?.model || order.model || '';
   const comps = row.model_components || order.indicators?.candidate?.model_components || {};
@@ -317,18 +360,18 @@ function windowCard(row) {
       <div class="stat-box"><small>Spread</small><strong>${spread == null ? '--' : `${spread.toFixed(2)}%`}</strong></div>
     </div>
     <div class="window-stats">
-      <div class="stat-box"><small>Estado trade</small><strong>${row.passes_filters ? 'TRADE' : 'NO TRADE'}</strong></div>
+      <div class="stat-box"><small>Senal modelo</small><strong>${hasSignal ? (row.passes_filters ? 'TRADE' : 'NO TRADE') : 'SIN DATO'}</strong></div>
       <div class="stat-box"><small>Ventana</small><strong>${pct(progress)}</strong></div>
-      <div class="stat-box"><small>SL tiempo</small><strong>${controlState.timeStop}%</strong></div>
+      <div class="stat-box"><small>Posicion real</small><strong>${(openPositionByAsset.size || 0)} abierta(s)</strong></div>
     </div>
     <div class="countdown"><span style="width:${progress || fill}%"></span></div>
     <div class="window-reason">${modelLine ? `<small>${esc(modelLine)}</small><br>` : ''}${esc(reason)}</div>
   </article>`;
 }
 function renderWindows(auto, txs) {
-  const rows = latestByInterval(auto, txs);
+  const rows = latestByInterval(auto);
   $('windowGrid').innerHTML = rows.map(windowCard).join('');
-  $('watchingBadge').textContent = `${rows.filter(r => r.passes_filters).length}/2 LISTAS`;
+  $('watchingBadge').textContent = `${rows.filter(r => r.passes_filters).length}/2 senales`;
 }
 
 function realizedPnlRows(txs) {
@@ -336,7 +379,7 @@ function realizedPnlRows(txs) {
 }
 function renderTop(auto, txs) {
   const orders = txs.filter(hasLiveSide);
-  const open = orders.filter(isOpenTrade).length;
+  const open = (auto.polymarket_open_positions || []).length;
   const won = orders.filter(tx => statusOf(tx) === 'won').length;
   const lost = orders.filter(tx => statusOf(tx) === 'lost').length;
   const rejected = orders.filter(isRejected).length;
@@ -354,26 +397,37 @@ function renderTop(auto, txs) {
   $('winRate').textContent = won + lost ? pct((won / (won + lost)) * 100) : 'N/D';
   $('rejectedCount').textContent = rejected;
   $('guardCount').textContent = guards.length;
-  $('pnlCaption').textContent = `${orders.length} operaciones auditadas · ${open} abiertas reales por ventana`;
+  $('pnlCaption').textContent = `${orders.length} operaciones auditadas · ${open} posiciones abiertas en Polymarket`;
 }
 function orderTitle(tx) {
   return `${intervalOf(tx)} · ${sideOf(tx)} · ${tx.market || 'BTC Up/Down'}`;
 }
+function positionInterval(position) {
+  const slug = String(position?.event_slug || '').toLowerCase();
+  return slug.includes('15m') ? '15m' : slug.includes('5m') ? '5m' : '--';
+}
+function positionTitle(position) {
+  return `${positionInterval(position)} · ${String(position?.outcome || '--').toUpperCase()} · ${position?.market || 'BTC Up/Down'}`;
+}
 function liquidationPayload(tx) {
   const c = (tx.indicators || {}).candidate || {};
   const m = c.microstructure || {};
+  const position = positionFor(tx) || {};
   return {
-    token_id:tx.token_id || m.token_id || tx.asset,
-    shares:tx.size || tx.shares,
-    current_price:tx.current_price || tx.price || m.ask,
+    token_id:position.asset || tx.token_id || m.token_id || tx.asset,
+    shares:position.size || tx.size || tx.shares,
+    current_price:position.current_price || tx.current_price || tx.price || m.ask,
     stake_usdt:tx.stake_usdt,
     price:tx.price
   };
 }
 function liquidationLine(tx) {
   const progress = windowProgress(tx);
-  const value = num(tx.shares, 0) && num(tx.current_price || tx.price, 0) ? money(num(tx.shares, 0) * num(tx.current_price || tx.price, 0)) : 'valor pendiente';
-  return `Liquidacion: SL ${controlState.timeStop}% ventana${progress == null ? '' : ` (va ${pct(progress)})`} con PnL negativo · TP +${controlState.tp}% · ${value}`;
+  const position = positionFor(tx);
+  const resolved = resolvedPositionFor(tx);
+  const value = position ? money(num(position.current_value, 0)) : (resolved ? `resuelto ${money(resolved.current_value)}` : 'sin posicion abierta');
+  const pnl = position ? ` · PnL ${pct(num(position.percent_pnl, 0))} / ${money(position.cash_pnl)}` : '';
+  return `Liquidacion: SL ${controlState.timeStop}% ventana${progress == null ? '' : ` (va ${pct(progress)})`} con PnL negativo · TP +${controlState.tp}% · ${value}${pnl}`;
 }
 async function liquidateTrade(tx) {
   const payload = liquidationPayload(tx);
@@ -386,45 +440,37 @@ async function liquidateTrade(tx) {
     alert(`No se pudo liquidar: ${e.message}`);
   }
 }
-function renderOrders(txs) {
-  const orders = txs.filter(hasLiveSide).slice(0, 14);
-  window.__polyOrders = orders;
-  $('orderList').innerHTML = orders.map((tx, i) => {
-    const st = displayStatus(tx);
-    const detail = tx.execution_error || tx.risk || tx.reason || tx.window || '';
-    const lp = liquidationPayload(tx);
-    const canLiquidate = isOpenTrade(tx) && !!lp.token_id;
-    const actionLabel = canLiquidate ? 'Liquidar' : (isRejected(tx) ? 'Sin posicion' : st);
+function renderOrders(auto, txs) {
+  const positions = auto.polymarket_open_positions || [];
+  window.__polyPositions = positions;
+  if (!positions.length) {
+    $('orderList').innerHTML = '<div class="empty">Sin posiciones abiertas reales en Polymarket. El historial queda solo en Ledger/Validation.</div>';
+    return;
+  }
+  $('orderList').innerHTML = positions.map((position, i) => {
+    const pnl = `PnL ${pct(position.percent_pnl || 0)} / ${money(position.cash_pnl || 0)}`;
+    const detail = [position.event_slug, pnl, `valor ${money(position.current_value || 0)}`].filter(Boolean).join(' · ');
     return `<div class="order-row">
       <div class="order-main">
-        <strong>${esc(orderTitle(tx))}</strong>
-        <small>${esc(tx.window || tx.timestamp || '')}</small>
+        <strong>${esc(positionTitle(position))}</strong>
         <small>${esc(detail)}</small>
-        <small>${esc(liquidationLine(tx))}</small>
+        <small>${esc(`Liquidacion: SL ${controlState.timeStop}% ventana con PnL negativo · TP +${controlState.tp}% · precio ${position.current_price || '--'}`)}</small>
       </div>
       <div class="order-money">
-        <b>${money(tx.stake_usdt)}</b>
-        <span class="badge ${esc(st)}">${esc(st)}</span>
-        <button class="mini-action" ${canLiquidate ? '' : 'disabled'} onclick="liquidateTrade(window.__polyOrders[${i}])">${esc(actionLabel)}</button>
+        <b>${money(position.current_value || 0)}</b>
+        <span class="badge abierta">abierta</span>
+        <button class="mini-action" onclick="liquidateTrade({token_id:window.__polyPositions[${i}].asset,shares:window.__polyPositions[${i}].size,current_price:window.__polyPositions[${i}].current_price})">Liquidar</button>
       </div>
     </div>`;
-  }).join('') || '<div class="empty">Sin ordenes recientes para Polymarket.</div>';
+  }).join('');
 }
 function renderGuards(auto, txs) {
   const actions = [...(auto.position_actions || []), ...(auto.claim_actions || [])];
-  const resolved = txs.filter(tx => ['won', 'lost'].includes(statusOf(tx))).slice(0, 6).map(tx => ({
-    action:statusOf(tx) === 'won' ? 'settled_profit' : 'settled_loss',
-    status:statusOf(tx),
-    market:orderTitle(tx),
-    cash_pnl:num(tx.pnl, 0),
-    threshold_pct:statusOf(tx) === 'won' ? controlState.tp : controlState.timeStop,
-    note:`Ventana resuelta por precio final ${tx.indicators?.final_price_reference || ''}`
-  }));
-  const list = actions.length ? actions : resolved;
-  $('guardBadge').textContent = actions.length ? `${actions.length} ACTIVAS` : (resolved.length ? `${resolved.length} RESUELTAS` : 'AUTO');
-  $('guardList').innerHTML = list.map(a => {
+  $('guardBadge').textContent = actions.length ? `${actions.length} acciones` : 'AUTO';
+  $('guardList').innerHTML = actions.map(a => {
     const st = statusOf(a);
     const title = a.action === 'claim_profit' || a.action === 'settled_profit' ? 'Ganancia / cobro' : (String(a.action || '').includes('stop_loss') || a.action === 'settled_loss' ? 'Stop loss / perdida' : 'Take profit');
+    const windowText = a.window || a.window_et || a.event_slug || a.market || '';
     const meta = [
       a.outcome,
       a.size ? `${a.size} shares` : null,
@@ -432,9 +478,9 @@ function renderGuards(auto, txs) {
       a.cash_pnl ? `PnL ${money(a.cash_pnl)}` : null,
       a.threshold_pct ? `umbral ${a.threshold_pct}%` : null
     ].filter(Boolean);
-    const note = a.note || a.error || a.market || '';
-    return `<div class="guard-row"><div><strong>${esc(title)}</strong><small>${esc(note)}</small><div class="guard-meta">${meta.map(x => `<span class="badge">${esc(x)}</span>`).join('')}</div></div><span class="badge ${esc(st)}">${esc(st)}</span></div>`;
-  }).join('') || '<div class="empty">Sin SL/TP, cobros o ventanas resueltas en la auditoria reciente.</div>';
+    const note = [compactTime(a.timestamp || auto.last_run_at), windowText, a.note || a.error].filter(Boolean).join(' · ');
+    return `<div class="guard-row"><div><strong>${esc(title)}</strong><small>${esc(note)}</small><div class="guard-meta">${meta.map(x => `<span class="badge">${esc(x)}</span>`).join('')}</div></div><span class="badge ${esc(st)}">${esc(labelForStatus(st))}</span></div>`;
+  }).join('') || '<div class="empty">Sin acciones reales de SL/TP/cobro en el ultimo ciclo.</div>';
 }
 function renderActivity(auto, txs) {
   const events = [];
@@ -453,12 +499,21 @@ function renderActivity(auto, txs) {
   $('activityCount').textContent = `${events.length} eventos`;
   $('activityLog').innerHTML = events.slice(0, 18).map(e => `<div class="activity-row"><div><strong>${esc(e.label)}</strong><small>${esc(e.detail)}</small></div><div><span class="activity-status">${esc(e.status)}</span><small>${compactTime(e.time)}</small></div></div>`).join('') || '<div class="empty">Sin actividad operativa relevante reciente.</div>';
 }
+function chartTheme() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  return {
+    bg:dark ? '#101722' : '#ffffff',
+    grid:dark ? '#263444' : '#e3ecef',
+    text:dark ? '#aab7c4' : '#687780'
+  };
+}
 function drawEmptyPnl(ctx, w, h, message) {
-  ctx.fillStyle = '#ffffff';
+  const theme = chartTheme();
+  ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = '#e3ecef';
+  ctx.strokeStyle = theme.grid;
   ctx.strokeRect(24, 24, w - 48, h - 52);
-  ctx.fillStyle = '#687780';
+  ctx.fillStyle = theme.text;
   ctx.font = '14px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(message, w / 2, h / 2);
@@ -478,9 +533,10 @@ function drawPnl(txs) {
   pnlRows.forEach(tx => values.push(values.at(-1) + num(tx.pnl, 0)));
   const min = Math.min(...values, 0);
   const max = Math.max(...values, 1);
-  ctx.fillStyle = '#ffffff';
+  const theme = chartTheme();
+  ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = '#e3ecef';
+  ctx.strokeStyle = theme.grid;
   ctx.lineWidth = 1;
   for (let i = 0; i < 6; i++) {
     const y = 24 + i * (h - 52) / 5;
@@ -504,7 +560,7 @@ function drawPnl(txs) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.stroke();
-  ctx.fillStyle = '#687780';
+  ctx.fillStyle = theme.text;
   ctx.font = '13px Space Mono';
   ctx.textAlign = 'left';
   ctx.fillText(`max ${money(max)}`, 32, 22);
@@ -520,10 +576,13 @@ async function refresh() {
     ]);
     const auto = autoPayload.automation || {};
     syncControls(auto, rulesPayload || {});
+    openPositionByAsset = new Map((auto.polymarket_open_positions || []).map(position => [String(position.asset || ''), position]).filter(([asset]) => asset));
+    resolvedPositionByAsset = new Map((auto.polymarket_resolved_positions || []).map(position => [String(position.asset || ''), position]).filter(([asset]) => asset));
+    openPositionsLoaded = Array.isArray(auto.polymarket_open_positions);
     const txs = (txPayload.transactions || []).filter(tx => String(tx.venue || '').toLowerCase() === 'polymarket');
     renderTop(auto, txs);
     renderWindows(auto, txs);
-    renderOrders(txs);
+    renderOrders(auto, txs);
     renderGuards(auto, txs);
     renderActivity(auto, txs);
     drawPnl(txs);

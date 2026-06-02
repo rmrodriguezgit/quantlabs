@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -229,6 +230,142 @@ class SessionStore:
         words = [w for w in text.split() if len(w) > 2 and w.lower() not in _TITLE_STOPWORDS]
         title = ' '.join(words[:6]) or text[:60]
         return title[:1].upper() + title[1:60].rstrip(' .,;:!?')
+
+
+class ProjectStore:
+    DEFAULT_PROJECT_NAME = 'QuantLabs Workspace'
+
+    def __init__(self):
+        self.root = Path(settings.conversation_root) / '_projects'
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def _user_root(self, user_id) -> Path:
+        path = self.root / user_key(user_id)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _path(self, user_id, project_id: str) -> Path:
+        safe_project = _SAFE_USER_RE.sub('_', str(project_id or 'default'))[:96] or 'default'
+        return self._user_root(user_id) / safe_project
+
+    def _meta_path(self, user_id, project_id: str) -> Path:
+        return self._path(user_id, project_id) / 'project.json'
+
+    def _md_path(self, user_id, project_id: str) -> Path:
+        return self._path(user_id, project_id) / 'PROJECT.md'
+
+    def default_id(self) -> str:
+        return 'quantlabs-workspace'
+
+    def ensure_default(self, user_id):
+        return self.ensure(user_id, self.default_id(), self.DEFAULT_PROJECT_NAME)
+
+    def ensure(self, user_id, project_id: str | None = None, name: str | None = None):
+        project_id = project_id or self.default_id()
+        path = self._path(user_id, project_id)
+        path.mkdir(parents=True, exist_ok=True)
+        meta_path = self._meta_path(user_id, project_id)
+        now = datetime.utcnow().isoformat() + 'Z'
+        if meta_path.exists():
+            try:
+                data = json.loads(meta_path.read_text(encoding='utf-8'))
+            except Exception:
+                data = {}
+        else:
+            data = {}
+        data.setdefault('id', project_id)
+        data.setdefault('name', name or self.DEFAULT_PROJECT_NAME)
+        data.setdefault('description', 'Base persistente de conocimiento para Harness: memoria RAG, archivos, especialistas y microservicios reutilizables.')
+        data.setdefault('created_at', now)
+        data['updated_at'] = now
+        data.setdefault('owner_id', user_key(user_id))
+        data.setdefault('files', [])
+        data.setdefault('memory_policy', {
+            'scope': 'project',
+            'specialist_isolation': True,
+            'dedupe': True,
+            'chat_delete_keeps_project_rag': True,
+        })
+        meta_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
+        md_path = self._md_path(user_id, project_id)
+        if not md_path.exists():
+            md_path.write_text(self._default_markdown(data), encoding='utf-8')
+        data['project_md_path'] = str(md_path)
+        data['project_md_preview'] = md_path.read_text(encoding='utf-8', errors='ignore')[:4000]
+        return data
+
+    def list(self, user_id):
+        self.ensure_default(user_id)
+        items = []
+        for meta_path in self._user_root(user_id).glob('*/project.json'):
+            try:
+                data = json.loads(meta_path.read_text(encoding='utf-8'))
+                data['project_md_path'] = str(meta_path.parent / 'PROJECT.md')
+                items.append(data)
+            except Exception:
+                continue
+        return sorted(items, key=lambda item: item.get('updated_at') or '', reverse=True)
+
+    def get(self, user_id, project_id: str | None = None):
+        return self.ensure(user_id, project_id or self.default_id())
+
+    def update(self, user_id, project_id: str, payload: dict):
+        data = self.ensure(user_id, project_id)
+        for key in ('name', 'description'):
+            if key in payload and str(payload.get(key) or '').strip():
+                data[key] = str(payload[key]).strip()[:240]
+        if isinstance(payload.get('files'), list):
+            known = {str(item) for item in data.get('files') or []}
+            for file_id in payload['files']:
+                if file_id:
+                    known.add(str(file_id))
+            data['files'] = sorted(known)
+        data['updated_at'] = datetime.utcnow().isoformat() + 'Z'
+        meta_path = self._meta_path(user_id, data['id'])
+        meta_path.write_text(json.dumps({k: v for k, v in data.items() if k not in {'project_md_preview', 'project_md_path'}}, indent=2, ensure_ascii=False), encoding='utf-8')
+        if payload.get('project_md') is not None:
+            md_text = str(payload.get('project_md') or '').strip()
+            if md_text:
+                self._md_path(user_id, data['id']).write_text(md_text[:50000], encoding='utf-8')
+        return self.get(user_id, data['id'])
+
+    def append_memory_note(self, user_id, project_id: str, note: str):
+        data = self.ensure(user_id, project_id)
+        text = str(note or '').strip()
+        if not text:
+            return data
+        md_path = self._md_path(user_id, data['id'])
+        current = md_path.read_text(encoding='utf-8', errors='ignore') if md_path.exists() else self._default_markdown(data)
+        if text not in current:
+            stamp = datetime.utcnow().isoformat(timespec='seconds') + 'Z'
+            current = current.rstrip() + f"\n\n## Memoria agregada {stamp}\n\n{text[:4000]}\n"
+            md_path.write_text(current, encoding='utf-8')
+        return self.get(user_id, data['id'])
+
+    def _default_markdown(self, data: dict) -> str:
+        return f"""# {data.get('name') or self.DEFAULT_PROJECT_NAME}
+
+## Propósito
+
+Conservar conocimiento estable del Harness aunque se borren chats: RAG por especialista, archivos de trabajo, decisiones de negocio y microservicios reutilizables.
+
+## Reglas de Memoria
+
+- La memoria RAG se etiqueta por proyecto, usuario y especialista.
+- Borrar un chat no borra la memoria del proyecto.
+- La recuperación RAG debe ser selectiva por especialista.
+- La memoria repetida se deduplica antes de insertarse.
+
+## Inventario Vivo
+
+- Especialistas: Planner, Coding, Codex4U, Finance, Polymrkt, Dexter, Research, Validation, Execution, File Analyst.
+- Microservicios/herramientas: se consultan en el catálogo visual del Harness.
+
+## Decisiones
+
+- Proyecto por defecto: {data.get('name') or self.DEFAULT_PROJECT_NAME}.
+- Los chats son interfaz; el proyecto es la unidad persistente de conocimiento.
+"""
 
 
 class ArtifactStore:

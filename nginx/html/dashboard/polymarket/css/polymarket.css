@@ -35,4 +35,71 @@
 @media(max-width:900px){.control-body{grid-template-columns:1fr;grid-template-areas:"switches" "mode" "stake" "auto" "rules" "save" "note"}.switch-stack,.rule-grid{grid-template-columns:1fr}.control-panel{grid-area:auto}}
 .badge.abierta,.badge.open,.badge.filled{background:var(--poly-green-2);border-color:rgba(0,166,106,.35);color:var(--poly-green)}
 .badge.rechazada{background:var(--poly-red-2);border-color:rgba(217,67,95,.35);color:var(--poly-red)}
-.badge.liquidado{background:var(--poly-amber-2);border-color:rgba(179,107,0,.35);color:var(--poly-amber)}
+.badge.liquidado,.badge.sin,.badge.sin_posicion,.badge.resuelto{background:var(--poly-amber-2);border-color:rgba(179,107,0,.35);color:var(--poly-amber)}
+html[data-theme="dark"] .poly-page{
+  --poly-green-2:rgba(33,209,159,.14);
+  --poly-red-2:rgba(245,91,119,.14);
+  --poly-blue-2:rgba(98,168,255,.14);
+  --poly-amber-2:rgba(240,184,79,.15);
+}
+html[data-theme="dark"] .poly-page .panel,
+html[data-theme="dark"] .poly-page .status-card,
+html[data-theme="dark"] .poly-page .order-row,
+html[data-theme="dark"] .poly-page .guard-row,
+html[data-theme="dark"] .poly-page .activity-row{
+  background:var(--poly-surface);
+  border-color:var(--poly-line);
+  color:var(--poly-ink);
+}
+html[data-theme="dark"] .poly-page .panel-head{
+  background:linear-gradient(180deg,#101722,#151f2b);
+  border-color:var(--poly-line);
+}
+html[data-theme="dark"] .poly-page .panel-head span,
+html[data-theme="dark"] .poly-page .badge,
+html[data-theme="dark"] .poly-page .stat-box,
+html[data-theme="dark"] .poly-page .toggle-line,
+html[data-theme="dark"] .poly-page .stake-group button,
+html[data-theme="dark"] .poly-page .mini-action,
+html[data-theme="dark"] .poly-page .confidence-ring span{
+  background:#0b111a;
+  border-color:var(--poly-line);
+  color:var(--poly-ink);
+}
+html[data-theme="dark"] .poly-page .window-card.trade{
+  background:linear-gradient(180deg,rgba(33,209,159,.12),#101722);
+  border-color:rgba(33,209,159,.35);
+}
+html[data-theme="dark"] .poly-page .window-card.no-trade{
+  background:linear-gradient(180deg,rgba(240,184,79,.12),#101722);
+  border-color:rgba(240,184,79,.34);
+}
+html[data-theme="dark"] .poly-page .window-reason,
+html[data-theme="dark"] .poly-page .order-main small,
+html[data-theme="dark"] .poly-page .guard-row small,
+html[data-theme="dark"] .poly-page .activity-row small,
+html[data-theme="dark"] .poly-page .status-card small,
+html[data-theme="dark"] .poly-page .rules-note,
+html[data-theme="dark"] .poly-page .muted{
+  color:var(--poly-muted);
+}
+html[data-theme="dark"] .poly-page .toggle-line.live-gate{
+  background:linear-gradient(180deg,rgba(217,67,95,.12),#101722);
+}
+html[data-theme="dark"] .poly-page .toggle-line.live-gate.disabled,
+html[data-theme="dark"] .poly-page .primary-action:disabled,
+html[data-theme="dark"] .poly-page .mini-action:disabled{
+  background:#151f2b;
+  color:#758594;
+  border-color:#263444;
+}
+html[data-theme="dark"] .poly-page .empty{
+  background:#0b111a;
+  border-color:#304052;
+  color:#aab7c4;
+}
+html[data-theme="dark"] .poly-page .order-money b,
+html[data-theme="dark"] .poly-page .status-card strong,
+html[data-theme="dark"] .poly-page .stat-box strong{
+  color:var(--poly-ink);
+}

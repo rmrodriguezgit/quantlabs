@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from agents.registry import AgentRegistry
 from api.auth import rate_limit, require_auth
 from config import settings
-from memory.store import SessionStore
+from memory.store import SessionStore, ProjectStore
 from memory.uploads import UploadStore
 from memory.vector import VectorMemory
 from observability import ValidationCollector
@@ -33,6 +34,7 @@ engine = HarnessEngine()
 agents = AgentRegistry()
 tools = ToolRegistry()
 sessions = SessionStore()
+projects = ProjectStore()
 uploads = UploadStore()
 vector_memory = VectorMemory()
 app.config["MAX_CONTENT_LENGTH"] = settings.max_upload_mb * 1024 * 1024
@@ -114,7 +116,7 @@ def rag_hit_relevant(prompt: str, text: str, agent: str) -> bool:
     return len(overlap) >= 2
 
 
-def rag_context(user_id: str, session_id: str, agent: str, prompt: str) -> str:
+def rag_context(user_id: str, session_id: str, agent: str, prompt: str, project_id: str | None = None) -> str:
     try:
         hits = vector_memory.search(vector_memory.embed(prompt), top_k=32)
     except Exception:
@@ -124,6 +126,8 @@ def rag_context(user_id: str, session_id: str, agent: str, prompt: str) -> str:
     for item in hits:
         meta = item.get("metadata") or {}
         if meta.get("user_id") != user_id:
+            continue
+        if project_id and meta.get("project_id") not in {project_id, None}:
             continue
         if meta.get("agent") != agent:
             continue
@@ -140,7 +144,7 @@ def rag_context(user_id: str, session_id: str, agent: str, prompt: str) -> str:
     return "\n".join(lines)
 
 
-def remember_exchange(user_id: str, session_id: str, agent: str, prompt: str, response: str):
+def remember_exchange(user_id: str, session_id: str, agent: str, prompt: str, response: str, project_id: str | None = None):
     try:
         clean_prompt = strip_rag_sections(prompt)
         clean_response = strip_rag_sections(response)
@@ -148,12 +152,15 @@ def remember_exchange(user_id: str, session_id: str, agent: str, prompt: str, re
             return
         text = f"Usuario: {clean_prompt}\nRespuesta: {clean_response}"
         text_hash = vector_memory._hash(text)
-        if vector_memory.exists_duplicate(text_hash, {"user_id": user_id, "agent": agent}):
+        duplicate_scope = {"user_id": user_id, "agent": agent}
+        if project_id:
+            duplicate_scope["project_id"] = project_id
+        if vector_memory.exists_duplicate(text_hash, duplicate_scope):
             return
         vector_memory.add(
             text,
             vector_memory.embed(f"{clean_prompt}\n{clean_response}"),
-            {"user_id": user_id, "session_id": session_id, "agent": agent, "model": active_llm_model(), "text_hash": text_hash},
+            {"user_id": user_id, "session_id": session_id, "project_id": project_id or projects.default_id(), "agent": agent, "model": active_llm_model(), "text_hash": text_hash},
         )
     except Exception:
         pass
@@ -266,6 +273,60 @@ def build_status_payload(state, role=None) -> dict[str, Any]:
     }
 
 
+MICROSERVICE_CATALOG = {
+    "shell": {"category": "Infra", "purpose": "Comandos controlados para diagnóstico operativo.", "inputs": ["command"], "outputs": ["stdout", "stderr", "exit_code"], "reusable_for": ["soporte", "deploy", "auditoría"]},
+    "python": {"category": "Compute", "purpose": "Ejecución Python local para análisis y transformación.", "inputs": ["code"], "outputs": ["stdout", "artefactos"], "reusable_for": ["datos", "validación", "prototipos"]},
+    "file": {"category": "Storage", "purpose": "Lectura/escritura segura de archivos permitidos.", "inputs": ["path", "content"], "outputs": ["archivo", "metadata"], "reusable_for": ["documentación", "configuración"]},
+    "docker": {"category": "Infra", "purpose": "Inspección de contenedores permitidos.", "inputs": ["target", "action"], "outputs": ["status", "logs"], "reusable_for": ["healthchecks", "operación"]},
+    "financial": {"category": "Market Data", "purpose": "Datos financieros y cálculos de mercado.", "inputs": ["ticker", "period"], "outputs": ["series", "indicadores"], "reusable_for": ["acciones", "reportes"]},
+    "web_api": {"category": "Integration", "purpose": "Consulta HTTP a hosts permitidos.", "inputs": ["url", "method"], "outputs": ["json", "text"], "reusable_for": ["conectores", "monitoreo"]},
+    "mexc_spot": {"category": "Trading", "purpose": "Análisis MEXC spot con reglas de riesgo.", "inputs": ["symbol", "timeframe"], "outputs": ["señal", "riesgo"], "reusable_for": ["scanner cripto"]},
+    "polymarket": {"category": "Trading", "purpose": "Señales BTC Up/Down 5m/15m con Chainlink y CLOB.", "inputs": ["asset", "window"], "outputs": ["decision", "candidatos", "microestructura"], "reusable_for": ["predicción", "validación"]},
+    "paper_trading": {"category": "Trading Ops", "purpose": "Automatización observe/paper/live con candados operativos.", "inputs": ["rules", "mode"], "outputs": ["orders", "observations", "actions"], "reusable_for": ["control room", "backtesting"]},
+    "deep_research": {"category": "Research", "purpose": "Investigación profunda estructurada.", "inputs": ["objective"], "outputs": ["tesis", "fuentes"], "reusable_for": ["reportes"]},
+    "dexter_research": {"category": "Research", "purpose": "Research financiero contextual.", "inputs": ["tickers", "horizon"], "outputs": ["contexto", "artefactos"], "reusable_for": ["polymarket", "acciones"]},
+    "jupyter_gpu": {"category": "GPU Lab", "purpose": "Ejecución de notebooks/código GPU.", "inputs": ["code"], "outputs": ["stdout", "modelos"], "reusable_for": ["entrenamiento", "validación CUDA"]},
+    "file_analyst": {"category": "Documents", "purpose": "Análisis local de documentos privados.", "inputs": ["file_id", "text"], "outputs": ["resumen", "riesgos", "plan"], "reusable_for": ["legal", "finanzas", "auditoría"]},
+}
+
+
+def build_microservice_catalog(role=None) -> dict[str, Any]:
+    visible = set(tools.visible_tools(role))
+    nodes = []
+    for name in sorted(visible):
+        spec = MICROSERVICE_CATALOG.get(name, {})
+        nodes.append({
+            "id": name,
+            "label": name.replace("_", " ").title(),
+            "category": spec.get("category", "Tool"),
+            "purpose": spec.get("purpose", "Herramienta disponible en Harness."),
+            "inputs": spec.get("inputs", []),
+            "outputs": spec.get("outputs", []),
+            "reusable_for": spec.get("reusable_for", []),
+            "roles": sorted(role_name for role_name, allowed in tools.allowed_by_role.items() if name in allowed),
+        })
+    edges = [
+        {"from": "file_analyst", "to": "research", "label": "documentos -> criterio"},
+        {"from": "polymarket", "to": "paper_trading", "label": "señal -> operación"},
+        {"from": "dexter_research", "to": "polymarket", "label": "contexto -> señal"},
+        {"from": "jupyter_gpu", "to": "polymarket", "label": "modelo -> predicción"},
+        {"from": "docker", "to": "shell", "label": "infra -> comandos"},
+        {"from": "financial", "to": "dexter_research", "label": "datos -> research"},
+    ]
+    edges = [edge for edge in edges if edge["from"] in visible and edge["to"] in visible]
+    return {
+        "catalog_version": "2026-06-02",
+        "concept": "Microservicios reutilizables tipo n8n: cada nodo declara entradas, salidas, rol y posibilidad de reciclaje.",
+        "nodes": nodes,
+        "edges": edges,
+        "recommended_flows": [
+            {"name": "Polymarket Predictivo", "nodes": ["dexter_research", "polymarket", "paper_trading"], "use": "contexto + señal + control operativo"},
+            {"name": "Documentos Privados", "nodes": ["file_analyst", "research", "planner"], "use": "documento + análisis + plan"},
+            {"name": "GPU Model Lab", "nodes": ["jupyter_gpu", "python", "file"], "use": "entrenar, guardar y documentar modelos"},
+        ],
+    }
+
+
 def _format_bytes(size: int) -> str:
     units = ("B", "KB", "MB", "GB")
     value = float(max(size, 0))
@@ -341,6 +402,39 @@ def _paper_trading_dir() -> Path:
     return Path(settings.artifact_root) / "paper_trading"
 
 
+def _polymarket_positions_snapshot() -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
+    try:
+        tool = tools.tools["paper_trading"]
+        positions = tool._fetch_polymarket_positions()
+    except Exception as exc:
+        return [], [], str(exc)[:240]
+    open_rows: list[dict[str, Any]] = []
+    resolved_rows: list[dict[str, Any]] = []
+    for position in positions:
+        try:
+            if not tool._is_managed_polymarket_position(position):
+                continue
+            summary = tool._polymarket_position_summary(position)
+        except Exception:
+            continue
+        size = float(summary.get("size") or 0)
+        asset = str(summary.get("asset") or "").strip()
+        if not asset or size <= 0:
+            continue
+        row = {
+            **summary,
+            "percent_pnl": round(float(position.get("percentPnl") or 0), 4),
+            "cash_pnl": round(float(position.get("cashPnl") or 0), 4),
+            "event_slug": position.get("eventSlug") or position.get("slug") or position.get("marketSlug"),
+            "secret_exposed": False,
+        }
+        if row.get("redeemable") or float(row.get("current_price") or 0) <= 0 or float(row.get("current_value") or 0) <= 0:
+            resolved_rows.append(row)
+        else:
+            open_rows.append(row)
+    return open_rows, resolved_rows, None
+
+
 def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
     root = root or _paper_trading_dir()
     root.mkdir(parents=True, exist_ok=True)
@@ -361,6 +455,7 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
     errors = latest.get("errors") or []
     position_actions = latest.get("position_actions") or []
     claim_actions = latest.get("claim_actions") or []
+    open_positions, resolved_positions, open_positions_error = _polymarket_positions_snapshot()
     enabled = bool(config.get("enabled", False))
     mode = str(config.get("mode") or latest.get("mode") or "observe").lower()
     server_live_trading_enabled = bool(settings.polymarket_live_trading_enabled)
@@ -438,6 +533,11 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "observations": observations,
         "position_actions": position_actions,
         "claim_actions": claim_actions,
+        "polymarket_open_positions": open_positions,
+        "polymarket_open_position_assets": [row.get("asset") for row in open_positions if row.get("asset")],
+        "polymarket_resolved_positions": resolved_positions,
+        "polymarket_resolved_position_assets": [row.get("asset") for row in resolved_positions if row.get("asset")],
+        "polymarket_positions_error": open_positions_error,
         "observations_count": len(observations),
         "position_actions_count": len(position_actions),
         "claim_actions_count": len(claim_actions),
@@ -582,12 +682,15 @@ def chat():
         show_rag = bool(data.get('show_rag'))
         file_ids = data.get('file_ids') or []
         session_id = data.get('session_id', 'default')
+        project_id = (data.get('project_id') or projects.default_id()).strip()
+        project = projects.get(request.identity['user_id'], project_id)
+        project_id = project['id']
         agent = route_agent_for_model(data.get('agent', 'planner'))
         context = uploads.context(request.identity['user_id'], file_ids)
         if context:
             prompt = f"{prompt}\n\n[Archivos adjuntos disponibles]\n{context}"
         use_rag = rag_enabled_for_agent(agent)
-        memory_context = rag_context(request.identity['user_id'], session_id, agent, prompt) if use_rag else ""
+        memory_context = rag_context(request.identity['user_id'], session_id, agent, prompt, project_id) if use_rag else ""
         if use_rag and memory_context:
             prompt = f"{prompt}\n\n[Memoria RAG relevante]\n{memory_context}"
         user_message_metadata = {}
@@ -603,13 +706,15 @@ def chat():
             user_message_metadata=user_message_metadata,
         )
         result.setdefault("metadata", {})["active_model"] = active_llm_model()
+        result["metadata"]["project_id"] = project_id
+        result["metadata"]["project_name"] = project.get("name")
         result["metadata"]["effective_agent"] = agent
         result["metadata"]["rag_enabled"] = use_rag
         result["metadata"]["rag_available"] = bool(memory_context)
         result["metadata"]["rag_visible"] = bool(show_rag and memory_context)
         if show_rag and memory_context:
             result["metadata"]["rag_context"] = memory_context
-        remember_exchange(request.identity['user_id'], session_id, agent, original_prompt, result.get("response", ""))
+        remember_exchange(request.identity['user_id'], session_id, agent, original_prompt, result.get("response", ""), project_id)
         return jsonify(result)
     except PermissionError as exc:
         return jsonify({'error': str(exc)}), 403
@@ -679,6 +784,51 @@ def delete_conversation(session_id):
     if not sessions.delete(request.identity['user_id'], session_id):
         return jsonify({'error': 'no encontrado'}), 404
     return jsonify({'ok': True})
+
+
+@app.get('/v1/projects')
+@require_auth({'admin', 'teacher', 'trader'})
+def list_projects():
+    return jsonify({'projects': projects.list(request.identity['user_id'])})
+
+
+@app.post('/v1/projects')
+@require_auth({'admin', 'teacher', 'trader'})
+def create_project():
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or 'Nuevo proyecto Harness').strip()[:120]
+    raw_id = data.get('id') or name.lower().replace(' ', '-')
+    project_id = re.sub(r'[^a-zA-Z0-9_.-]+', '-', raw_id).strip('-').lower()[:80] or str(uuid.uuid4())
+    return jsonify({'project': projects.ensure(request.identity['user_id'], project_id, name)}), 201
+
+
+@app.get('/v1/projects/<project_id>')
+@require_auth({'admin', 'teacher', 'trader'})
+def get_project(project_id):
+    data = projects.get(request.identity['user_id'], project_id)
+    data['rag_stats'] = vector_memory.stats({'user_id': request.identity['user_id'], 'project_id': data['id']})
+    return jsonify({'project': data})
+
+
+@app.patch('/v1/projects/<project_id>')
+@require_auth({'admin', 'teacher', 'trader'})
+def update_project(project_id):
+    data = request.get_json(silent=True) or {}
+    return jsonify({'project': projects.update(request.identity['user_id'], project_id, data)})
+
+
+@app.post('/v1/projects/<project_id>/memory')
+@require_auth({'admin', 'teacher', 'trader'})
+def append_project_memory(project_id):
+    data = request.get_json(silent=True) or {}
+    project = projects.append_memory_note(request.identity['user_id'], project_id, data.get('note') or '')
+    return jsonify({'project': project})
+
+
+@app.get('/v1/microservices/catalog')
+@require_auth({'admin', 'teacher', 'trader'})
+def microservices_catalog():
+    return jsonify(build_microservice_catalog(request.identity.get('role')))
 
 
 @app.get('/v1/system')
