@@ -41,17 +41,20 @@ No expongas secretos, no ejecutes trading live y no modifiques produccion sin va
             code = self._gpu_probe_code(objective)
             result = ctx.tools.execute('jupyter_gpu', role=ctx.role, code=code, timeout=120).model_dump()
             final = self._format_jupyter_gpu_response(result.get('output') or {})
+            events = [{
+                'step': 1,
+                'decision': {'action': 'tool', 'tool': 'jupyter_gpu', 'arguments': {'purpose': 'gpu_cuda_torch_priority_probe'}},
+                'result': result,
+            }]
+            hybrid = self.hybrid_finalize(objective, final, result, mode='coding_gpu_probe')
+            events.append(hybrid['event'])
             return {
                 'agent': self.name,
                 'objective': objective,
-                'result': final,
-                'events': [{
-                    'step': 1,
-                    'decision': {'action': 'tool', 'tool': 'jupyter_gpu', 'arguments': {'purpose': 'gpu_cuda_torch_priority_probe'}},
-                    'result': result,
-                }],
-                'usage': {},
-                'last_usage': {},
+                'result': hybrid['result'],
+                'events': events,
+                'usage': hybrid['usage'],
+                'last_usage': hybrid['last_usage'],
             }
         return super().act(objective, ctx)
 
@@ -121,17 +124,20 @@ Prioriza resumen ejecutivo, interpretación, riesgos, conclusiones y plan de acc
         ).model_dump()
         output = result.get('output') or {}
         final = self._format_file_analysis(output) if result.get('ok') else f"File Analyst no pudo analizar: {result.get('error')}"
+        events = [{
+            'step': 1,
+            'decision': {'action': 'tool', 'tool': 'file_analyst', 'arguments': {'file_id': file_id, 'mode': mode}},
+            'result': result,
+        }]
+        hybrid = self.hybrid_finalize(objective, final, output, mode='file_analyst_private_document')
+        events.append(hybrid['event'])
         return {
             'agent': self.name,
             'objective': objective,
-            'result': final,
-            'events': [{
-                'step': 1,
-                'decision': {'action': 'tool', 'tool': 'file_analyst', 'arguments': {'file_id': file_id, 'mode': mode}},
-                'result': result,
-            }],
-            'usage': {},
-            'last_usage': {},
+            'result': hybrid['result'],
+            'events': events,
+            'usage': hybrid['usage'],
+            'last_usage': hybrid['last_usage'],
         }
 
     def _extract_file_id(self, objective: str) -> str | None:
@@ -224,7 +230,9 @@ Reglas base: confidence >= 0.80, edge >= 0.03, spread <= 0.08, ask_size >= 1, se
             final = FinanceAgent()._format_btc_updown_response(signal)
         else:
             final = self._format_signal_flow(signal, research, artifact)
-        return {'agent': self.name, 'objective': objective, 'result': final, 'events': events, 'usage': {}, 'last_usage': {}}
+        hybrid = self.hybrid_finalize(objective, final, {'signal': signal, 'research': research, 'artifact': artifact}, mode='polymarket_signal_risk', preserve_evidence=True)
+        events.append(hybrid['event'])
+        return {'agent': self.name, 'objective': objective, 'result': hybrid['result'], 'events': events, 'usage': hybrid['usage'], 'last_usage': hybrid['last_usage']}
 
     def _prefers_hybrid_prediction_simulation(self, objective: str) -> bool:
         text = str(objective or '').lower()
@@ -408,17 +416,20 @@ Separa hechos, inferencias e incertidumbre. No ejecutes operaciones, no cambies 
             if artifact and artifact not in ctx.state.artifacts:
                 ctx.state.artifacts.append(artifact)
         final = self._format_response(output)
+        events = [{
+            'step': 1,
+            'decision': {'action': 'tool', 'tool': 'dexter_research', 'arguments': {'tickers': tickers, 'horizon': '6mo'}},
+            'result': result,
+        }]
+        hybrid = self.hybrid_finalize(objective, final, output, mode='dexter_research_synthesis')
+        events.append(hybrid['event'])
         return {
             'agent': self.name,
             'objective': objective,
-            'result': final,
-            'events': [{
-                'step': 1,
-                'decision': {'action': 'tool', 'tool': 'dexter_research', 'arguments': {'tickers': tickers, 'horizon': '6mo'}},
-                'result': result,
-            }],
-            'usage': {},
-            'last_usage': {},
+            'result': hybrid['result'],
+            'events': events,
+            'usage': hybrid['usage'],
+            'last_usage': hybrid['last_usage'],
         }
 
     def _extract_tickers(self, objective: str) -> list[str]:
@@ -486,6 +497,26 @@ Eres el analista cuantitativo de mercados. Evalua oportunidades con datos, proba
 Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, spread <= 8%, profundidad ask >= 1, al menos 60s al cierre, stake manual fijo de 1/2/3 USDT, SL por 75% de ventana con PnL negativo y TP +100%. Nunca ejecutes dinero real; entrega recomendacion y razon de bloqueo cuando no haya trade.'''
 
     def act(self, objective: str, ctx) -> dict:
+        if self._should_use_finance_scalping(objective):
+            tickers = self._extract_finance_tickers(objective)
+            result = ctx.tools.execute(
+                'financial',
+                role=ctx.role,
+                action='technical_scalping',
+                tickers=tickers,
+                period=self._extract_period(objective),
+                interval=self._extract_interval(objective),
+            ).model_dump()
+            output = result.get('output') or {}
+            final = self._format_technical_scalping_response(output)
+            events = [{
+                'step': 1,
+                'decision': {'action': 'tool', 'tool': 'financial', 'arguments': {'action': 'technical_scalping', 'tickers': tickers}},
+                'result': result,
+            }]
+            hybrid = self.hybrid_finalize(objective, final, output, mode='finance_technical_scalping')
+            events.append(hybrid['event'])
+            return {'agent': self.name, 'objective': objective, 'result': hybrid['result'], 'events': events, 'usage': hybrid['usage'], 'last_usage': hybrid['last_usage']}
         if self._should_use_deep_research(objective):
             tickers = self._extract_research_tickers(objective)
             result = ctx.tools.execute(
@@ -501,17 +532,20 @@ Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, sprea
                 if artifact and artifact not in ctx.state.artifacts:
                     ctx.state.artifacts.append(artifact)
             final = self._format_deep_research_response(output)
+            events = [{
+                'step': 1,
+                'decision': {'action': 'tool', 'tool': 'dexter_research', 'arguments': {'tickers': tickers, 'horizon': '6mo'}},
+                'result': result,
+            }]
+            hybrid = self.hybrid_finalize(objective, final, output, mode='finance_deep_research')
+            events.append(hybrid['event'])
             return {
                 'agent': self.name,
                 'objective': objective,
-                'result': final,
-                'events': [{
-                    'step': 1,
-                    'decision': {'action': 'tool', 'tool': 'dexter_research', 'arguments': {'tickers': tickers, 'horizon': '6mo'}},
-                    'result': result,
-                }],
-                'usage': {},
-                'last_usage': {},
+                'result': hybrid['result'],
+                'events': events,
+                'usage': hybrid['usage'],
+                'last_usage': hybrid['last_usage'],
             }
         if self._should_train_btc_deep_model(objective):
             start_et, end_et = self._extract_et_window(objective)
@@ -527,17 +561,20 @@ Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, sprea
                 hidden_size=16,
             ).model_dump()
             final = self._format_btc_deep_train_response(result.get('output') or {})
+            events = [{
+                'step': 1,
+                'decision': {'action': 'tool', 'tool': 'polymarket', 'arguments': {'action': 'btc_updown_deep_train', 'interval': '5m', 'lookback_window': '1d', 'window_start_et': start_et, 'window_end_et': end_et}},
+                'result': result,
+            }]
+            hybrid = self.hybrid_finalize(objective, final, result.get('output') or {}, mode='finance_model_training')
+            events.append(hybrid['event'])
             return {
                 'agent': self.name,
                 'objective': objective,
-                'result': final,
-                'events': [{
-                    'step': 1,
-                    'decision': {'action': 'tool', 'tool': 'polymarket', 'arguments': {'action': 'btc_updown_deep_train', 'interval': '5m', 'lookback_window': '1d', 'window_start_et': start_et, 'window_end_et': end_et}},
-                    'result': result,
-                }],
-                'usage': {},
-                'last_usage': {},
+                'result': hybrid['result'],
+                'events': events,
+                'usage': hybrid['usage'],
+                'last_usage': hybrid['last_usage'],
             }
         if self._should_use_paper_trading(objective):
             symbols = self._extract_symbols(objective)
@@ -559,27 +596,30 @@ Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, sprea
                 lookback=288,
             ).model_dump()
             final = self._format_paper_trading_response(result.get('output') or {}, symbols)
+            events = [{
+                'step': 1,
+                'decision': {
+                    'action': 'tool',
+                    'tool': 'paper_trading',
+                    'arguments': {
+                        'action': 'run_cycle',
+                        'mode': 'paper',
+                        'venues': ['polymarket', 'mexc'],
+                        'mexc_tickers': symbols,
+                        'threshold': 0.8,
+                    },
+                },
+                'result': result,
+            }]
+            hybrid = self.hybrid_finalize(objective, final, result.get('output') or {}, mode='finance_paper_trading')
+            events.append(hybrid['event'])
             return {
                 'agent': self.name,
                 'objective': objective,
-                'result': final,
-                'events': [{
-                    'step': 1,
-                    'decision': {
-                        'action': 'tool',
-                        'tool': 'paper_trading',
-                        'arguments': {
-                            'action': 'run_cycle',
-                            'mode': 'paper',
-                            'venues': ['polymarket', 'mexc'],
-                            'mexc_tickers': symbols,
-                            'threshold': 0.8,
-                        },
-                    },
-                    'result': result,
-                }],
-                'usage': {},
-                'last_usage': {},
+                'result': hybrid['result'],
+                'events': events,
+                'usage': hybrid['usage'],
+                'last_usage': hybrid['last_usage'],
             }
         if self._should_use_btc_updown(objective):
             result = ctx.tools.execute(
@@ -599,30 +639,33 @@ Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, sprea
                 min_seconds_to_close=45,
             ).model_dump()
             final = self._format_btc_updown_response(result.get('output') or {})
+            events = [{
+                'step': 1,
+                'decision': {
+                    'action': 'tool',
+                    'tool': 'polymarket',
+                    'arguments': {
+                        'action': 'btc_updown_5m15m_coordinated_signal',
+                        'asset': 'btc',
+                        'threshold': 0.8,
+                        'candle_interval': '5m',
+                        'lookback_window': '1d',
+                        'lookback': 288,
+                        'prediction_candle_interval': '1m',
+                        'prediction_lookback': 90,
+                    },
+                },
+                'result': result,
+            }]
+            hybrid = self.hybrid_finalize(objective, final, result.get('output') or {}, mode='finance_polymarket_signal', preserve_evidence=True)
+            events.append(hybrid['event'])
             return {
                 'agent': self.name,
                 'objective': objective,
-                'result': final,
-                'events': [{
-                    'step': 1,
-                    'decision': {
-                        'action': 'tool',
-                        'tool': 'polymarket',
-                        'arguments': {
-                            'action': 'btc_updown_5m15m_coordinated_signal',
-                            'asset': 'btc',
-                            'threshold': 0.8,
-                            'candle_interval': '5m',
-                            'lookback_window': '1d',
-                            'lookback': 288,
-                            'prediction_candle_interval': '1m',
-                            'prediction_lookback': 90,
-                        },
-                    },
-                    'result': result,
-                }],
-                'usage': {},
-                'last_usage': {},
+                'result': hybrid['result'],
+                'events': events,
+                'usage': hybrid['usage'],
+                'last_usage': hybrid['last_usage'],
             }
         if self._should_use_mexc_spot_long(objective):
             symbols = self._extract_symbols(objective)
@@ -635,23 +678,101 @@ Para Polymarket usa reglas deterministicas: confidence >= 80%, edge >= 3%, sprea
                 limit=200,
             ).model_dump()
             final = self._format_mexc_spot_response(result.get('output') or {}, symbols)
+            events = [{
+                'step': 1,
+                'decision': {
+                    'action': 'tool',
+                    'tool': 'mexc_spot',
+                    'arguments': {'action': 'scan_spot_long_candidates', 'tickers': symbols, 'interval': '15m', 'limit': 200},
+                },
+                'result': result,
+            }]
+            hybrid = self.hybrid_finalize(objective, final, result.get('output') or {}, mode='finance_mexc_spot')
+            events.append(hybrid['event'])
             return {
                 'agent': self.name,
                 'objective': objective,
-                'result': final,
-                'events': [{
-                    'step': 1,
-                    'decision': {
-                        'action': 'tool',
-                        'tool': 'mexc_spot',
-                        'arguments': {'action': 'scan_spot_long_candidates', 'tickers': symbols, 'interval': '15m', 'limit': 200},
-                    },
-                    'result': result,
-                }],
-                'usage': {},
-                'last_usage': {},
+                'result': hybrid['result'],
+                'events': events,
+                'usage': hybrid['usage'],
+                'last_usage': hybrid['last_usage'],
             }
         return super().act(objective, ctx)
+
+    def _should_use_finance_scalping(self, objective: str) -> bool:
+        text = str(objective or '').lower()
+        return (
+            any(token in text for token in ['scalping', 'scalp', 'intradia', 'intraday', 'trading corto', 'análisis técnico', 'analisis tecnico'])
+            and any(token in text for token in ['btc', 'bitcoin', 'eth', 'nvda', 'tsla', 'spy', '-usd', 'usdt', 'usd'])
+            and 'polymarket' not in text
+            and 'mexc' not in text
+        )
+
+    def _extract_finance_tickers(self, objective: str) -> list[str]:
+        text = str(objective or '')
+        tickers = []
+        if re.search(r'\bBTC|BITCOIN\b', text, flags=re.IGNORECASE):
+            tickers.append('BTC-USD')
+        if re.search(r'\bETH|ETHEREUM\b', text, flags=re.IGNORECASE):
+            tickers.append('ETH-USD')
+        for token in re.findall(r'\b[A-Z]{1,6}(?:[-/]USD|[/]?USDT)?\b', text.upper()):
+            normalized = token.replace('/', '-')
+            if normalized.endswith('USDT'):
+                normalized = normalized.replace('USDT', '-USD')
+            if normalized in {'USD','USDT','RSI','MACD','VWAP','ATR','EMA','DIA','DAY','DE','DEL','LA','EL','LOS','LAS','UN','UNA','Y','O','EN','CON','PARA','POR'}:
+                continue
+            if normalized in {'BTC','ETH','SOL'}:
+                normalized = f'{normalized}-USD'
+            if normalized not in tickers and len(normalized) >= 2:
+                tickers.append(normalized)
+        return tickers[:6] or ['BTC-USD']
+
+    def _extract_period(self, objective: str) -> str:
+        text = str(objective or '').lower()
+        if '1d' in text or '1 día' in text or '1 dia' in text:
+            return '5d'
+        if '5d' in text:
+            return '5d'
+        if '1mo' in text or '1 mes' in text:
+            return '1mo'
+        return '1mo'
+
+    def _extract_interval(self, objective: str) -> str:
+        text = str(objective or '').lower()
+        if '1d' in text or '1 día' in text or '1 dia' in text or 'scalping' in text:
+            return '15m'
+        if '5m' in text:
+            return '5m'
+        if '1h' in text or '60m' in text:
+            return '60m'
+        return '1d'
+
+    def _format_technical_scalping_response(self, output: dict) -> str:
+        rows = output.get('results') or []
+        lines = [
+            'Análisis técnico para scalping',
+            '',
+            f"Periodo: {output.get('period')} · Intervalo: {output.get('interval')} · Fuente: Yahoo Finance/yfinance",
+            '',
+            '| Ticker | Fuente | Señal | Precio | Tendencia | RSI14 | MACD Hist | EMA20 | EMA50 | VWAP | ATR14 | Soporte | Resistencia | Stop | Target | Riesgo |',
+            '|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
+        ]
+        for row in rows:
+            if row.get('status') != 'ok':
+                lines.append(f"| {self._cell(row.get('ticker'))} | {self._cell(row.get('source'))} | NO DATA | — | — | — | — | — | — | — | — | — | — | — | — | {self._cell(row.get('reason'))} |")
+                continue
+            lines.append(
+                f"| {self._cell(row.get('ticker'))} | {self._cell(row.get('source'))} | {self._cell(row.get('signal'))} | {self._num(row.get('last_price'))} | {self._cell(row.get('trend'))} | "
+                f"{self._num(row.get('rsi14'))} | {self._num(row.get('macd_histogram'))} | {self._num(row.get('ema20'))} | {self._num(row.get('ema50'))} | "
+                f"{self._num(row.get('vwap'))} | {self._num(row.get('atr14'))} | {self._num(row.get('support_20'))} | {self._num(row.get('resistance_20'))} | "
+                f"{self._num(row.get('suggested_stop'))} | {self._num(row.get('suggested_target'))} | {self._cell(row.get('risk_note'))} |"
+            )
+        lines.extend([
+            '',
+            'Reglas: LONG WATCH requiere confluencia de precio/EMA, momentum y VWAP; SHORT WATCH requiere confluencia inversa. NO TRADE si no hay confluencia suficiente.',
+            'Esto es análisis técnico local, no recomendación financiera ni orden automática.',
+        ])
+        return '\n'.join(lines)
 
     def _should_use_deep_research(self, objective: str) -> bool:
         text = str(objective or '').lower()
@@ -1133,17 +1254,20 @@ Audita cronjobs, bots, senales, metricas, logs, infraestructura, GPU, Docker, pe
             snapshot = collector.snapshot()
             transactions = collector.transactions(limit=80)
             final = self._format_validation_snapshot(snapshot, transactions)
+            events = [{
+                'step': 1,
+                'decision': {'action': 'observability_snapshot'},
+                'result': {'name': 'validation_observability', 'ok': True, 'agents': len(snapshot.get('agents') or [])},
+            }]
+            hybrid = self.hybrid_finalize(objective, final, {'snapshot': snapshot, 'transactions': transactions}, mode='validation_observability')
+            events.append(hybrid['event'])
             return {
                 'agent': self.name,
                 'objective': objective,
-                'result': final,
-                'events': [{
-                    'step': 1,
-                    'decision': {'action': 'observability_snapshot'},
-                    'result': {'name': 'validation_observability', 'ok': True, 'agents': len(snapshot.get('agents') or [])},
-                }],
-                'usage': {},
-                'last_usage': {},
+                'result': hybrid['result'],
+                'events': events,
+                'usage': hybrid['usage'],
+                'last_usage': hybrid['last_usage'],
             }
         return super().act(objective, ctx)
 

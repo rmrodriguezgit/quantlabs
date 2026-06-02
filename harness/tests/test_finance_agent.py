@@ -4,8 +4,24 @@ from core.models import SessionState
 from tools.registry import ToolRegistry
 
 
-def test_finance_agent_formats_btc_updown_without_llm(monkeypatch):
+def _stub_hybrid(agent, monkeypatch):
+    def fake_hybrid(objective, draft, evidence=None, **kwargs):
+        return {
+            "result": f"{draft}\n\nLLM Local: síntesis de prueba",
+            "usage": {"total_tokens": 1},
+            "last_usage": {"total_tokens": 1},
+            "event": {
+                "step": "llm_synthesis",
+                "decision": {"action": "llm_local_synthesis", "mode": kwargs.get("mode")},
+                "result": {"name": "llm_local", "ok": True},
+            },
+        }
+    monkeypatch.setattr(agent, "hybrid_finalize", fake_hybrid)
+
+
+def test_finance_agent_formats_btc_updown_hybrid(monkeypatch):
     agent = FinanceAgent()
+    _stub_hybrid(agent, monkeypatch)
     ctx = AgentContext(state=SessionState(session_id="demo"), tools=ToolRegistry(), role="trader")
 
     def fake_execute(name, role=None, **kwargs):
@@ -53,8 +69,9 @@ def test_finance_agent_formats_btc_updown_without_llm(monkeypatch):
 
     result = agent.act("Analiza Polymarket Bitcoin 5m y 15m scalping", ctx)
 
-    assert result["usage"] == {}
+    assert result["usage"] == {"total_tokens": 1}
     assert result["events"][0]["decision"]["tool"] == "polymarket"
+    assert result["events"][1]["decision"]["action"] == "llm_local_synthesis"
     assert result["result"].startswith("Decisión: NO TRADE")
     assert "2023" not in result["result"]
     assert '"Hora_actual_simulacion"' not in result["result"]
@@ -64,12 +81,14 @@ def test_finance_agent_formats_btc_updown_without_llm(monkeypatch):
     assert "77553.25" in result["result"]
     assert "77590.12" in result["result"]
     assert "UP 47.0% / DOWN 53.0%" in result["result"]
-    assert "chainlink_1m_bounded_nowcast" in result["result"]
+    assert "Modelo: señal coordinada BTC Up/Down 5m + 15m" in result["result"]
     assert "Kelly: fraccion" in result["result"]
+    assert "LLM Local:" in result["result"]
 
 
-def test_finance_agent_formats_mexc_spot_scan_without_llm(monkeypatch):
+def test_finance_agent_formats_mexc_spot_scan_hybrid(monkeypatch):
     agent = FinanceAgent()
+    _stub_hybrid(agent, monkeypatch)
     ctx = AgentContext(state=SessionState(session_id="demo"), tools=ToolRegistry(), role="trader")
 
     def fake_execute(name, role=None, **kwargs):
@@ -110,16 +129,19 @@ def test_finance_agent_formats_mexc_spot_scan_without_llm(monkeypatch):
 
     result = agent.act("MEXC spot LONG RSI MACD VWAP AIDOGE/USDT ELF/USDT", ctx)
 
-    assert result["usage"] == {}
+    assert result["usage"] == {"total_tokens": 1}
     assert result["events"][0]["decision"]["tool"] == "mexc_spot"
+    assert result["events"][1]["decision"]["action"] == "llm_local_synthesis"
     assert result["result"].startswith("Señal MEXC Spot: BUY")
     assert "| Ticker | Señal | Precio | RSI |" in result["result"]
     assert "SELL:" in result["result"] or "| SELL Score |" in result["result"]
     assert "| AIDOGEUSDT | BUY |" in result["result"]
+    assert "LLM Local:" in result["result"]
 
 
-def test_finance_agent_runs_paper_trading_cycle_without_llm(monkeypatch):
+def test_finance_agent_runs_paper_trading_cycle_hybrid(monkeypatch):
     agent = FinanceAgent()
+    _stub_hybrid(agent, monkeypatch)
     ctx = AgentContext(state=SessionState(session_id="demo"), tools=ToolRegistry(), role="trader")
 
     def fake_execute(name, role=None, **kwargs):
@@ -158,6 +180,8 @@ def test_finance_agent_runs_paper_trading_cycle_without_llm(monkeypatch):
     result = agent.act("MODE=paper automatiza ciclo Polymarket y MEXC BTC/USDT", ctx)
 
     assert result["events"][0]["decision"]["tool"] == "paper_trading"
+    assert result["events"][1]["decision"]["action"] == "llm_local_synthesis"
     assert result["result"].startswith("Paper Trading:")
     assert "| polymarket | BTC Up/Down | 5m | UP |" in result["result"]
     assert "MODE=paper" in result["result"]
+    assert "LLM Local:" in result["result"]
