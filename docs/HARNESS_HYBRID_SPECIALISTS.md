@@ -54,3 +54,16 @@ Flujo esperado:
 - Polymarket live sigue bajo candados operativos.
 - Si LLM Local falla, el Harness conserva la respuesta determinística.
 - Cada síntesis se registra como evento `llm_local_synthesis`.
+
+## Decision Router
+
+Se agregó `agents.decision_router.DecisionRouter` como primera capa del Harness. Su objetivo es escoger el camino más rápido sin perder control:
+
+- `rule`: respuesta determinística inmediata, sin LLM ni herramienta.
+- `tool`: reservado para herramientas directas cuando no se necesita síntesis.
+- `hybrid`: herramienta/regla del especialista primero y LLM Local después para explicación.
+- `llm_local`: preguntas conceptuales o ambiguas sin regla confiable.
+
+Cada ejecución registra un primer evento `decision_router` con `route`, `confidence`, `reason`, `tool`, `risk` y `expected_latency_ms`.
+
+Ejemplo: `como reinicio nginx en docker` responde por regla directa con `docker restart quantlab_nginx`. Polymarket y finance scalping quedan en ruta `hybrid` porque necesitan datos reales, reglas de negocio y explicación.
