@@ -559,7 +559,8 @@ def _paper_trading_config_path() -> Path:
     return _paper_trading_dir() / "config.json"
 
 
-POLYMARKET_STAKE_CHOICES = {1.0, 2.0, 3.0}
+POLYMARKET_STAKE_MIN = 0.1
+POLYMARKET_STAKE_MAX = 100.0
 
 
 def _bounded_percent(value: Any, default: float, minimum: float, maximum: float) -> float:
@@ -592,7 +593,7 @@ def _default_polymarket_rules() -> dict[str, Any]:
     return {
         "polymarket_btc_updown": {
             "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
-            "stake": ["manual fixed stake only: 1, 2 or 3 USDT", "no martingale", "no averaging down"],
+            "stake": ["manual fixed stake configurable between 0.1 and 100 USDT", "presets 1/2/3 remain available", "no martingale", "no averaging down"],
             "exit": ["SL: liquidate after configured window percent if PnL remains negative", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop defaults to 75% of window when PnL remains negative"],
             "prediction": ["optional invert switch: Down becomes Up and Up becomes Down before order sizing"],
         }
@@ -612,9 +613,9 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
         config["mode"] = "live"
     if "polymarket_stake_usdt" in data or "stake" in data:
         raw_stake = float(data.get("polymarket_stake_usdt", data.get("stake")))
-        if raw_stake not in POLYMARKET_STAKE_CHOICES:
-            raise ValueError("stake_must_be_1_2_or_3_usdt")
-        config["polymarket_stake_usdt"] = raw_stake
+        if raw_stake < POLYMARKET_STAKE_MIN or raw_stake > POLYMARKET_STAKE_MAX:
+            raise ValueError("stake_must_be_between_0_1_and_100_usdt")
+        config["polymarket_stake_usdt"] = round(raw_stake, 2)
     if "polymarket_auto_liquidate_enabled" in data or "auto_liquidate" in data:
         config["polymarket_auto_liquidate_enabled"] = bool(data.get("polymarket_auto_liquidate_enabled", data.get("auto_liquidate")))
     if "polymarket_time_stop_pct" in data:
@@ -660,7 +661,9 @@ def paper_trading_rules_payload() -> dict[str, Any]:
         "server_live_trading_enabled": bool(settings.polymarket_live_trading_enabled),
         "live_ready": bool(settings.polymarket_live_trading_enabled and config.get("live_execution_enabled", False)),
         "allowed_modes": ["observe", "paper", "live"],
-        "allowed_stakes": sorted(POLYMARKET_STAKE_CHOICES),
+        "allowed_stakes": [1, 2, 3],
+        "stake_min": POLYMARKET_STAKE_MIN,
+        "stake_max": POLYMARKET_STAKE_MAX,
     }
 
 

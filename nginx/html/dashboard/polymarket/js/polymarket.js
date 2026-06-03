@@ -9,6 +9,10 @@ const boundedPct = (v, fallback, min, max) => {
   const n = num(v, fallback);
   return n < min ? fallback : clamp(n, min, max);
 };
+const stakeValue = v => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0.1 ? Math.round(clamp(n, 0.1, 100) * 100) / 100 : 1;
+};
 
 let controlState = {
   enabled:false,
@@ -179,7 +183,7 @@ function friendlyError(value = '') {
   return text ? `Ultimo error: ${text.slice(0, 160)}` : '';
 }
 function syncControlSummary() {
-  const invert = controlState.invertPrediction ? ' Invertir ON: DOWN->UP y UP->DOWN.' : ' Invertir OFF: se opera el lado indicado.';
+  const invert = '';
   const err = controlState.lastError ? ` ${friendlyError(controlState.lastError)}` : '';
   $('rulesNote').textContent = `SL ${controlState.timeStop}% ventana con PnL negativo. TP +${controlState.tp}%.${invert}${liveGateHint()}${err}`;
 }
@@ -197,7 +201,7 @@ function readControls() {
   return {
     enabled:$('tradingEnabled').checked,
     mode:$('tradingMode').value,
-    stake:controlState.stake,
+    stake:stakeValue($('customStake').value || controlState.stake),
     autoLiquidate:$('autoLiquidate').checked,
     timeStop:boundedPct($('timeStopPct').value, 75, 10, 99),
     tp:boundedPct($('takeProfitPct').value, 100, 10, 500),
@@ -217,8 +221,13 @@ function markControlsDirty() {
   setSaveState('SIN GUARDAR');
 }
 function syncStakeButtons() {
-  [...$('stakeGroup').querySelectorAll('button')].forEach(b => b.classList.toggle('active', Number(b.dataset.stake) === controlState.stake));
+  const presetActive = [1, 2, 3].includes(Number(controlState.stake));
+  [...$('stakeGroup').querySelectorAll('button')].forEach(b => b.classList.toggle('active', Number(b.dataset.stake) === Number(controlState.stake)));
+  const custom = $('customStake');
+  if (custom && document.activeElement !== custom) custom.value = presetActive ? '' : controlState.stake;
+  custom?.parentElement?.classList.toggle('active', !presetActive);
 }
+
 function syncControls(auto, rules = {}) {
   if (controlDirty) return;
   const latestError = ((auto.errors || [])[0] || {}).error || '';
@@ -267,9 +276,10 @@ function bindControls() {
     const b = e.target.closest('button[data-stake]');
     if (!b) return;
     controlState.stake = Number(b.dataset.stake);
+    $('customStake').value = '';
     markControlsDirty();
   });
-  ['tradingEnabled','tradingMode','liveExecutionEnabled','autoLiquidate','timeStopPct','takeProfitPct','invertPrediction'].forEach(id => {
+  ['tradingEnabled','tradingMode','liveExecutionEnabled','autoLiquidate','timeStopPct','takeProfitPct','invertPrediction','customStake'].forEach(id => {
     const node = $(id);
     node.addEventListener('change', markControlsDirty);
     node.addEventListener('input', markControlsDirty);

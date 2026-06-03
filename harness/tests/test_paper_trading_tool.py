@@ -215,7 +215,7 @@ def test_paper_trading_allows_only_one_polymarket_trade_per_window(tmp_path, mon
                     "forecast_price_at_close": 98,
                     "passes_filters": True,
                     "countdown": "03:00",
-                    "window_et": "2026-05-20 12:00:00 EDT - 2026-05-20 12:05:00 EDT",
+                    "window_et": "2026-12-20 12:00:00 EDT - 2026-12-20 12:05:00 EDT",
                 }
             ],
             "reasons": [],
@@ -474,3 +474,39 @@ def test_live_polymarket_liquidates_position_at_stop_loss(tmp_path, monkeypatch)
     assert result["position_actions"][0]["action"] == "liquidate_stop_loss_time_75"
     assert result["position_actions"][0]["status"] == "stop_loss_time_75_order_sent"
     assert result["position_actions"][0]["threshold_pct"] == 60
+
+
+
+def test_paper_trading_preserves_custom_polymarket_stake(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+
+    def fake_poly_run(self, **kwargs):
+        return {
+            "strategy": "BTC Up/Down coordinated 5m/15m paper signal",
+            "candidates": [{
+                "interval": "5m",
+                "preferred_side": "Up",
+                "confidence": 0.9,
+                "probability": 0.9,
+                "edge": 0.3,
+                "microstructure": {"ask": 0.60, "spread": 0.01, "ask_size": 10, "token_id": "up-token"},
+                "passes_filters": True,
+                "countdown": "03:00",
+                "window_et": "2026-05-20 12:00:00 EDT - 2026-05-20 12:05:00 EDT",
+            }],
+            "reasons": [],
+        }
+
+    monkeypatch.setattr("tools.paper_trading.PolymarketTool.run", fake_poly_run)
+
+    result = PaperTradingTool().run(
+        action="run_cycle",
+        role="trader",
+        mode="paper",
+        venues=["polymarket"],
+        bankroll_usdt=1000,
+        polymarket_stake_usdt=4.5,
+    )
+
+    assert result["polymarket_stake_usdt"] == 4.5
+    assert result["orders"][0]["stake_usdt"] == 4.5

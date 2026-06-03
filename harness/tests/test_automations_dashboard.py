@@ -32,3 +32,18 @@ def test_build_paper_trading_snapshot_reports_mode_trades_and_log_health(tmp_pat
     assert snapshot["orders"][0]["stake_usdt"] == 50
     assert snapshot["logs"]["files"]
     assert snapshot["logs"]["retention"].startswith("logrotate")
+
+
+
+def test_paper_trading_config_accepts_custom_stake(tmp_path, monkeypatch):
+    from api import app as api_app
+    from config import settings
+
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    config = api_app._sanitize_paper_trading_update({"polymarket_stake_usdt": 4.75})
+
+    assert config["polymarket_stake_usdt"] == 4.75
+    payload = api_app.paper_trading_rules_payload()
+    assert payload["stake_min"] == 0.1
+    assert payload["stake_max"] == 100.0
+    assert payload["allowed_stakes"] == [1, 2, 3]

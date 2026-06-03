@@ -58,9 +58,7 @@ class PaperTradingTool(BaseTool):
         if isinstance(venues, str):
             venues = [x.strip().lower() for x in venues.split(',') if x.strip()]
         bankroll = float(kwargs.get('bankroll_usdt') or 10000)
-        polymarket_stake_usdt = max(0, float(kwargs.get('polymarket_stake_usdt') or 1))
-        if polymarket_stake_usdt not in {1.0, 2.0, 3.0}:
-            polymarket_stake_usdt = min({1.0, 2.0, 3.0}, key=lambda value: abs(value - polymarket_stake_usdt))
+        polymarket_stake_usdt = round(min(max(float(kwargs.get('polymarket_stake_usdt') or 1), 0.1), 100.0), 2)
         max_stake_pct = min(max(float(kwargs.get('max_stake_pct') or 0.05), 0), 0.05)
         kelly_fraction = min(max(float(kwargs.get('kelly_fraction') or 0.25), 0), 0.25)
         if mode == 'live' and 'mexc' in venues:
