@@ -211,7 +211,7 @@
           model: els.model.value.trim(),
           agent: options && options.agent ? options.agent : els.agent.value,
           temperature: Number(els.temp.value || 0.45),
-          max_tokens: options && options.maxTokens ? options.maxTokens : 900,
+          max_tokens: options && options.maxTokens ? options.maxTokens : 90,
         }),
         signal: state.controller.signal,
       });
@@ -300,7 +300,7 @@
         sendMessage(prompt, {
           displayMessage: "Continúa tu respuesta anterior.",
           agent: item.meta.agentType || els.agent.value,
-          maxTokens: 1200,
+          maxTokens: 110,
         });
       }
     });

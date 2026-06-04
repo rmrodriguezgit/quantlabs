@@ -122,6 +122,11 @@ PROVIDERS = {
     "deepseek": {"label": "DeepSeek", "requires_token": True},
 }
 
+LOCAL_DEFAULT_MAX_TOKENS = 90
+LOCAL_HARD_MAX_TOKENS = 110
+REMOTE_DEFAULT_MAX_TOKENS = 700
+REMOTE_HARD_MAX_TOKENS = 900
+
 
 def _messages(system: str, user: str) -> list[dict[str, str]]:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
@@ -157,6 +162,20 @@ def _normalize_agent(value: str) -> str:
     if "COMPLEJO" in upper:
         return "COMPLEJO"
     return "SOCRATICO"
+
+
+def _bounded_max_tokens(provider: str, requested: Any) -> int:
+    try:
+        value = int(requested) if requested is not None else 0
+    except (TypeError, ValueError):
+        value = 0
+    if provider == "local":
+        default, hard_limit = LOCAL_DEFAULT_MAX_TOKENS, LOCAL_HARD_MAX_TOKENS
+    else:
+        default, hard_limit = REMOTE_DEFAULT_MAX_TOKENS, REMOTE_HARD_MAX_TOKENS
+    if value <= 0:
+        return default
+    return max(24, min(value, hard_limit))
 
 
 def _call_local(messages: list[dict[str, str]], temperature: float, max_tokens: int) -> dict[str, Any]:
@@ -273,7 +292,9 @@ def ocean_chat():
                 agent_type, route_source = _normalize_agent(router["content"]), "llm_router"
 
         prompt = AGENT_PROMPTS[agent_type]
-        requested_max_tokens = int(data.get("max_tokens") or 900)
+        if provider == "local":
+            prompt = f"{prompt}\n\nRestriccion operativa OCEAN Local: responde compacto, prioriza lo esencial y deja ideas extensas para el boton Continuar. Evita respuestas largas de una sola vez."
+        requested_max_tokens = _bounded_max_tokens(provider, data.get("max_tokens"))
         completion = call_ocean_llm(provider, _messages(prompt, message), token, model, temperature=float(data.get("temperature") or 0.45), max_tokens=requested_max_tokens)
         finish_reason = str(completion.get("finish_reason") or "").lower()
         usage = completion.get("usage") or {}
