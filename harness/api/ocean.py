@@ -160,11 +160,11 @@ def ocean_chat():
         else:
             agent_type, route_source = _route_by_rules(message)
             if route_source == "default":
-                router = call_ocean_llm(_messages(ROUTER_PROMPT, f"Mensaje del usuario: {message}"), provider, token, model, temperature=0.0, max_tokens=12)
+                router = call_ocean_llm(provider, _messages(ROUTER_PROMPT, f"Mensaje del usuario: {message}"), token, model, temperature=0.0, max_tokens=12)
                 agent_type, route_source = _normalize_agent(router["content"]), "llm_router"
 
         prompt = AGENT_PROMPTS[agent_type]
-        completion = call_ocean_llm(_messages(prompt, message), provider, token, model, temperature=float(data.get("temperature") or 0.45), max_tokens=int(data.get("max_tokens") or 700))
+        completion = call_ocean_llm(provider, _messages(prompt, message), token, model, temperature=float(data.get("temperature") or 0.45), max_tokens=int(data.get("max_tokens") or 700))
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         return jsonify({
             "agent_type": agent_type,
