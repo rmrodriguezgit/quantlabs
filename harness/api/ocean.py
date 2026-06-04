@@ -232,6 +232,20 @@ def ocean_models():
     })
 
 
+@ocean_bp.get("/health")
+@require_auth({"admin", "teacher", "trader"})
+def ocean_health():
+    return jsonify({
+        "status": "ok",
+        "service": "OCEAN",
+        "agents_count": len(AGENT_META),
+        "agents": list(AGENT_META.keys()),
+        "providers": list(PROVIDERS.keys()),
+        "local_llm": settings.llama_base_url,
+        "generated_at": time.time(),
+    })
+
+
 @ocean_bp.post("/chat")
 @rate_limit(settings.rate_limit_per_minute)
 @require_auth({"admin", "teacher", "trader"})
