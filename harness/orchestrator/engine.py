@@ -10,6 +10,7 @@ from agents.base import AgentContext
 from agents.registry import AgentRegistry
 from memory.store import SessionStore, ArtifactStore
 from runtime.context import ContextManager
+from runtime.text_encoding import normalize_utf8_text
 from tools.registry import ToolRegistry
 from telemetry.metrics import AGENT_RUNS, ACTIVE_SESSIONS
 from telemetry.trajectory import append_trajectory
@@ -144,18 +145,18 @@ class HarnessEngine:
         if isinstance(parsed, dict):
             final = str(parsed.get("final") or parsed.get("response") or "").strip()
             if final:
-                return final
+                return normalize_utf8_text(final)
 
         final_match = re.search(r'"final"\s*:\s*"(?P<final>.*)"\s*[,}]', text, flags=re.DOTALL)
         if final_match:
             final = final_match.group("final")
             final = final.replace("\\n", "\n").replace('\\"', '"').strip()
             if final:
-                return final
+                return normalize_utf8_text(final)
 
         text = re.sub(r"^\[[a-zA-Z0-9_-]+\]\s*", "", text).strip()
         text = re.sub(r'^\{?\s*"thought"\s*:\s*".*?"\s*,\s*"action"\s*:\s*"respond"\s*,\s*', "", text, flags=re.DOTALL)
-        return text.strip() or "No obtuve una respuesta final del agente."
+        return normalize_utf8_text(text.strip()) or "No obtuve una respuesta final del agente."
 
     def _parse_json_response(self, text: str):
         try:

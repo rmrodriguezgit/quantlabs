@@ -199,3 +199,21 @@ def test_base_agent_coerces_final_from_json_text():
     raw = '{"final":"Respuesta limpia\\n\\n| A | B |\\n|---|---|\\n| 1 | 2 |"}'
     assert BaseAgent()._coerce_llm_final(raw).startswith("Respuesta limpia")
     assert "{\"final\"" not in BaseAgent()._coerce_llm_final(raw)
+
+
+
+def test_response_normalizes_mojibake_utf8_text():
+    from runtime.text_encoding import normalize_utf8_text
+
+    broken = "La decisiÃ³n es NO TRADE. SegÃºn el flujo de seÃ±ales no se recomienda acciÃ³n."
+    fixed = normalize_utf8_text(broken)
+
+    assert fixed == "La decisión es NO TRADE. Según el flujo de señales no se recomienda acción."
+    assert "Ã" not in fixed
+
+
+def test_engine_clean_response_normalizes_mojibake_json_final():
+    engine = HarnessEngine()
+    response = engine._synthesize("demo", {"result": '{"final":"La decisiÃ³n es NO TRADE. SegÃºn seÃ±ales."}'})
+
+    assert response == "La decisión es NO TRADE. Según señales."

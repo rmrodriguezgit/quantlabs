@@ -6,6 +6,7 @@ from config import settings
 from tools.registry import ToolRegistry
 from runtime.agent_loop import AgentLoop
 from runtime.llm import LlamaClient
+from runtime.text_encoding import normalize_utf8_text
 
 @dataclass
 class AgentContext:
@@ -93,7 +94,7 @@ class BaseAgent:
         try:
             parsed = json.loads(text)
             if isinstance(parsed, dict):
-                return str(parsed.get('final') or parsed.get('response') or '').strip()
+                return normalize_utf8_text(str(parsed.get('final') or parsed.get('response') or '').strip())
         except json.JSONDecodeError:
             pass
         marker = '"final"'
@@ -118,7 +119,7 @@ class BaseAgent:
                         chars.append(ch)
                     pos += 1
                 value = ''.join(chars)
-                return bytes(value, 'utf-8').decode('unicode_escape').strip()
+                return normalize_utf8_text(bytes(value, 'utf-8').decode('unicode_escape').strip())
             except Exception:
                 pass
-        return text
+        return normalize_utf8_text(text)
