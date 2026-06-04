@@ -1,0 +1,482 @@
+.ocean-page {
+  --ocean-bg: #f4f7fb;
+  --ocean-surface: #ffffff;
+  --ocean-panel: #fbfdff;
+  --ocean-border: #d9e3ea;
+  --ocean-text: #17212b;
+  --ocean-muted: #627382;
+  --ocean-blue: #2557d6;
+  --ocean-teal: #0f9f8c;
+  --ocean-gold: #b87518;
+  --ocean-rose: #c84d64;
+  --ocean-shadow: 0 18px 50px rgba(31, 48, 70, .10);
+  background:
+    linear-gradient(180deg, rgba(216, 230, 239, .7), rgba(244, 247, 251, 0) 360px),
+    var(--ocean-bg);
+  color: var(--ocean-text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html[data-theme="dark"] .ocean-page {
+  --ocean-bg: #071018;
+  --ocean-surface: #101922;
+  --ocean-panel: #0c151e;
+  --ocean-border: #243544;
+  --ocean-text: #f3f7fb;
+  --ocean-muted: #9aacbb;
+  --ocean-blue: #6ea2ff;
+  --ocean-teal: #50d6be;
+  --ocean-gold: #e6aa4f;
+  --ocean-rose: #ff7b92;
+  --ocean-shadow: 0 18px 56px rgba(0, 0, 0, .34);
+  background:
+    linear-gradient(180deg, rgba(23, 43, 60, .72), rgba(7, 16, 24, 0) 420px),
+    var(--ocean-bg);
+}
+
+.ocean-page header,
+.ocean-page aside {
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.ocean-page main.ocean-shell {
+  padding: 28px;
+  overflow: auto;
+}
+
+.ocean-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 28px;
+  min-height: 210px;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(11, 25, 39, .92), rgba(18, 48, 61, .78)),
+    radial-gradient(circle at 22% 20%, rgba(80, 214, 190, .35), transparent 34%),
+    radial-gradient(circle at 88% 30%, rgba(110, 162, 255, .22), transparent 30%),
+    #101922;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 8px;
+  box-shadow: var(--ocean-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.ocean-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--ocean-teal), var(--ocean-blue), var(--ocean-gold));
+}
+
+.eyebrow,
+.panel-head p,
+.modal-head p {
+  margin: 0 0 8px;
+  color: var(--ocean-teal);
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.ocean-hero h1 {
+  margin: 0;
+  font-size: clamp(46px, 6vw, 84px);
+  line-height: .88;
+  letter-spacing: 0;
+  font-weight: 800;
+}
+
+.ocean-hero p:not(.eyebrow) {
+  max-width: 720px;
+  margin: 16px 0 0;
+  color: rgba(255, 255, 255, .80);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.hero-actions,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ghost-btn,
+.composer button,
+.modal-actions button,
+.modal-head button {
+  min-height: 42px;
+  border: 1px solid var(--ocean-border);
+  border-radius: 8px;
+  background: var(--ocean-surface);
+  color: var(--ocean-text);
+  font: 700 13px Inter, sans-serif;
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.ghost-btn {
+  padding: 0 16px;
+}
+
+.hero-actions .ghost-btn {
+  background: rgba(255, 255, 255, .10);
+  border-color: rgba(255, 255, 255, .28);
+  color: #fff;
+  backdrop-filter: blur(12px);
+}
+
+.ghost-btn:hover,
+.composer button:hover,
+.modal-actions button:hover {
+  transform: translateY(-1px);
+  border-color: var(--ocean-blue);
+}
+
+.ocean-grid {
+  display: grid;
+  grid-template-columns: minmax(270px, 350px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  background: color-mix(in srgb, var(--ocean-surface) 94%, transparent);
+  border: 1px solid var(--ocean-border);
+  border-radius: 8px;
+  box-shadow: var(--ocean-shadow);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--ocean-border);
+}
+
+.panel-head h2,
+.modal-head h2 {
+  margin: 0;
+  color: var(--ocean-text);
+  font-size: 22px;
+  line-height: 1.05;
+}
+
+.panel-head > span,
+.session-pill,
+#routeBadge,
+#modelBadge,
+#latencyBadge {
+  border-radius: 999px;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--ocean-teal) 34%, var(--ocean-border));
+  background: color-mix(in srgb, var(--ocean-teal) 11%, var(--ocean-surface));
+  color: var(--ocean-teal);
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.control-stack {
+  display: grid;
+  gap: 12px;
+  padding: 18px 22px;
+}
+
+.control-stack label,
+.modal-card label {
+  display: grid;
+  gap: 7px;
+}
+
+.control-stack small,
+.modal-card small {
+  color: var(--ocean-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+
+.control-stack select,
+.control-stack input,
+.modal-card input,
+.composer textarea {
+  width: 100%;
+  border: 1px solid var(--ocean-border);
+  border-radius: 8px;
+  background: var(--ocean-panel);
+  color: var(--ocean-text);
+  font: 600 14px Inter, sans-serif;
+  outline: none;
+}
+
+.control-stack select,
+.control-stack input,
+.modal-card input {
+  min-height: 46px;
+  padding: 0 13px;
+}
+
+.control-stack select:focus,
+.control-stack input:focus,
+.modal-card input:focus,
+.composer textarea:focus {
+  border-color: var(--ocean-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ocean-blue) 17%, transparent);
+}
+
+.agent-map {
+  display: grid;
+  gap: 10px;
+  padding: 0 22px 22px;
+}
+
+.agent-node {
+  padding: 13px;
+  border: 1px solid var(--ocean-border);
+  border-left: 4px solid var(--ocean-teal);
+  border-radius: 8px;
+  background: var(--ocean-panel);
+}
+
+.agent-node strong,
+.agent-node span {
+  display: block;
+}
+
+.agent-node strong {
+  color: var(--ocean-text);
+  font-size: 15px;
+}
+
+.agent-node span {
+  margin-top: 4px;
+  color: var(--ocean-muted);
+  font-size: 13px;
+}
+
+.agent-node.critico { border-left-color: var(--ocean-rose); }
+.agent-node.complejo { border-left-color: var(--ocean-gold); }
+
+.chat-panel {
+  min-height: calc(100vh - 176px);
+  display: grid;
+  grid-template-rows: auto minmax(430px, 1fr) auto;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  overflow: auto;
+}
+
+.message {
+  display: grid;
+  gap: 6px;
+  max-width: min(820px, 92%);
+}
+
+.message.user {
+  align-self: flex-end;
+}
+
+.message.assistant {
+  align-self: flex-start;
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ocean-muted);
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.message.user .message-meta {
+  justify-content: flex-end;
+}
+
+.bubble {
+  border: 1px solid var(--ocean-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--ocean-panel);
+  color: var(--ocean-text);
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.message.user .bubble {
+  background: color-mix(in srgb, var(--ocean-blue) 13%, var(--ocean-surface));
+  border-color: color-mix(in srgb, var(--ocean-blue) 30%, var(--ocean-border));
+}
+
+.message.assistant .bubble {
+  background: color-mix(in srgb, var(--ocean-teal) 9%, var(--ocean-surface));
+  border-color: color-mix(in srgb, var(--ocean-teal) 28%, var(--ocean-border));
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 12px;
+  padding: 18px 22px 22px;
+  border-top: 1px solid var(--ocean-border);
+}
+
+.composer textarea {
+  min-height: 76px;
+  max-height: 220px;
+  resize: vertical;
+  padding: 13px 14px;
+}
+
+.composer button,
+.modal-actions button:last-child {
+  background: var(--ocean-blue);
+  border-color: var(--ocean-blue);
+  color: #fff;
+}
+
+.composer button:disabled {
+  cursor: wait;
+  opacity: .68;
+  transform: none;
+}
+
+.telemetry-panel {
+  grid-column: 1;
+}
+
+.telemetry-list {
+  display: grid;
+  gap: 0;
+  padding: 6px 22px 18px;
+}
+
+.telemetry-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--ocean-border);
+}
+
+.telemetry-list div:last-child {
+  border-bottom: 0;
+}
+
+.telemetry-list span {
+  color: var(--ocean-muted);
+  font-weight: 700;
+}
+
+.telemetry-list strong {
+  color: var(--ocean-text);
+  text-align: right;
+  font-family: "Space Mono", monospace;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 10, 16, .62);
+  backdrop-filter: blur(10px);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-card {
+  width: min(560px, 100%);
+  background: var(--ocean-surface);
+  border: 1px solid var(--ocean-border);
+  border-radius: 8px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .32);
+  padding: 22px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-head button {
+  width: 42px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.modal-copy {
+  margin: 16px 0;
+  color: var(--ocean-muted);
+  line-height: 1.45;
+}
+
+.modal-card label + label {
+  margin-top: 12px;
+}
+
+.modal-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.modal-actions button {
+  padding: 0 18px;
+}
+
+@media (max-width: 1080px) {
+  .ocean-grid {
+    grid-template-columns: 1fr;
+  }
+  .telemetry-panel {
+    grid-column: auto;
+  }
+  .chat-panel {
+    min-height: 640px;
+  }
+}
+
+@media (max-width: 760px) {
+  .ocean-page main.ocean-shell {
+    padding: 18px;
+  }
+  .ocean-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .composer {
+    grid-template-columns: 1fr;
+  }
+  .message {
+    max-width: 100%;
+  }
+}

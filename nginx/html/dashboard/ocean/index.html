@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OCEAN · QuantLabs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css?v=20260531-logo">
+  <link rel="stylesheet" href="./css/ocean.css?v=20260604-ocean-1">
+</head>
+<body class="ocean-page">
+<header>
+  <a href="/dashboard/" class="logo"><img class="logo-icon" src="/assets/quantlabs-logo.svg" alt="QuantLabs"><span class="logo-name">QuantLabs AI</span><span class="logo-badge">OCEAN</span></a>
+  <div class="header-right">
+    <div class="session-pill"><div class="session-dot"></div><span id="statusPill">OCEAN listo</span></div>
+    <a href="/dashboard/harness/" class="session-pill">Harness</a>
+    <a href="/logout" class="btn-logout">Cerrar sesion</a>
+  </div>
+</header>
+<div class="layout">
+  <aside></aside>
+  <main class="ocean-shell">
+    <section class="ocean-hero">
+      <div>
+        <p class="eyebrow">ORQUESTADOR COGNITIVO</p>
+        <h1>OCEAN</h1>
+        <p>Orquestador Cognitivo de Entornos y Agentes Neuronales para razonar con agentes Socrático, Crítico y Complejo.</p>
+      </div>
+      <div class="hero-actions">
+        <button id="credentialsBtn" class="ghost-btn" type="button">Credenciales</button>
+        <button id="clearBtn" class="ghost-btn" type="button">Limpiar</button>
+      </div>
+    </section>
+
+    <section class="ocean-grid">
+      <article class="panel control-panel">
+        <div class="panel-head"><div><p>ROUTER</p><h2>Modelo y ruta</h2></div><span id="routeBadge">AUTO</span></div>
+        <div class="control-stack">
+          <label><small>Proveedor</small><select id="providerSelect"><option value="local">LLM Local QuantLabs</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="deepseek">DeepSeek</option></select></label>
+          <label><small>Modelo</small><input id="modelInput" placeholder="auto / modelo por defecto"></label>
+          <label><small>Agente</small><select id="agentSelect"><option value="auto">Auto Router</option><option value="SOCRATICO">Socrático</option><option value="CRITICO">Crítico</option><option value="COMPLEJO">Complejo</option></select></label>
+          <label><small>Temperatura</small><input id="temperatureInput" type="number" min="0" max="1" step="0.05" value="0.45"></label>
+        </div>
+        <div class="agent-map">
+          <div class="agent-node socratico"><strong>Socrático</strong><span>preguntas que guían</span></div>
+          <div class="agent-node critico"><strong>Crítico</strong><span>objeciones y evidencia</span></div>
+          <div class="agent-node complejo"><strong>Complejo</strong><span>sistemas y consecuencias</span></div>
+        </div>
+      </article>
+
+      <article class="panel chat-panel">
+        <div class="panel-head"><div><p>CONVERSACIÓN</p><h2>Entorno cognitivo</h2></div><span id="modelBadge">local</span></div>
+        <div id="chatLog" class="chat-log"></div>
+        <form id="chatForm" class="composer">
+          <textarea id="promptInput" rows="3" placeholder="Describe tu duda, argumento o problema sistémico..."></textarea>
+          <button id="sendBtn" type="submit">Enviar</button>
+        </form>
+      </article>
+
+      <article class="panel telemetry-panel">
+        <div class="panel-head"><div><p>TELEMETRÍA</p><h2>Última ejecución</h2></div><span id="latencyBadge">-- ms</span></div>
+        <div class="telemetry-list">
+          <div><span>Agente</span><strong id="lastAgent">--</strong></div>
+          <div><span>Ruta</span><strong id="lastRoute">--</strong></div>
+          <div><span>Modelo</span><strong id="lastModel">--</strong></div>
+          <div><span>Tokens</span><strong id="lastTokens">--</strong></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+
+<div id="credentialsModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><div><p>SEGURIDAD</p><h2>Credenciales de proveedor</h2></div><button id="closeModal" type="button">×</button></div>
+    <p class="modal-copy">Los tokens se guardan en este navegador con localStorage. No se escriben en el servidor. Para LLM Local no necesitas token.</p>
+    <label><small>OpenAI token</small><input id="openaiToken" type="password" placeholder="sk-..."></label>
+    <label><small>Anthropic token</small><input id="anthropicToken" type="password" placeholder="sk-ant-..."></label>
+    <label><small>DeepSeek token</small><input id="deepseekToken" type="password" placeholder="sk-..."></label>
+    <div class="modal-actions"><button id="forgetTokens" class="ghost-btn" type="button">Borrar</button><button id="saveTokens" type="button">Guardar</button></div>
+  </div>
+</div>
+
+<script src="../js/platform-menu.js?v=20260604-ocean-menu"></script>
+<script src="../js/session.js?v=20260517-user"></script>
+<script src="./js/ocean.js?v=20260604-ocean-1"></script>
+</body>
+</html>

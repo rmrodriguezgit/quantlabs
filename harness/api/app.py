@@ -14,6 +14,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from agents.registry import AgentRegistry
 from api.auth import rate_limit, require_auth
+from api.ocean import ocean_bp
 from config import settings
 from memory.store import SessionStore, ProjectStore
 from memory.uploads import UploadStore
@@ -38,6 +39,7 @@ projects = ProjectStore()
 uploads = UploadStore()
 vector_memory = VectorMemory()
 app.config["MAX_CONTENT_LENGTH"] = settings.max_upload_mb * 1024 * 1024
+app.register_blueprint(ocean_bp, url_prefix="/v1/ocean")
 IGNORED_LOG_LINES = ("Importing plotly failed. Interactive plots will not work.",)
 
 
