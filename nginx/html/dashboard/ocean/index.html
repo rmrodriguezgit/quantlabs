@@ -40,13 +40,16 @@
         <div class="control-stack">
           <label><small>Proveedor</small><select id="providerSelect"><option value="local">LLM Local QuantLabs</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="deepseek">DeepSeek</option></select></label>
           <label><small>Modelo</small><input id="modelInput" placeholder="auto / modelo por defecto"></label>
-          <label><small>Agente</small><select id="agentSelect"><option value="auto">Auto Router</option><option value="SOCRATICO">Socrático</option><option value="CRITICO">Crítico</option><option value="COMPLEJO">Complejo</option></select></label>
+          <label><small>Agente</small><select id="agentSelect"><option value="auto">Auto Router</option><option value="SOCRATICO">Socrático</option><option value="CRITICO">Crítico</option><option value="INTERACCIONISTA">Interaccionista</option><option value="COMPLEJO">Complejo</option><option value="METACOGNITIVO">Metacognitivo</option><option value="INVESTIGADOR">Investigador</option></select></label>
           <label><small>Temperatura</small><input id="temperatureInput" type="number" min="0" max="1" step="0.05" value="0.45"></label>
         </div>
         <div class="agent-map">
           <div class="agent-node socratico"><strong>Socrático</strong><span>preguntas que guían</span></div>
           <div class="agent-node critico"><strong>Crítico</strong><span>objeciones y evidencia</span></div>
+          <div class="agent-node interaccionista"><strong>Interaccionista</strong><span>comunicación y acuerdos</span></div>
           <div class="agent-node complejo"><strong>Complejo</strong><span>sistemas y consecuencias</span></div>
+          <div class="agent-node metacognitivo"><strong>Metacognitivo</strong><span>aprender a pensar mejor</span></div>
+          <div class="agent-node investigador"><strong>Investigador</strong><span>método, fuentes y síntesis</span></div>
         </div>
       </article>
 

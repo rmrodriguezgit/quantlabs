@@ -268,7 +268,10 @@ html[data-theme="dark"] .ocean-page {
 }
 
 .agent-node.critico { border-left-color: var(--ocean-rose); }
+.agent-node.interaccionista { border-left-color: var(--ocean-blue); }
 .agent-node.complejo { border-left-color: var(--ocean-gold); }
+.agent-node.metacognitivo { border-left-color: #7c66d9; }
+.agent-node.investigador { border-left-color: #2f8f5b; }
 
 .chat-panel {
   min-height: calc(100vh - 176px);
