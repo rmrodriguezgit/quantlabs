@@ -68,9 +68,10 @@ def _normalize_agent(value: str) -> str:
 
 
 def _call_local(messages: list[dict[str, str]], temperature: float, max_tokens: int) -> dict[str, Any]:
-    completion = LlamaClient().chat(messages, temperature=temperature)
+    completion = LlamaClient().chat(messages, temperature=temperature, max_tokens=max_tokens)
     return {
         "content": normalize_utf8_text(completion.get("content") or ""),
+        "finish_reason": completion.get("finish_reason"),
         "usage": completion.get("usage") or {},
         "model": completion.get("model") or "llm-local",
     }
@@ -85,8 +86,10 @@ def _call_openai_compatible(base_url: str, model: str, messages: list[dict[str, 
     )
     response.raise_for_status()
     payload = response.json()
+    choice = payload["choices"][0]
     return {
-        "content": normalize_utf8_text(payload["choices"][0]["message"]["content"]),
+        "content": normalize_utf8_text(choice["message"]["content"]),
+        "finish_reason": choice.get("finish_reason"),
         "usage": payload.get("usage") or {},
         "model": payload.get("model") or model,
     }
@@ -109,7 +112,7 @@ def _call_anthropic(messages: list[dict[str, str]], token: str, model: str, temp
     payload = response.json()
     parts = payload.get("content") or []
     content = "\n".join(part.get("text", "") for part in parts if part.get("type") == "text")
-    return {"content": normalize_utf8_text(content), "usage": payload.get("usage") or {}, "model": payload.get("model") or model}
+    return {"content": normalize_utf8_text(content), "finish_reason": payload.get("stop_reason"), "usage": payload.get("usage") or {}, "model": payload.get("model") or model}
 
 
 def call_ocean_llm(provider: str, messages: list[dict[str, str]], token: str = "", model: str = "", temperature: float = 0.4, max_tokens: int = 500) -> dict[str, Any]:
@@ -164,7 +167,12 @@ def ocean_chat():
                 agent_type, route_source = _normalize_agent(router["content"]), "llm_router"
 
         prompt = AGENT_PROMPTS[agent_type]
-        completion = call_ocean_llm(provider, _messages(prompt, message), token, model, temperature=float(data.get("temperature") or 0.45), max_tokens=int(data.get("max_tokens") or 700))
+        requested_max_tokens = int(data.get("max_tokens") or 900)
+        completion = call_ocean_llm(provider, _messages(prompt, message), token, model, temperature=float(data.get("temperature") or 0.45), max_tokens=requested_max_tokens)
+        finish_reason = str(completion.get("finish_reason") or "").lower()
+        usage = completion.get("usage") or {}
+        completion_tokens = usage.get("completion_tokens") or usage.get("output_tokens") or usage.get("tokens_predicted") or 0
+        incomplete = finish_reason in {"length", "max_tokens", "model_length"} or (completion_tokens and completion_tokens >= requested_max_tokens - 8)
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         return jsonify({
             "agent_type": agent_type,
@@ -173,7 +181,9 @@ def ocean_chat():
             "model": completion.get("model"),
             "route_source": route_source,
             "response": completion["content"],
-            "usage": completion.get("usage") or {},
+            "finish_reason": completion.get("finish_reason"),
+            "incomplete": bool(incomplete),
+            "usage": usage,
             "elapsed_ms": elapsed_ms,
         })
     except requests.HTTPError as exc:

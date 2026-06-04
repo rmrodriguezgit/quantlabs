@@ -336,7 +336,7 @@ html[data-theme="dark"] .ocean-page {
 
 .composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 108px;
+  grid-template-columns: minmax(0, 1fr) 48px 48px;
   gap: 12px;
   padding: 18px 22px 22px;
   border-top: 1px solid var(--ocean-border);
@@ -356,10 +356,64 @@ html[data-theme="dark"] .ocean-page {
   color: #fff;
 }
 
+.composer .icon-submit {
+  width: 48px;
+  min-height: 48px;
+  align-self: end;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  font-family: "Space Mono", monospace;
+  font-size: 18px;
+}
+
+.composer .icon-submit.stop {
+  background: color-mix(in srgb, var(--ocean-rose) 14%, var(--ocean-surface));
+  border-color: color-mix(in srgb, var(--ocean-rose) 42%, var(--ocean-border));
+  color: var(--ocean-rose);
+}
+
 .composer button:disabled {
   cursor: wait;
   opacity: .68;
   transform: none;
+}
+
+.message-meta {
+  position: relative;
+}
+
+.message-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-action {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--ocean-border);
+  border-radius: 8px;
+  background: var(--ocean-surface);
+  color: var(--ocean-muted);
+  font: 700 14px "Space Mono", monospace;
+  cursor: pointer;
+  transition: border-color .16s ease, color .16s ease, transform .16s ease, background .16s ease;
+}
+
+.message-action:hover {
+  transform: translateY(-1px);
+  border-color: var(--ocean-blue);
+  color: var(--ocean-blue);
+}
+
+.message-action.primary {
+  background: color-mix(in srgb, var(--ocean-gold) 14%, var(--ocean-surface));
+  border-color: color-mix(in srgb, var(--ocean-gold) 44%, var(--ocean-border));
+  color: var(--ocean-gold);
 }
 
 .telemetry-panel {
