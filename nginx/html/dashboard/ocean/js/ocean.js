@@ -21,10 +21,16 @@
     prompt: $("promptInput"),
     send: $("sendBtn"),
     stop: $("stopBtn"),
+    routerBtn: $("routerBtn"),
+    telemetryBtn: $("telemetryBtn"),
     credentials: $("credentialsBtn"),
     clear: $("clearBtn"),
     modal: $("credentialsModal"),
+    routerModal: $("routerModal"),
+    telemetryModal: $("telemetryModal"),
     closeModal: $("closeModal"),
+    closeRouterModal: $("closeRouterModal"),
+    closeTelemetryModal: $("closeTelemetryModal"),
     saveTokens: $("saveTokens"),
     forgetTokens: $("forgetTokens"),
     openaiToken: $("openaiToken"),
@@ -123,7 +129,7 @@
 
   function welcome() {
     if (els.chat.children.length) return;
-    appendMessage("assistant", "OCEAN está listo. Escribe una duda, un argumento o un problema complejo; el router elegirá el agente adecuado o puedes fijarlo manualmente.", {
+    appendMessage("assistant", "OCEAN está listo. Escribe una duda, argumento, interacción, problema complejo, meta de aprendizaje o pregunta de investigación; el router elegirá entre los seis agentes educativos o puedes fijarlo manualmente desde el panel de router.", {
       agent: "OCEAN",
       extra: "auto router",
     });
@@ -141,8 +147,13 @@
     els.openaiToken.focus();
   }
 
-  function hideModal() {
-    els.modal.classList.add("hidden");
+  function showPanelModal(modal, focusTarget) {
+    modal.classList.remove("hidden");
+    if (focusTarget) focusTarget.focus();
+  }
+
+  function hideModal(modal) {
+    modal.classList.add("hidden");
   }
 
   async function loadMetadata() {
@@ -299,10 +310,20 @@
       els.modelBadge.textContent = els.provider.value === "local" ? "local" : els.provider.value;
     });
 
+    els.routerBtn.addEventListener("click", () => showPanelModal(els.routerModal, els.provider));
+    els.telemetryBtn.addEventListener("click", () => showPanelModal(els.telemetryModal, els.closeTelemetryModal));
     els.credentials.addEventListener("click", showModal);
-    els.closeModal.addEventListener("click", hideModal);
+    els.closeModal.addEventListener("click", () => hideModal(els.modal));
+    els.closeRouterModal.addEventListener("click", () => hideModal(els.routerModal));
+    els.closeTelemetryModal.addEventListener("click", () => hideModal(els.telemetryModal));
     els.modal.addEventListener("click", (event) => {
-      if (event.target === els.modal) hideModal();
+      if (event.target === els.modal) hideModal(els.modal);
+    });
+    els.routerModal.addEventListener("click", (event) => {
+      if (event.target === els.routerModal) hideModal(els.routerModal);
+    });
+    els.telemetryModal.addEventListener("click", (event) => {
+      if (event.target === els.telemetryModal) hideModal(els.telemetryModal);
     });
     els.clear.addEventListener("click", () => {
       els.chat.innerHTML = "";
@@ -316,7 +337,7 @@
         deepseek: els.deepseekToken.value.trim(),
       };
       writeTokens(state.tokens);
-      hideModal();
+      hideModal(els.modal);
       setStatus("Credenciales guardadas", "ready");
     });
     els.forgetTokens.addEventListener("click", () => {

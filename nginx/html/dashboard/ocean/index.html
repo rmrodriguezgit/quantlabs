@@ -26,7 +26,7 @@
       <div>
         <p class="eyebrow">ORQUESTADOR COGNITIVO</p>
         <h1>OCEAN</h1>
-        <p>Orquestador Cognitivo de Entornos y Agentes Neuronales para razonar con agentes Socrático, Crítico y Complejo.</p>
+        <p>Orquestador Cognitivo de Entornos y Agentes Neuronales con agentes Socrático, Crítico, Interaccionista, Complejo, Metacognitivo e Investigador para aprendizaje, análisis, evidencia y reflexión guiada.</p>
       </div>
       <div class="hero-actions">
         <button id="credentialsBtn" class="ghost-btn" type="button">Credenciales</button>
@@ -35,26 +35,15 @@
     </section>
 
     <section class="ocean-grid">
-      <article class="panel control-panel">
-        <div class="panel-head"><div><p>ROUTER</p><h2>Modelo y ruta</h2></div><span id="routeBadge">AUTO</span></div>
-        <div class="control-stack">
-          <label><small>Proveedor</small><select id="providerSelect"><option value="local">LLM Local QuantLabs</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="deepseek">DeepSeek</option></select></label>
-          <label><small>Modelo</small><input id="modelInput" placeholder="auto / modelo por defecto"></label>
-          <label><small>Agente</small><select id="agentSelect"><option value="auto">Auto Router</option><option value="SOCRATICO">Socrático</option><option value="CRITICO">Crítico</option><option value="INTERACCIONISTA">Interaccionista</option><option value="COMPLEJO">Complejo</option><option value="METACOGNITIVO">Metacognitivo</option><option value="INVESTIGADOR">Investigador</option></select></label>
-          <label><small>Temperatura</small><input id="temperatureInput" type="number" min="0" max="1" step="0.05" value="0.45"></label>
-        </div>
-        <div class="agent-map">
-          <div class="agent-node socratico"><strong>Socrático</strong><span>preguntas que guían</span></div>
-          <div class="agent-node critico"><strong>Crítico</strong><span>objeciones y evidencia</span></div>
-          <div class="agent-node interaccionista"><strong>Interaccionista</strong><span>comunicación y acuerdos</span></div>
-          <div class="agent-node complejo"><strong>Complejo</strong><span>sistemas y consecuencias</span></div>
-          <div class="agent-node metacognitivo"><strong>Metacognitivo</strong><span>aprender a pensar mejor</span></div>
-          <div class="agent-node investigador"><strong>Investigador</strong><span>método, fuentes y síntesis</span></div>
-        </div>
-      </article>
-
       <article class="panel chat-panel">
-        <div class="panel-head"><div><p>CONVERSACIÓN</p><h2>Entorno cognitivo</h2></div><span id="modelBadge">local</span></div>
+        <div class="panel-head chat-head">
+          <div><p>CONVERSACIÓN</p><h2>Entorno cognitivo</h2></div>
+          <div class="chat-tools">
+            <button id="routerBtn" class="tool-btn" type="button" title="Router y modelo" aria-label="Router y modelo">⚙</button>
+            <button id="telemetryBtn" class="tool-btn" type="button" title="Telemetría" aria-label="Telemetría">◷</button>
+            <span id="modelBadge">local</span>
+          </div>
+        </div>
         <div id="chatLog" class="chat-log"></div>
         <form id="chatForm" class="composer">
           <textarea id="promptInput" rows="3" placeholder="Describe tu duda, argumento o problema sistémico..."></textarea>
@@ -63,17 +52,40 @@
         </form>
       </article>
 
-      <article class="panel telemetry-panel">
-        <div class="panel-head"><div><p>TELEMETRÍA</p><h2>Última ejecución</h2></div><span id="latencyBadge">-- ms</span></div>
-        <div class="telemetry-list">
-          <div><span>Agente</span><strong id="lastAgent">--</strong></div>
-          <div><span>Ruta</span><strong id="lastRoute">--</strong></div>
-          <div><span>Modelo</span><strong id="lastModel">--</strong></div>
-          <div><span>Tokens</span><strong id="lastTokens">--</strong></div>
-        </div>
-      </article>
     </section>
   </main>
+</div>
+
+<div id="routerModal" class="modal hidden">
+  <div class="modal-card modal-card-wide">
+    <div class="modal-head"><div><p>ROUTER</p><h2>Modelo y ruta</h2></div><div class="modal-head-actions"><span id="routeBadge">AUTO</span><button id="closeRouterModal" type="button">×</button></div></div>
+    <div class="control-stack">
+      <label><small>Proveedor</small><select id="providerSelect"><option value="local">LLM Local QuantLabs</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="deepseek">DeepSeek</option></select></label>
+      <label><small>Modelo</small><input id="modelInput" placeholder="auto / modelo por defecto"></label>
+      <label><small>Agente</small><select id="agentSelect"><option value="auto">Auto Router</option><option value="SOCRATICO">Socrático</option><option value="CRITICO">Crítico</option><option value="INTERACCIONISTA">Interaccionista</option><option value="COMPLEJO">Complejo</option><option value="METACOGNITIVO">Metacognitivo</option><option value="INVESTIGADOR">Investigador</option></select></label>
+      <label><small>Temperatura</small><input id="temperatureInput" type="number" min="0" max="1" step="0.05" value="0.45"></label>
+    </div>
+    <div class="agent-map">
+      <div class="agent-node socratico"><strong>Socrático</strong><span>preguntas que guían</span></div>
+      <div class="agent-node critico"><strong>Crítico</strong><span>objeciones y evidencia</span></div>
+      <div class="agent-node interaccionista"><strong>Interaccionista</strong><span>comunicación y acuerdos</span></div>
+      <div class="agent-node complejo"><strong>Complejo</strong><span>sistemas y consecuencias</span></div>
+      <div class="agent-node metacognitivo"><strong>Metacognitivo</strong><span>aprender a pensar mejor</span></div>
+      <div class="agent-node investigador"><strong>Investigador</strong><span>método, fuentes y síntesis</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="telemetryModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><div><p>TELEMETRÍA</p><h2>Última ejecución</h2></div><div class="modal-head-actions"><span id="latencyBadge">-- ms</span><button id="closeTelemetryModal" type="button">×</button></div></div>
+    <div class="telemetry-list">
+      <div><span>Agente</span><strong id="lastAgent">--</strong></div>
+      <div><span>Ruta</span><strong id="lastRoute">--</strong></div>
+      <div><span>Modelo</span><strong id="lastModel">--</strong></div>
+      <div><span>Tokens</span><strong id="lastTokens">--</strong></div>
+    </div>
+  </div>
 </div>
 
 <div id="credentialsModal" class="modal hidden">

@@ -102,7 +102,9 @@ html[data-theme="dark"] .ocean-page {
 }
 
 .hero-actions,
-.modal-actions {
+.modal-actions,
+.modal-head-actions,
+.chat-tools {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -143,9 +145,9 @@ html[data-theme="dark"] .ocean-page {
 
 .ocean-grid {
   display: grid;
-  grid-template-columns: minmax(270px, 350px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .panel {
@@ -188,8 +190,37 @@ html[data-theme="dark"] .ocean-page {
   white-space: nowrap;
 }
 
+.chat-head {
+  align-items: center;
+}
+
+.chat-tools {
+  justify-content: flex-end;
+}
+
+.tool-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--ocean-border);
+  border-radius: 8px;
+  background: var(--ocean-panel);
+  color: var(--ocean-text);
+  font: 700 17px "Space Mono", monospace;
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.tool-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--ocean-blue);
+  color: var(--ocean-blue);
+}
+
 .control-stack {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding: 18px 22px;
 }
@@ -239,6 +270,7 @@ html[data-theme="dark"] .ocean-page {
 
 .agent-map {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding: 0 22px 22px;
 }
@@ -274,9 +306,9 @@ html[data-theme="dark"] .ocean-page {
 .agent-node.investigador { border-left-color: #2f8f5b; }
 
 .chat-panel {
-  min-height: calc(100vh - 176px);
+  min-height: calc(100vh - 330px);
   display: grid;
-  grid-template-rows: auto minmax(430px, 1fr) auto;
+  grid-template-rows: auto minmax(520px, 1fr) auto;
 }
 
 .chat-log {
@@ -290,7 +322,7 @@ html[data-theme="dark"] .ocean-page {
 .message {
   display: grid;
   gap: 6px;
-  max-width: min(820px, 92%);
+  max-width: min(1040px, 92%);
 }
 
 .message.user {
@@ -476,6 +508,10 @@ html[data-theme="dark"] .ocean-page {
   padding: 22px;
 }
 
+.modal-card-wide {
+  width: min(920px, 100%);
+}
+
 .modal-head {
   display: flex;
   align-items: start;
@@ -510,14 +546,11 @@ html[data-theme="dark"] .ocean-page {
 }
 
 @media (max-width: 1080px) {
-  .ocean-grid {
-    grid-template-columns: 1fr;
-  }
-  .telemetry-panel {
-    grid-column: auto;
-  }
   .chat-panel {
     min-height: 640px;
+  }
+  .agent-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -529,6 +562,18 @@ html[data-theme="dark"] .ocean-page {
     align-items: flex-start;
     flex-direction: column;
     min-height: 0;
+  }
+  .panel-head.chat-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .chat-tools {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .control-stack,
+  .agent-map {
+    grid-template-columns: 1fr;
   }
   .composer {
     grid-template-columns: 1fr;
