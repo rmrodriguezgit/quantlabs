@@ -40,10 +40,26 @@ def test_paper_trading_config_accepts_custom_stake(tmp_path, monkeypatch):
     from config import settings
 
     monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
-    config = api_app._sanitize_paper_trading_update({"polymarket_stake_usdt": 4.75})
+    config = api_app._sanitize_paper_trading_update({
+        "polymarket_stake_usdt": 4.75,
+        "polymarket_strategy_profile": "adaptive_5m15m",
+        "threshold": 0.82,
+        "polymarket_min_edge": 0.1,
+        "polymarket_max_spread": 0.08,
+        "polymarket_min_ask_size": 2,
+        "polymarket_min_seconds_to_close": 75,
+    })
 
     assert config["polymarket_stake_usdt"] == 4.75
+    assert config["polymarket_strategy_profile"] == "adaptive_5m15m"
+    assert config["threshold"] == 0.82
+    assert config["polymarket_min_edge"] == 0.1
+    assert config["polymarket_max_spread"] == 0.08
+    assert config["polymarket_min_ask_size"] == 2
+    assert config["polymarket_min_seconds_to_close"] == 75
     payload = api_app.paper_trading_rules_payload()
     assert payload["stake_min"] == 0.1
     assert payload["stake_max"] == 100.0
     assert payload["allowed_stakes"] == [1, 2, 3]
+    assert payload["allowed_strategy_profiles"] == ["adaptive_5m15m", "legacy"]
+    assert payload["polymarket_strategy_profile"] == "adaptive_5m15m"

@@ -531,6 +531,12 @@ def build_paper_trading_snapshot(root: Path | None = None) -> dict[str, Any]:
         "polymarket_time_stop_pct": _bounded_percent(config.get("polymarket_time_stop_pct", latest.get("polymarket_time_stop_pct", 75)), 75, 10, 99),
         "polymarket_take_profit_pct": _bounded_percent(config.get("polymarket_take_profit_pct", latest.get("polymarket_take_profit_pct", 100)), 100, 10, 500),
         "polymarket_invert_prediction_enabled": config.get("polymarket_invert_prediction_enabled", latest.get("polymarket_invert_prediction_enabled", False)),
+        "polymarket_strategy_profile": config.get("polymarket_strategy_profile", latest.get("polymarket_strategy_profile", "adaptive_5m15m")),
+        "threshold": _bounded_float(config.get("threshold", latest.get("threshold", 0.8)), 0.8, 0.5, 0.99),
+        "polymarket_min_edge": _bounded_float(config.get("polymarket_min_edge", latest.get("polymarket_min_edge", 0.03)), 0.03, 0.0, 0.5),
+        "polymarket_max_spread": _bounded_float(config.get("polymarket_max_spread", latest.get("polymarket_max_spread", 0.08)), 0.08, 0.0, 0.5),
+        "polymarket_min_ask_size": _bounded_float(config.get("polymarket_min_ask_size", latest.get("polymarket_min_ask_size", 1.0)), 1.0, 0.0, 10000.0),
+        "polymarket_min_seconds_to_close": _bounded_int(config.get("polymarket_min_seconds_to_close", latest.get("polymarket_min_seconds_to_close", 45)), 45, 0, 600),
         "orders": orders,
         "observations": observations,
         "position_actions": position_actions,
@@ -563,6 +569,7 @@ def _paper_trading_config_path() -> Path:
 
 POLYMARKET_STAKE_MIN = 0.1
 POLYMARKET_STAKE_MAX = 100.0
+POLYMARKET_STRATEGY_PROFILES = {"legacy", "adaptive_5m15m"}
 
 
 def _bounded_percent(value: Any, default: float, minimum: float, maximum: float) -> float:
@@ -573,6 +580,26 @@ def _bounded_percent(value: Any, default: float, minimum: float, maximum: float)
     if number < minimum:
         number = default
     return max(minimum, min(maximum, float(number)))
+
+
+def _bounded_float(value: Any, default: float, minimum: float, maximum: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = default
+    if number < minimum:
+        number = default
+    return round(max(minimum, min(maximum, float(number))), 6)
+
+
+def _bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError):
+        number = default
+    if number < minimum:
+        number = default
+    return int(max(minimum, min(maximum, number)))
 
 
 def _load_paper_trading_config() -> dict[str, Any]:
@@ -594,10 +621,10 @@ def _write_paper_trading_config(config: dict[str, Any]) -> None:
 def _default_polymarket_rules() -> dict[str, Any]:
     return {
         "polymarket_btc_updown": {
-            "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
+            "trade": ["enabled=true", "adaptive_5m15m profile", "5m: confidence>=0.82 edge>=0.10 ask<=0.60 unless confidence>=0.92", "15m: confidence>=0.76 edge>=0.06 ask<=0.65 unless confidence>=0.90", "spread<=0.08", "ask_size>=1", "one_trade_per_event_window"],
             "stake": ["manual fixed stake configurable between 0.1 and 100 USDT", "presets 1/2/3 remain available", "no martingale", "no averaging down"],
             "exit": ["SL: liquidate after configured window percent if PnL remains negative", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop defaults to 75% of window when PnL remains negative"],
-            "prediction": ["optional invert switch: Down becomes Up and Up becomes Down before order sizing"],
+            "prediction": ["hybrid Chainlink nowcast + technical probability drives edge/Kelly", "optional invert switch: Down becomes Up and Up becomes Down before order sizing"],
         }
     }
 
@@ -626,6 +653,21 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
         config["polymarket_take_profit_pct"] = _bounded_percent(data["polymarket_take_profit_pct"], 100, 10, 500)
     if "polymarket_invert_prediction_enabled" in data:
         config["polymarket_invert_prediction_enabled"] = bool(data.get("polymarket_invert_prediction_enabled"))
+    if "polymarket_strategy_profile" in data or "strategy_profile" in data:
+        profile = str(data.get("polymarket_strategy_profile", data.get("strategy_profile")) or "adaptive_5m15m").lower()
+        if profile not in POLYMARKET_STRATEGY_PROFILES:
+            raise ValueError("invalid_polymarket_strategy_profile")
+        config["polymarket_strategy_profile"] = profile
+    if "threshold" in data:
+        config["threshold"] = _bounded_float(data["threshold"], 0.8, 0.5, 0.99)
+    if "polymarket_min_edge" in data:
+        config["polymarket_min_edge"] = _bounded_float(data["polymarket_min_edge"], 0.03, 0.0, 0.5)
+    if "polymarket_max_spread" in data:
+        config["polymarket_max_spread"] = _bounded_float(data["polymarket_max_spread"], 0.08, 0.0, 0.5)
+    if "polymarket_min_ask_size" in data:
+        config["polymarket_min_ask_size"] = _bounded_float(data["polymarket_min_ask_size"], 1.0, 0.0, 10000.0)
+    if "polymarket_min_seconds_to_close" in data:
+        config["polymarket_min_seconds_to_close"] = _bounded_int(data["polymarket_min_seconds_to_close"], 45, 0, 600)
     if "live_execution_enabled" in data:
         config["live_execution_enabled"] = bool(data.get("live_execution_enabled")) and bool(settings.polymarket_live_trading_enabled)
     if isinstance(data.get("trading_rules"), dict):
@@ -640,6 +682,12 @@ def _sanitize_paper_trading_update(data: dict[str, Any]) -> dict[str, Any]:
     config["polymarket_time_stop_pct"] = _bounded_percent(config.get("polymarket_time_stop_pct"), 75, 10, 99)
     config["polymarket_take_profit_pct"] = _bounded_percent(config.get("polymarket_take_profit_pct"), 100, 10, 500)
     config.setdefault("polymarket_invert_prediction_enabled", False)
+    config.setdefault("polymarket_strategy_profile", "adaptive_5m15m")
+    config["threshold"] = _bounded_float(config.get("threshold"), 0.8, 0.5, 0.99)
+    config["polymarket_min_edge"] = _bounded_float(config.get("polymarket_min_edge"), 0.03, 0.0, 0.5)
+    config["polymarket_max_spread"] = _bounded_float(config.get("polymarket_max_spread"), 0.08, 0.0, 0.5)
+    config["polymarket_min_ask_size"] = _bounded_float(config.get("polymarket_min_ask_size"), 1.0, 0.0, 10000.0)
+    config["polymarket_min_seconds_to_close"] = _bounded_int(config.get("polymarket_min_seconds_to_close"), 45, 0, 600)
     config.setdefault("live_execution_enabled", False)
     return config
 
@@ -662,6 +710,13 @@ def paper_trading_rules_payload() -> dict[str, Any]:
         "live_execution_enabled": bool(config.get("live_execution_enabled", False)),
         "server_live_trading_enabled": bool(settings.polymarket_live_trading_enabled),
         "live_ready": bool(settings.polymarket_live_trading_enabled and config.get("live_execution_enabled", False)),
+        "polymarket_strategy_profile": config.get("polymarket_strategy_profile", "adaptive_5m15m"),
+        "threshold": _bounded_float(config.get("threshold"), 0.8, 0.5, 0.99),
+        "polymarket_min_edge": _bounded_float(config.get("polymarket_min_edge"), 0.03, 0.0, 0.5),
+        "polymarket_max_spread": _bounded_float(config.get("polymarket_max_spread"), 0.08, 0.0, 0.5),
+        "polymarket_min_ask_size": _bounded_float(config.get("polymarket_min_ask_size"), 1.0, 0.0, 10000.0),
+        "polymarket_min_seconds_to_close": _bounded_int(config.get("polymarket_min_seconds_to_close"), 45, 0, 600),
+        "allowed_strategy_profiles": sorted(POLYMARKET_STRATEGY_PROFILES),
         "allowed_modes": ["observe", "paper", "live"],
         "allowed_stakes": [1, 2, 3],
         "stake_min": POLYMARKET_STAKE_MIN,

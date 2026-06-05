@@ -9,6 +9,13 @@ const boundedPct = (v, fallback, min, max) => {
   const n = num(v, fallback);
   return n < min ? fallback : clamp(n, min, max);
 };
+const boundedNumber = (v, fallback, min, max, decimals = 2) => {
+  const n = num(v, fallback);
+  const safe = n < min ? fallback : clamp(n, min, max);
+  const factor = 10 ** decimals;
+  return Math.round(safe * factor) / factor;
+};
+const boundedInt = (v, fallback, min, max) => Math.round(boundedNumber(v, fallback, min, max, 0));
 const stakeValue = v => {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0.1 ? Math.round(clamp(n, 0.1, 100) * 100) / 100 : 1;
@@ -21,6 +28,12 @@ let controlState = {
   autoLiquidate:true,
   timeStop:75,
   tp:100,
+  strategyProfile:'adaptive_5m15m',
+  threshold:0.8,
+  minEdge:0.03,
+  maxSpread:0.08,
+  minAskSize:1,
+  minSecondsToClose:45,
   invertPrediction:false,
   liveExecution:false,
   serverLive:false,
@@ -185,7 +198,8 @@ function friendlyError(value = '') {
 function syncControlSummary() {
   const invert = '';
   const err = controlState.lastError ? ` ${friendlyError(controlState.lastError)}` : '';
-  $('rulesNote').textContent = `SL ${controlState.timeStop}% ventana con PnL negativo. TP +${controlState.tp}%.${invert}${liveGateHint()}${err}`;
+  const profile = controlState.strategyProfile === 'adaptive_5m15m' ? 'Adaptivo' : 'Legacy';
+  $('rulesNote').textContent = `${profile}: confianza ${controlState.threshold.toFixed(2)}, edge ${controlState.minEdge.toFixed(2)}, spread ${controlState.maxSpread.toFixed(2)}, profundidad ${controlState.minAskSize}, cierre ${controlState.minSecondsToClose}s. SL ${controlState.timeStop}% ventana. TP +${controlState.tp}%.${invert}${liveGateHint()}${err}`;
 }
 function applyLiveGateAvailability() {
   const liveToggle = $('liveExecutionEnabled');
@@ -202,6 +216,12 @@ function readControls() {
     enabled:$('tradingEnabled').checked,
     mode:$('tradingMode').value,
     stake:stakeValue($('customStake').value || controlState.stake),
+    strategyProfile:$('strategyProfile').value,
+    threshold:boundedNumber($('threshold').value, 0.8, 0.5, 0.99, 2),
+    minEdge:boundedNumber($('minEdge').value, 0.03, 0, 0.5, 2),
+    maxSpread:boundedNumber($('maxSpread').value, 0.08, 0, 0.5, 2),
+    minAskSize:boundedNumber($('minAskSize').value, 1, 0, 10000, 2),
+    minSecondsToClose:boundedInt($('minSecondsToClose').value, 45, 0, 600),
     autoLiquidate:$('autoLiquidate').checked,
     timeStop:boundedPct($('timeStopPct').value, 75, 10, 99),
     tp:boundedPct($('takeProfitPct').value, 100, 10, 500),
@@ -214,6 +234,11 @@ function markControlsDirty() {
   controlState = {...controlState, ...current, liveBlocked:false};
   $('timeStopPct').value = controlState.timeStop;
   $('takeProfitPct').value = controlState.tp;
+  $('threshold').value = controlState.threshold;
+  $('minEdge').value = controlState.minEdge;
+  $('maxSpread').value = controlState.maxSpread;
+  $('minAskSize').value = controlState.minAskSize;
+  $('minSecondsToClose').value = controlState.minSecondsToClose;
   applyLiveGateAvailability();
   syncStakeButtons();
   syncControlSummary();
@@ -235,6 +260,12 @@ function syncControls(auto, rules = {}) {
     enabled:!!auto.enabled,
     mode:auto.mode || rules.mode || 'observe',
     stake:num(auto.polymarket_stake_usdt ?? rules.polymarket_stake_usdt, 1),
+    strategyProfile:auto.polymarket_strategy_profile ?? rules.polymarket_strategy_profile ?? 'adaptive_5m15m',
+    threshold:boundedNumber(auto.threshold ?? rules.threshold, 0.8, 0.5, 0.99, 2),
+    minEdge:boundedNumber(auto.polymarket_min_edge ?? rules.polymarket_min_edge, 0.03, 0, 0.5, 2),
+    maxSpread:boundedNumber(auto.polymarket_max_spread ?? rules.polymarket_max_spread, 0.08, 0, 0.5, 2),
+    minAskSize:boundedNumber(auto.polymarket_min_ask_size ?? rules.polymarket_min_ask_size, 1, 0, 10000, 2),
+    minSecondsToClose:boundedInt(auto.polymarket_min_seconds_to_close ?? rules.polymarket_min_seconds_to_close, 45, 0, 600),
     autoLiquidate:auto.polymarket_auto_liquidate_enabled ?? rules.polymarket_auto_liquidate_enabled ?? true,
     timeStop:boundedPct(auto.polymarket_time_stop_pct ?? rules.polymarket_time_stop_pct, 75, 10, 99),
     tp:boundedPct(auto.polymarket_take_profit_pct ?? rules.polymarket_take_profit_pct, 100, 10, 500),
@@ -246,6 +277,12 @@ function syncControls(auto, rules = {}) {
   };
   $('tradingEnabled').checked = controlState.enabled;
   $('tradingMode').value = controlState.mode;
+  $('strategyProfile').value = controlState.strategyProfile;
+  $('threshold').value = controlState.threshold;
+  $('minEdge').value = controlState.minEdge;
+  $('maxSpread').value = controlState.maxSpread;
+  $('minAskSize').value = controlState.minAskSize;
+  $('minSecondsToClose').value = controlState.minSecondsToClose;
   $('autoLiquidate').checked = controlState.autoLiquidate;
   $('timeStopPct').value = controlState.timeStop;
   $('takeProfitPct').value = controlState.tp;
@@ -263,6 +300,12 @@ function controlPayload() {
     mode:current.mode,
     live_execution_enabled:current.liveExecution,
     polymarket_stake_usdt:current.stake,
+    polymarket_strategy_profile:current.strategyProfile,
+    threshold:current.threshold,
+    polymarket_min_edge:current.minEdge,
+    polymarket_max_spread:current.maxSpread,
+    polymarket_min_ask_size:current.minAskSize,
+    polymarket_min_seconds_to_close:current.minSecondsToClose,
     polymarket_auto_liquidate_enabled:current.autoLiquidate,
     polymarket_time_stop_pct:current.timeStop,
     polymarket_take_profit_pct:current.tp,
@@ -279,7 +322,7 @@ function bindControls() {
     $('customStake').value = '';
     markControlsDirty();
   });
-  ['tradingEnabled','tradingMode','liveExecutionEnabled','autoLiquidate','timeStopPct','takeProfitPct','invertPrediction','customStake'].forEach(id => {
+  ['tradingEnabled','tradingMode','liveExecutionEnabled','strategyProfile','threshold','minEdge','maxSpread','minAskSize','minSecondsToClose','autoLiquidate','timeStopPct','takeProfitPct','invertPrediction','customStake'].forEach(id => {
     const node = $(id);
     node.addEventListener('change', markControlsDirty);
     node.addEventListener('input', markControlsDirty);
@@ -358,7 +401,8 @@ function windowCard(row) {
   const reason = (row.reasons && row.reasons.join(', ')) || order.reason || row.reason || order.risk || (row.passes_filters ? 'Pasa filtros de confianza, edge y microestructura' : 'No cumple filtros del ciclo');
   const model = row.model || order.indicators?.candidate?.model || order.model || '';
   const comps = row.model_components || order.indicators?.candidate?.model_components || {};
-  const modelLine = model ? `Modelo ${model}${comps.technical_weight != null ? ` · tecnico ${(Number(comps.technical_weight) * 100).toFixed(0)}%` : ''}` : '';
+  const profile = row.strategy_profile || order.strategy_profile || order.indicators?.strategy_profile || order.indicators?.candidate?.strategy_profile || controlState.strategyProfile;
+  const modelLine = [profile ? `Perfil ${profile}` : '', model ? `Modelo ${model}${comps.technical_weight != null ? ` · tecnico ${(Number(comps.technical_weight) * 100).toFixed(0)}%` : ''}` : ''].filter(Boolean).join(' · ');
   const progress = windowProgress(row) ?? 0;
   const fill = clamp(conf, 8, 100);
   return `<article class="window-card ${status}">
