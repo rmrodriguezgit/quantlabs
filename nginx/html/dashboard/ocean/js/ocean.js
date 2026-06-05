@@ -215,7 +215,7 @@
           model: els.model.value.trim(),
           agent: options && options.agent ? options.agent : els.agent.value,
           temperature: Number(els.temp.value || 0.45),
-          max_tokens: options && options.maxTokens ? options.maxTokens : 42,
+          max_tokens: options && options.maxTokens ? options.maxTokens : 160,
           buffered: options && options.buffered === false ? false : true,
         }),
         signal: state.controller.signal,
@@ -307,7 +307,7 @@
         sendMessage(prompt, {
           displayMessage: "Continúa tu respuesta anterior.",
           agent: item.meta.agentType || els.agent.value,
-          maxTokens: 55,
+          maxTokens: 220,
         });
       }
     });

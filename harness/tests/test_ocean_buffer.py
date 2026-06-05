@@ -57,3 +57,9 @@ def test_unbuffered_ocean_completion_returns_first_chunk(monkeypatch):
     assert result["content"] == "Solo primer bloque"
     assert result["chunks"] == 1
     assert result["buffer_limit_reached"] is True
+
+
+def test_local_token_budget_allows_fuller_blocks():
+    assert ocean._bounded_max_tokens("local", None) == 160
+    assert ocean._bounded_max_tokens("local", 999) == 220
+    assert ocean.LOCAL_BUFFER_MAX_CHUNKS == 4
