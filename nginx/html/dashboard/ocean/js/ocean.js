@@ -7,6 +7,7 @@
     tokens: {},
     busy: false,
     controller: null,
+    timeoutId: null,
     messages: new Map(),
     nextId: 1,
   };
@@ -194,7 +195,10 @@
 
     setBusy(true);
     state.controller = new AbortController();
-    setStatus("Pensando...", "busy");
+    state.timeoutId = setTimeout(() => {
+      if (state.controller) state.controller.abort();
+    }, 115000);
+    setStatus("Llenando buffer...", "busy");
     if (!options || options.appendUser !== false) {
       appendMessage("user", options && options.displayMessage ? options.displayMessage : message, { extra: provider, rawMessage: message });
     }
@@ -211,7 +215,8 @@
           model: els.model.value.trim(),
           agent: options && options.agent ? options.agent : els.agent.value,
           temperature: Number(els.temp.value || 0.45),
-          max_tokens: options && options.maxTokens ? options.maxTokens : 90,
+          max_tokens: options && options.maxTokens ? options.maxTokens : 42,
+          buffered: options && options.buffered === false ? false : true,
         }),
         signal: state.controller.signal,
       });
@@ -223,7 +228,7 @@
 
       appendMessage("assistant", data.response || "", {
         agent: data.agent && data.agent.label ? data.agent.label : data.agent_type,
-        extra: `${data.route_source || "router"} · ${data.elapsed_ms || "--"} ms${data.incomplete ? " · incompleta" : ""}`,
+        extra: `${data.route_source || "router"} · buffer ${data.buffer_chunks || 1} · ${data.elapsed_ms || "--"} ms${data.incomplete ? " · incompleta" : ""}`,
         incomplete: data.incomplete,
         agentType: data.agent_type,
         originalPrompt: message,
@@ -238,11 +243,11 @@
       setStatus("Respuesta lista", "ready");
     } catch (err) {
       if (err.name === "AbortError") {
-        appendMessage("assistant", "Petición detenida por el usuario.", {
+        appendMessage("assistant", "El buffer se detuvo antes de completar la respuesta. El LLM local tardó demasiado; intenta de nuevo o usa Continuar para llenar otro bloque.", {
           agent: "OCEAN",
-          extra: "stop",
+          extra: "timeout preventivo",
         });
-        setStatus("Petición detenida", "warn");
+        setStatus("Timeout preventivo", "warn");
         return;
       }
       appendMessage("assistant", `No fue posible consultar OCEAN: ${err.message}`, {
@@ -251,6 +256,8 @@
       });
       setStatus("Error de consulta", "error");
     } finally {
+      if (state.timeoutId) clearTimeout(state.timeoutId);
+      state.timeoutId = null;
       state.controller = null;
       setBusy(false);
       els.prompt.focus();
@@ -300,7 +307,7 @@
         sendMessage(prompt, {
           displayMessage: "Continúa tu respuesta anterior.",
           agent: item.meta.agentType || els.agent.value,
-          maxTokens: 110,
+          maxTokens: 55,
         });
       }
     });

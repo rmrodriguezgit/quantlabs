@@ -122,10 +122,12 @@ PROVIDERS = {
     "deepseek": {"label": "DeepSeek", "requires_token": True},
 }
 
-LOCAL_DEFAULT_MAX_TOKENS = 90
-LOCAL_HARD_MAX_TOKENS = 110
+LOCAL_DEFAULT_MAX_TOKENS = 42
+LOCAL_HARD_MAX_TOKENS = 55
 REMOTE_DEFAULT_MAX_TOKENS = 700
 REMOTE_HARD_MAX_TOKENS = 900
+LOCAL_BUFFER_MAX_CHUNKS = 6
+REMOTE_BUFFER_MAX_CHUNKS = 2
 
 
 def _messages(system: str, user: str) -> list[dict[str, str]]:
@@ -176,6 +178,103 @@ def _bounded_max_tokens(provider: str, requested: Any) -> int:
     if value <= 0:
         return default
     return max(24, min(value, hard_limit))
+
+
+def _completion_tokens(usage: dict[str, Any]) -> int:
+    value = usage.get("completion_tokens") or usage.get("output_tokens") or usage.get("tokens_predicted") or 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _is_incomplete(completion: dict[str, Any], requested_max_tokens: int) -> bool:
+    finish_reason = str(completion.get("finish_reason") or "").lower()
+    if finish_reason in {"stop", "end_turn", "stop_sequence", "complete", "completed"}:
+        return False
+    usage = completion.get("usage") or {}
+    completion_tokens = _completion_tokens(usage)
+    return finish_reason in {"length", "max_tokens", "model_length"} or (completion_tokens and completion_tokens >= requested_max_tokens - 8)
+
+
+def _merge_usage(total: dict[str, Any], usage: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(total or {})
+    for key, value in (usage or {}).items():
+        if isinstance(value, int | float):
+            merged[key] = merged.get(key, 0) + value
+        elif key not in merged:
+            merged[key] = value
+    return merged
+
+
+def _continuation_messages(system: str, original_message: str, buffered_text: str) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": original_message},
+        {
+            "role": "assistant",
+            "content": buffered_text,
+        },
+        {
+            "role": "user",
+            "content": "Continua exactamente desde donde se corto. No repitas lo anterior. Completa la idea pendiente y cierra la respuesta cuando ya este completa.",
+        },
+    ]
+
+
+def _format_buffered_chunks(chunks: list[str]) -> str:
+    output = ""
+    for raw in chunks:
+        chunk = normalize_utf8_text(raw or "").strip()
+        if not chunk:
+            continue
+        if not output:
+            output = chunk
+            continue
+        if output.endswith((".", "!", "?", ":", ";", "\n")):
+            output = f"{output}\n{chunk}"
+        else:
+            output = f"{output} {chunk}"
+    return normalize_utf8_text(output)
+
+
+def buffered_ocean_completion(
+    provider: str,
+    system_prompt: str,
+    message: str,
+    token: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    buffered: bool,
+) -> dict[str, Any]:
+    max_chunks = LOCAL_BUFFER_MAX_CHUNKS if provider == "local" else REMOTE_BUFFER_MAX_CHUNKS
+    if not buffered:
+        max_chunks = 1
+    chunks: list[str] = []
+    usage: dict[str, Any] = {}
+    completion: dict[str, Any] = {}
+    messages = _messages(system_prompt, message)
+
+    for index in range(max_chunks):
+        completion = call_ocean_llm(provider, messages, token, model, temperature=temperature, max_tokens=max_tokens)
+        content = normalize_utf8_text(completion.get("content") or "").strip()
+        if content:
+            chunks.append(content)
+        usage = _merge_usage(usage, completion.get("usage") or {})
+        if not _is_incomplete(completion, max_tokens):
+            break
+        if index == max_chunks - 1:
+            break
+        messages = _continuation_messages(system_prompt, message, _format_buffered_chunks(chunks))
+
+    return {
+        **completion,
+        "content": _format_buffered_chunks(chunks),
+        "usage": usage,
+        "chunks": len(chunks),
+        "buffer_limit_reached": bool(completion and _is_incomplete(completion, max_tokens) and len(chunks) >= max_chunks),
+    }
 
 
 def _call_local(messages: list[dict[str, str]], temperature: float, max_tokens: int) -> dict[str, Any]:
@@ -293,13 +392,21 @@ def ocean_chat():
 
         prompt = AGENT_PROMPTS[agent_type]
         if provider == "local":
-            prompt = f"{prompt}\n\nRestriccion operativa OCEAN Local: responde compacto, prioriza lo esencial y deja ideas extensas para el boton Continuar. Evita respuestas largas de una sola vez."
+            prompt = f"{prompt}\n\nRestriccion operativa OCEAN Local: responde en bloques compactos y continuables. Cada bloque debe continuar la idea sin repetir y terminar en una frontera semantica clara cuando sea posible."
         requested_max_tokens = _bounded_max_tokens(provider, data.get("max_tokens"))
-        completion = call_ocean_llm(provider, _messages(prompt, message), token, model, temperature=float(data.get("temperature") or 0.45), max_tokens=requested_max_tokens)
-        finish_reason = str(completion.get("finish_reason") or "").lower()
+        buffered = data.get("buffered") is not False
+        completion = buffered_ocean_completion(
+            provider,
+            prompt,
+            message,
+            token,
+            model,
+            temperature=float(data.get("temperature") or 0.45),
+            max_tokens=requested_max_tokens,
+            buffered=buffered,
+        )
         usage = completion.get("usage") or {}
-        completion_tokens = usage.get("completion_tokens") or usage.get("output_tokens") or usage.get("tokens_predicted") or 0
-        incomplete = finish_reason in {"length", "max_tokens", "model_length"} or (completion_tokens and completion_tokens >= requested_max_tokens - 8)
+        incomplete = _is_incomplete(completion, requested_max_tokens)
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         return jsonify({
             "agent_type": agent_type,
@@ -310,6 +417,9 @@ def ocean_chat():
             "response": completion["content"],
             "finish_reason": completion.get("finish_reason"),
             "incomplete": bool(incomplete),
+            "buffered": bool(buffered),
+            "buffer_chunks": completion.get("chunks") or 1,
+            "buffer_limit_reached": completion.get("buffer_limit_reached", False),
             "usage": usage,
             "elapsed_ms": elapsed_ms,
         })
