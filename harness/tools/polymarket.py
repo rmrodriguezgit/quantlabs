@@ -184,6 +184,7 @@ class PolymarketTool(BaseTool):
                 'technical': technical,
                 'model_components': hybrid.get('components') or {},
                 'model': hybrid.get('model'),
+                'hybrid_probability_up': up_probability,
                 'forecast_price_at_close': hybrid.get('forecast_price_at_close') or prophet.get('forecast_price_at_close'),
                 'prediction_candle_interval': prediction_interval,
                 'prediction_lookback': prediction_lookback,
@@ -206,10 +207,20 @@ class PolymarketTool(BaseTool):
         max_spread = float(kwargs.get('max_spread', 0.08))
         min_ask_size = float(kwargs.get('min_ask_size', 1))
         min_seconds_to_close = int(kwargs.get('min_seconds_to_close', 45))
+        strategy_profile = str(kwargs.get('strategy_profile') or 'legacy').lower()
+        profiles = self._btc_updown_strategy_profiles(
+            threshold=threshold,
+            min_edge=min_edge,
+            max_spread=max_spread,
+            min_ask_size=min_ask_size,
+            min_seconds_to_close=min_seconds_to_close,
+            profile=strategy_profile,
+        )
+        signal_threshold = min(profile['threshold'] for profile in profiles.values())
         payload = self._btc_updown_scalping_signal(
             gamma,
             clob,
-            threshold=threshold,
+            threshold=signal_threshold,
             intervals=['5m', '15m'],
             candle_interval=kwargs.get('candle_interval') or '5m',
             lookback_window=kwargs.get('lookback_window') or '1d',
@@ -223,24 +234,27 @@ class PolymarketTool(BaseTool):
         for interval in ['5m', '15m']:
             signal = signals.get(interval) or {}
             market = markets.get(interval) or {}
+            profile = profiles[interval]
             preferred = signal.get('preferred_side')
             micro = self._side_microstructure(market, preferred)
             probability = self._side_probability(signal, preferred)
             edge = probability - micro['ask'] if probability is not None and micro.get('ask') is not None else None
             reasons = []
-            if not signal.get('meets_threshold'):
+            if probability is None or probability < profile['threshold']:
                 reasons.append('confidence_below_threshold')
             if preferred not in {'Up', 'Down'}:
                 reasons.append('missing_side')
-            if (market.get('seconds_to_close') or 0) < min_seconds_to_close:
+            if (market.get('seconds_to_close') or 0) < profile['min_seconds_to_close']:
                 reasons.append('too_close_to_close')
             if micro.get('ask') is None:
                 reasons.append('missing_ask')
-            if micro.get('spread') is None or micro['spread'] > max_spread:
+            elif micro['ask'] > profile['max_ask'] and probability < profile['expensive_ask_threshold']:
+                reasons.append('ask_too_expensive')
+            if micro.get('spread') is None or micro['spread'] > profile['max_spread']:
                 reasons.append('spread_too_wide')
-            if micro.get('ask_size') is None or micro['ask_size'] < min_ask_size:
+            if micro.get('ask_size') is None or micro['ask_size'] < profile['min_ask_size']:
                 reasons.append('insufficient_ask_depth')
-            if edge is None or edge < min_edge:
+            if edge is None or edge < profile['min_edge']:
                 reasons.append('edge_too_small')
             candidates.append({
                 'interval': interval,
@@ -249,6 +263,8 @@ class PolymarketTool(BaseTool):
                 'probability': probability,
                 'edge': round(edge, 4) if edge is not None else None,
                 'microstructure': micro,
+                'strategy_profile': strategy_profile,
+                'strategy_rules': profile,
                 'seconds_to_close': market.get('seconds_to_close'),
                 'countdown': signal.get('countdown'),
                 'price_to_beat_reference': signal.get('price_to_beat_reference'),
@@ -258,6 +274,7 @@ class PolymarketTool(BaseTool):
                 'model_components': signal.get('model_components') or {},
                 'nowcast_probability': ((signal.get('nowcast') or signal.get('prophet') or {}).get('up_probability')),
                 'technical_probability': ((signal.get('technical') or {}).get('up_probability')),
+                'hybrid_probability_up': signal.get('hybrid_probability_up'),
                 'window_et': f"{signal.get('start_time_et')} - {signal.get('end_time_et')}",
                 'passes_filters': not reasons,
                 'reasons': reasons,
@@ -274,13 +291,15 @@ class PolymarketTool(BaseTool):
         return {
             'action': action,
             'side': side,
-            'strategy': 'BTC Up/Down independent 5m/15m live signal',
-            'threshold': threshold,
+            'strategy': 'BTC Up/Down adaptive 5m/15m signal' if strategy_profile != 'legacy' else 'BTC Up/Down independent 5m/15m live signal',
+            'strategy_profile': strategy_profile,
+            'threshold': signal_threshold,
             'filters': {
                 'min_edge': min_edge,
                 'max_spread': max_spread,
                 'min_ask_size': min_ask_size,
                 'min_seconds_to_close': min_seconds_to_close,
+                'profiles': profiles,
             },
             'candidates': candidates,
             'reasons': [] if passing else ['no_event_passed_filters'],
@@ -910,13 +929,56 @@ class PolymarketTool(BaseTool):
         return probabilities
 
     def _side_probability(self, signal: dict, side: str | None):
-        up_probability = (signal.get('prophet') or {}).get('up_probability')
+        up_probability = signal.get('hybrid_probability_up')
+        if not isinstance(up_probability, int | float):
+            up_probability = (signal.get('prophet') or {}).get('up_probability')
         if isinstance(up_probability, int | float) and side in {'Up', 'Down'}:
             return up_probability if side == 'Up' else 1 - up_probability
         confidence = signal.get('confidence')
         if isinstance(confidence, int | float) and signal.get('preferred_side') == side:
             return confidence
         return None
+
+    def _btc_updown_strategy_profiles(
+        self,
+        threshold: float,
+        min_edge: float,
+        max_spread: float,
+        min_ask_size: float,
+        min_seconds_to_close: int,
+        profile: str,
+    ) -> dict[str, dict]:
+        legacy = {
+            'threshold': threshold,
+            'min_edge': min_edge,
+            'max_spread': max_spread,
+            'min_ask_size': min_ask_size,
+            'min_seconds_to_close': min_seconds_to_close,
+            'max_ask': 0.99,
+            'expensive_ask_threshold': 1.0,
+        }
+        if profile in {'legacy', 'classic'}:
+            return {'5m': dict(legacy), '15m': dict(legacy)}
+        if profile in {'adaptive', 'adaptive_5m15m', 'catalog'}:
+            return {
+                '5m': {
+                    **legacy,
+                    'threshold': max(threshold, 0.82),
+                    'min_edge': max(min_edge, 0.10),
+                    'max_ask': 0.60,
+                    'expensive_ask_threshold': 0.92,
+                    'min_seconds_to_close': max(min_seconds_to_close, 75),
+                },
+                '15m': {
+                    **legacy,
+                    'threshold': max(min(threshold, 0.78), 0.76),
+                    'min_edge': max(min_edge, 0.06),
+                    'max_ask': 0.65,
+                    'expensive_ask_threshold': 0.90,
+                    'min_seconds_to_close': max(min_seconds_to_close, 90),
+                },
+            }
+        raise ValueError('strategy_profile must be legacy or adaptive_5m15m')
 
     def _side_microstructure(self, market: dict, side: str | None):
         for token in market.get('tokens') or []:

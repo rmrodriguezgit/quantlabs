@@ -64,6 +64,13 @@ def close_price(tx: dict[str, Any]) -> float | None:
     return number(indicators.get("final_price_reference") or candidate.get("final_price_reference") or tx.get("final_price_reference"))
 
 
+def indicator_value(tx: dict[str, Any], key: str) -> Any:
+    indicators = tx.get("indicators") or {}
+    candidate = indicators.get("candidate") or {}
+    micro = candidate.get("microstructure") or {}
+    return indicators.get(key, candidate.get(key, micro.get(key, tx.get(key))))
+
+
 def outcome(tx: dict[str, Any]) -> str:
     indicators = tx.get("indicators") or {}
     actual = str(indicators.get("winning_side") or indicators.get("actual_close_side") or "").upper()
@@ -92,6 +99,7 @@ def reason(tx: dict[str, Any]) -> str:
         "confidence_below_threshold": "Confianza < 80%",
         "edge_too_small": "Edge/Kelly insuficiente",
         "missing_ask": "Sin ask en book",
+        "ask_too_expensive": "Ask demasiado caro",
         "spread_too_wide": "Spread alto",
         "insufficient_ask_depth": "Profundidad baja",
         "too_close_to_close": "Cierre muy cerca",
@@ -124,6 +132,15 @@ def normalize(tx: dict[str, Any], collected_at: str) -> dict[str, Any]:
         "precio_a_superar": price_to_beat(tx),
         "precio_predicho": predicted_price(tx),
         "precio_cierre": close_price(tx),
+        "ask": number(indicator_value(tx, "ask")),
+        "bid": number(indicator_value(tx, "bid")),
+        "spread": number(indicator_value(tx, "spread")),
+        "ask_size": number(indicator_value(tx, "ask_size")),
+        "edge": number(tx.get("edge") or indicator_value(tx, "edge")),
+        "nowcast_probability": number(indicator_value(tx, "nowcast_probability")),
+        "technical_probability": number(indicator_value(tx, "technical_probability")),
+        "hybrid_probability_up": number(indicator_value(tx, "hybrid_probability_up")),
+        "strategy_profile": indicator_value(tx, "strategy_profile") or "",
         "stake": number(tx.get("stake_usdt")) or 0,
         "confianza_pct": round(confidence, 4),
         "motivo": reason(tx),

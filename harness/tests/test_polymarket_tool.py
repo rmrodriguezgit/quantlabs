@@ -293,6 +293,80 @@ def test_coordinated_signal_requires_both_windows_and_microstructure(monkeypatch
     assert result["candidates"][0]["edge"] == 0.06
 
 
+def test_coordinated_signal_uses_hybrid_probability_for_edge(monkeypatch):
+    tool = PolymarketTool()
+
+    monkeypatch.setattr(tool, "_base_urls", lambda: ("https://gamma", "https://data", "https://clob"))
+    monkeypatch.setattr(
+        tool,
+        "_btc_updown_scalping_signal",
+        lambda gamma, clob, **kwargs: {
+            "signals": [
+                {
+                    "interval": "5m",
+                    "preferred_side": "Up",
+                    "confidence": 0.90,
+                    "hybrid_probability_up": 0.90,
+                    "prophet": {"up_probability": 0.55},
+                    "countdown": "03:00",
+                    "start_time_et": "2026-05-19 18:10:00 EDT",
+                    "end_time_et": "2026-05-19 18:15:00 EDT",
+                },
+                {
+                    "interval": "15m",
+                    "preferred_side": "Down",
+                    "confidence": 0.90,
+                    "hybrid_probability_up": 0.10,
+                    "prophet": {"up_probability": 0.45},
+                    "countdown": "12:00",
+                    "start_time_et": "2026-05-19 18:00:00 EDT",
+                    "end_time_et": "2026-05-19 18:15:00 EDT",
+                },
+            ],
+            "markets": [
+                {"interval": "5m", "seconds_to_close": 180, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.50", "size": "10"}, "best_ask": {"price": "0.56", "size": "5"}}}]},
+                {"interval": "15m", "seconds_to_close": 720, "tokens": [{"outcome": "Down", "book": {"best_bid": {"price": "0.50", "size": "10"}, "best_ask": {"price": "0.56", "size": "5"}}}]},
+            ],
+        },
+    )
+
+    result = tool.run(action="btc_updown_5m15m_coordinated_signal", role="trader", threshold=0.8)
+
+    assert result["candidates"][0]["probability"] == 0.90
+    assert result["candidates"][0]["edge"] == 0.34
+    assert result["candidates"][1]["probability"] == 0.90
+    assert result["candidates"][1]["edge"] == 0.34
+
+
+def test_adaptive_profile_blocks_expensive_5m_and_allows_15m(monkeypatch):
+    tool = PolymarketTool()
+
+    monkeypatch.setattr(tool, "_base_urls", lambda: ("https://gamma", "https://data", "https://clob"))
+    monkeypatch.setattr(
+        tool,
+        "_btc_updown_scalping_signal",
+        lambda gamma, clob, **kwargs: {
+            "signals": [
+                {"interval": "5m", "preferred_side": "Up", "confidence": 0.86, "hybrid_probability_up": 0.86},
+                {"interval": "15m", "preferred_side": "Up", "confidence": 0.82, "hybrid_probability_up": 0.82},
+            ],
+            "markets": [
+                {"interval": "5m", "seconds_to_close": 180, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.68", "size": "10"}, "best_ask": {"price": "0.70", "size": "5"}}}]},
+                {"interval": "15m", "seconds_to_close": 720, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.58", "size": "10"}, "best_ask": {"price": "0.60", "size": "5"}}}]},
+            ],
+        },
+    )
+
+    result = tool.run(action="btc_updown_5m15m_coordinated_signal", role="trader", strategy_profile="adaptive_5m15m")
+
+    assert result["strategy_profile"] == "adaptive_5m15m"
+    assert result["action"] == "TRADE"
+    assert result["side"] == "UP"
+    assert result["candidates"][0]["passes_filters"] is False
+    assert "ask_too_expensive" in result["candidates"][0]["reasons"]
+    assert result["candidates"][1]["passes_filters"] is True
+
+
 def test_independent_signal_allows_direction_conflict(monkeypatch):
     tool = PolymarketTool()
 

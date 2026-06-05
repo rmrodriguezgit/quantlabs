@@ -24,9 +24,9 @@ class PaperTradingTool(BaseTool):
             'filters': ['volume_ratio', 'EMA50', 'Bollinger bands', 'ATR/risk'],
         },
         'polymarket_btc_updown': {
-            'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'confidence>=0.80', 'edge>=0.03', 'spread<=0.08', 'ask_size>=1', 'seconds_to_close>=60', 'one_trade_per_event_window'],
+            'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'legacy or adaptive_5m15m strategy_profile', '5m adaptive: confidence>=0.82, edge>=0.10, ask<=0.60 unless confidence>=0.92, seconds_to_close>=75', '15m adaptive: confidence>=0.76, edge>=0.06, ask<=0.65 unless confidence>=0.90, seconds_to_close>=90', 'spread<=0.08', 'ask_size>=1', 'one_trade_per_event_window'],
             'risk': ['stake fixed manually at 1/2/3 USDT', 'max one trade per 5m/15m window', 'live requires server flag plus UI enablement', 'price_to_beat=Chainlink candle open'],
-            'prediction': ['optional invert switch flips UP/DOWN before order sizing'],
+            'prediction': ['hybrid Chainlink nowcast + technical probability drives edge/Kelly', 'optional invert switch flips UP/DOWN before order sizing'],
             'exit': ['stop_loss_time_75_when_window_elapsed_and_pnl_negative', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'time stop: after 75% of the window, liquidate if PnL remains negative', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],
         },
         'modes': {
@@ -79,6 +79,7 @@ class PaperTradingTool(BaseTool):
             'polymarket_time_stop_pct': self._percent_setting(kwargs.get('polymarket_time_stop_pct') or os.getenv('POLYMARKET_TIME_STOP_PCT'), 75, 10, 99),
             'polymarket_take_profit_pct': self._percent_setting(kwargs.get('polymarket_take_profit_pct') or os.getenv('POLYMARKET_TAKE_PROFIT_PCT'), 100, 10, 500),
             'polymarket_invert_prediction_enabled': self._bool_setting(kwargs.get('polymarket_invert_prediction_enabled'), False),
+            'polymarket_strategy_profile': str(kwargs.get('polymarket_strategy_profile') or kwargs.get('strategy_profile') or 'legacy'),
             'rules': kwargs.get('rules') or self.default_rules,
             'transactions': [],
             'orders': [],
@@ -121,6 +122,7 @@ class PaperTradingTool(BaseTool):
                 lookback=int(kwargs.get('lookback') or 288),
                 prediction_candle_interval=kwargs.get('prediction_candle_interval') or '1m',
                 prediction_lookback=int(kwargs.get('prediction_lookback') or 90),
+                strategy_profile=kwargs.get('polymarket_strategy_profile') or kwargs.get('strategy_profile') or 'legacy',
                 min_edge=float(kwargs.get('polymarket_min_edge') or 0.03),
                 max_spread=float(kwargs.get('polymarket_max_spread') or 0.08),
                 min_ask_size=float(kwargs.get('polymarket_min_ask_size') or 1),
@@ -236,6 +238,8 @@ class PaperTradingTool(BaseTool):
             micro = self._side_microstructure_from_market(market, selected_side) if invert_prediction else (candidate.get('microstructure') or {})
             ask = self._float(micro.get('ask'))
             probability = self._float(candidate.get('probability') or candidate.get('confidence'))
+            if invert_prediction and probability is not None:
+                probability = 1 - probability
             edge = probability - ask if probability is not None and ask is not None else None
             full_kelly = self._kelly_fraction(probability, ask)
             fractional_kelly = max(0, min(max_stake_pct, full_kelly * kelly_fraction_setting))
@@ -256,6 +260,7 @@ class PaperTradingTool(BaseTool):
                 'forecast_price_at_close': candidate.get('forecast_price_at_close'),
                 'reason': 'prediccion invertida por regla de negocio' if invert_prediction else 'evento independiente pasa confianza, edge, Kelly y microestructura',
                 'filters': payload.get('filters') or {},
+                'strategy_profile': payload.get('strategy_profile') or result.get('polymarket_strategy_profile'),
                 'candidate': {**candidate, 'preferred_side': selected_side, 'predicted_side': predicted_side, 'prediction_inverted': invert_prediction, 'microstructure': micro, 'edge': round(edge, 4) if edge is not None else None},
             }
             if side == 'NONE':
@@ -273,6 +278,10 @@ class PaperTradingTool(BaseTool):
                 'mode': result['mode'],
                 'side': side,
                 'price': ask,
+                'bid': micro.get('bid'),
+                'ask': ask,
+                'spread': micro.get('spread'),
+                'ask_size': micro.get('ask_size'),
                 'edge': round(edge, 4) if edge is not None else None,
                 'full_kelly': round(full_kelly, 6),
                 'fractional_kelly': round(fractional_kelly, 6),
@@ -305,6 +314,16 @@ class PaperTradingTool(BaseTool):
                     'price_to_beat_reference': candidate.get('price_to_beat_reference'),
                     'current_price_reference': candidate.get('current_price_reference'),
                     'forecast_price_at_close': candidate.get('forecast_price_at_close'),
+                    'bid': micro.get('bid'),
+                    'ask': ask,
+                    'spread': micro.get('spread'),
+                    'ask_size': micro.get('ask_size'),
+                    'nowcast_probability': candidate.get('nowcast_probability'),
+                    'technical_probability': candidate.get('technical_probability'),
+                    'hybrid_probability_up': candidate.get('hybrid_probability_up'),
+                    'model_components': candidate.get('model_components') or {},
+                    'strategy_profile': payload.get('strategy_profile') or result.get('polymarket_strategy_profile'),
+                    'strategy_rules': candidate.get('strategy_rules') or {},
                     'full_kelly': round(full_kelly, 6),
                 },
                 token_id=order.get('token_id'),

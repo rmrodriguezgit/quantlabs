@@ -123,7 +123,10 @@ def test_paper_trading_uses_coordinated_polymarket_signal(tmp_path, monkeypatch)
     assert result["orders"][1]["stake_usdt"] == 1
     assert result["orders"][0]["full_kelly"] == 0.3
     assert result["orders"][0]["price_to_beat_reference"] == 100.5
+    assert result["orders"][0]["ask"] == 0.80
+    assert result["orders"][0]["spread"] == 0.04
     assert result["transactions"][0]["indicators"]["price_to_beat_reference"] == 100.5
+    assert result["transactions"][0]["indicators"]["ask"] == 0.80
 
 
 def test_paper_trading_trades_each_polymarket_event_independently(tmp_path, monkeypatch):

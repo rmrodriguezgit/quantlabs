@@ -24,6 +24,7 @@ DEFAULT_CONFIG = {
     "polymarket_time_stop_pct": 75,
     "polymarket_take_profit_pct": 100,
     "polymarket_invert_prediction_enabled": False,
+    "polymarket_strategy_profile": "adaptive_5m15m",
     "threshold": 0.8,
     "trading_rules": {
         "mexc_spot": {
@@ -33,7 +34,7 @@ DEFAULT_CONFIG = {
             "live_stake": "Kelly 1/4, limitado por bankroll/max_stake_pct/polymarket_stake_usdt",
         },
         "polymarket_btc_updown": {
-            "trade": ["enabled=true", "confidence>=0.80", "edge>=0.03", "spread<=0.08", "ask_size>=1", "seconds_to_close>=60", "one_trade_per_event_window"],
+            "trade": ["enabled=true", "adaptive_5m15m profile", "5m: confidence>=0.82 edge>=0.10 ask<=0.60 unless confidence>=0.92", "15m: confidence>=0.76 edge>=0.06 ask<=0.65 unless confidence>=0.90", "spread<=0.08", "ask_size>=1", "one_trade_per_event_window"],
             "stake": ["manual fixed stake configurable between 0.1 and 100 USDT", "presets 1/2/3 remain available"],
             "exit": ["SL at configured window percent when PnL remains negative", "TP at +100% position value (3.00 -> 6.00 USDT)", "manual liquidation button per trade", "time stop defaults to 75% of window when PnL remains negative"],
             "prediction": ["optional invert switch flips UP/DOWN before order sizing"],
