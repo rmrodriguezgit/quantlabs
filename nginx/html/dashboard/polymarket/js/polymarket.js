@@ -204,7 +204,7 @@ function syncControlSummary() {
     five_scalp_conservative:'5m conservador',
     adaptive_5m15m:'Adaptivo',
     research_ml:'Research ML',
-    legacy:'Legacy'
+    legacy:'Legacy saneado'
   };
   const profile = profileLabels[controlState.strategyProfile] || controlState.strategyProfile;
   $('rulesNote').textContent = `${profile}: confianza ${controlState.threshold.toFixed(2)}, edge ${controlState.minEdge.toFixed(2)}, spread ${controlState.maxSpread.toFixed(2)}, profundidad ${controlState.minAskSize}, cierre ${controlState.minSecondsToClose}s. SL ${controlState.timeStop}% ventana. TP +${controlState.tp}%.${invert}${liveGateHint()}${err}`;

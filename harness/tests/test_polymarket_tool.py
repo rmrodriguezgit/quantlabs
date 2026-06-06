@@ -262,7 +262,7 @@ def test_coordinated_signal_requires_both_windows_and_microstructure(monkeypatch
                     "interval": "5m",
                     "seconds_to_close": 180,
                     "tokens": [
-                        {"outcome": "Up", "book": {"best_bid": {"price": "0.76", "size": "10"}, "best_ask": {"price": "0.80", "size": "5"}}},
+                        {"outcome": "Up", "book": {"best_bid": {"price": "0.52", "size": "10"}, "best_ask": {"price": "0.56", "size": "5"}}},
                         {"outcome": "Down", "book": {"best_bid": {"price": "0.18", "size": "10"}, "best_ask": {"price": "0.22", "size": "5"}}},
                     ],
                 },
@@ -270,7 +270,7 @@ def test_coordinated_signal_requires_both_windows_and_microstructure(monkeypatch
                     "interval": "15m",
                     "seconds_to_close": 720,
                     "tokens": [
-                        {"outcome": "Up", "book": {"best_bid": {"price": "0.75", "size": "10"}, "best_ask": {"price": "0.79", "size": "5"}}},
+                        {"outcome": "Up", "book": {"best_bid": {"price": "0.54", "size": "10"}, "best_ask": {"price": "0.58", "size": "5"}}},
                         {"outcome": "Down", "book": {"best_bid": {"price": "0.19", "size": "10"}, "best_ask": {"price": "0.23", "size": "5"}}},
                     ],
                 },
@@ -290,7 +290,7 @@ def test_coordinated_signal_requires_both_windows_and_microstructure(monkeypatch
     assert result["action"] == "TRADE"
     assert result["side"] == "UP"
     assert [c["passes_filters"] for c in result["candidates"]] == [True, True]
-    assert result["candidates"][0]["edge"] == 0.06
+    assert result["candidates"][0]["edge"] == 0.30
 
 
 def test_coordinated_signal_uses_hybrid_probability_for_edge(monkeypatch):
@@ -367,6 +367,33 @@ def test_adaptive_profile_blocks_expensive_5m_and_allows_15m(monkeypatch):
     assert result["candidates"][1]["passes_filters"] is True
 
 
+def test_legacy_profile_blocks_expensive_low_quality_entries(monkeypatch):
+    tool = PolymarketTool()
+
+    monkeypatch.setattr(tool, "_base_urls", lambda: ("https://gamma", "https://data", "https://clob"))
+    monkeypatch.setattr(
+        tool,
+        "_btc_updown_scalping_signal",
+        lambda gamma, clob, **kwargs: {
+            "signals": [
+                {"interval": "5m", "preferred_side": "Up", "confidence": 0.85, "hybrid_probability_up": 0.85},
+                {"interval": "15m", "preferred_side": "Up", "confidence": 0.82, "hybrid_probability_up": 0.82},
+            ],
+            "markets": [
+                {"interval": "5m", "seconds_to_close": 180, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.70", "size": "10"}, "best_ask": {"price": "0.72", "size": "5"}}}]},
+                {"interval": "15m", "seconds_to_close": 720, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.74", "size": "10"}, "best_ask": {"price": "0.76", "size": "5"}}}]},
+            ],
+        },
+    )
+
+    result = tool.run(action="btc_updown_5m15m_coordinated_signal", role="trader", strategy_profile="legacy")
+
+    assert result["action"] == "NO_TRADE"
+    assert result["strategy_profile"] == "legacy"
+    assert "ask_too_expensive" in result["candidates"][0]["reasons"]
+    assert "edge_too_small" in result["candidates"][1]["reasons"]
+
+
 def test_target_75_blocks_15m_when_5m_strongly_disagrees(monkeypatch):
     tool = PolymarketTool()
 
@@ -432,8 +459,8 @@ def test_independent_signal_allows_direction_conflict(monkeypatch):
                 {"interval": "15m", "preferred_side": "Down", "confidence": 0.84, "meets_threshold": True, "prophet": {"up_probability": 0.16}},
             ],
             "markets": [
-                {"interval": "5m", "seconds_to_close": 180, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.76", "size": "10"}, "best_ask": {"price": "0.80", "size": "5"}}}]},
-                {"interval": "15m", "seconds_to_close": 720, "tokens": [{"outcome": "Down", "book": {"best_bid": {"price": "0.75", "size": "10"}, "best_ask": {"price": "0.79", "size": "5"}}}]},
+                {"interval": "5m", "seconds_to_close": 180, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.54", "size": "10"}, "best_ask": {"price": "0.58", "size": "5"}}}]},
+                {"interval": "15m", "seconds_to_close": 720, "tokens": [{"outcome": "Down", "book": {"best_bid": {"price": "0.54", "size": "10"}, "best_ask": {"price": "0.58", "size": "5"}}}]},
             ],
         },
     )

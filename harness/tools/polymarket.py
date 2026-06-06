@@ -951,7 +951,7 @@ class PolymarketTool(BaseTool):
         min_seconds_to_close: int,
         profile: str,
     ) -> dict[str, dict]:
-        legacy = {
+        base = {
             'threshold': threshold,
             'min_edge': min_edge,
             'max_spread': max_spread,
@@ -961,11 +961,30 @@ class PolymarketTool(BaseTool):
             'expensive_ask_threshold': 1.0,
         }
         if profile in {'legacy', 'classic'}:
-            return {'5m': dict(legacy), '15m': dict(legacy)}
+            return {
+                '5m': {
+                    **base,
+                    'threshold': max(threshold, 0.84),
+                    'min_edge': max(min_edge, 0.10),
+                    'max_spread': min(max_spread, 0.06),
+                    'max_ask': 0.62,
+                    'expensive_ask_threshold': 0.94,
+                    'min_seconds_to_close': max(min_seconds_to_close, 90),
+                },
+                '15m': {
+                    **base,
+                    'threshold': max(threshold, 0.80),
+                    'min_edge': max(min_edge, 0.08),
+                    'max_spread': min(max_spread, 0.06),
+                    'max_ask': 0.66,
+                    'expensive_ask_threshold': 0.92,
+                    'min_seconds_to_close': max(min_seconds_to_close, 150),
+                },
+            }
         if profile in {'adaptive', 'adaptive_5m15m', 'catalog', 'balanced'}:
             return {
                 '5m': {
-                    **legacy,
+                    **base,
                     'threshold': max(threshold, 0.82),
                     'min_edge': max(min_edge, 0.10),
                     'max_ask': 0.60,
@@ -973,7 +992,7 @@ class PolymarketTool(BaseTool):
                     'min_seconds_to_close': max(min_seconds_to_close, 75),
                 },
                 '15m': {
-                    **legacy,
+                    **base,
                     'threshold': max(min(threshold, 0.78), 0.76),
                     'min_edge': max(min_edge, 0.06),
                     'max_ask': 0.65,
@@ -984,7 +1003,7 @@ class PolymarketTool(BaseTool):
         if profile in {'target_75', 'high_accuracy'}:
             return {
                 '5m': {
-                    **legacy,
+                    **base,
                     'threshold': max(threshold, 0.90),
                     'min_edge': max(min_edge, 0.16),
                     'max_spread': min(max_spread, 0.05),
@@ -993,7 +1012,7 @@ class PolymarketTool(BaseTool):
                     'min_seconds_to_close': max(min_seconds_to_close, 105),
                 },
                 '15m': {
-                    **legacy,
+                    **base,
                     'threshold': max(threshold, 0.84),
                     'min_edge': max(min_edge, 0.10),
                     'max_spread': min(max_spread, 0.06),
@@ -1006,7 +1025,7 @@ class PolymarketTool(BaseTool):
         if profile in {'five_scalp_conservative', '5m_conservative'}:
             return {
                 '5m': {
-                    **legacy,
+                    **base,
                     'threshold': max(threshold, 0.88),
                     'min_edge': max(min_edge, 0.14),
                     'max_spread': min(max_spread, 0.05),
@@ -1014,13 +1033,13 @@ class PolymarketTool(BaseTool):
                     'expensive_ask_threshold': 0.94,
                     'min_seconds_to_close': max(min_seconds_to_close, 90),
                 },
-                '15m': {**legacy, 'enabled': False},
+                '15m': {**base, 'enabled': False},
             }
         if profile in {'fifteen_confirmed', '15m_confirmed'}:
             return {
-                '5m': {**legacy, 'enabled': False},
+                '5m': {**base, 'enabled': False},
                 '15m': {
-                    **legacy,
+                    **base,
                     'threshold': max(threshold, 0.80),
                     'min_edge': max(min_edge, 0.08),
                     'max_spread': min(max_spread, 0.06),
@@ -1033,7 +1052,7 @@ class PolymarketTool(BaseTool):
         if profile in {'research_ml', 'experimental_ml'}:
             return {
                 '5m': {
-                    **legacy,
+                    **base,
                     'threshold': max(min(threshold, 0.74), 0.72),
                     'min_edge': max(min_edge, 0.04),
                     'max_spread': max(max_spread, 0.10),
@@ -1042,7 +1061,7 @@ class PolymarketTool(BaseTool):
                     'min_seconds_to_close': max(min_seconds_to_close, 45),
                 },
                 '15m': {
-                    **legacy,
+                    **base,
                     'threshold': max(min(threshold, 0.74), 0.72),
                     'min_edge': max(min_edge, 0.04),
                     'max_spread': max(max_spread, 0.10),

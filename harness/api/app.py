@@ -621,7 +621,7 @@ def _write_paper_trading_config(config: dict[str, Any]) -> None:
 def _default_polymarket_rules() -> dict[str, Any]:
     return {
         "polymarket_btc_updown": {
-            "trade": ["enabled=true", "catalogo de perfiles: target_75, 5m conservador, 15m confirmado, research_ml, adaptive_5m15m", "target_75: menos trades, mayor exigencia de confianza/edge/precio", "5m conservative: solo scalping 5m barato", "15m confirmed: opera 15m si 5m no contradice fuerte", "research_ml: exploracion observe/paper con filtros mas abiertos", "spread/ask_size/one_trade_per_event_window"],
+            "trade": ["enabled=true", "catalogo de perfiles: target_75, 5m conservador, 15m confirmado, research_ml, adaptive_5m15m, legacy saneado", "legacy saneado: bloquea entradas caras, edge flojo, spread amplio y cierres demasiado cercanos", "target_75: menos trades, mayor exigencia de confianza/edge/precio", "5m conservative: solo scalping 5m barato", "15m confirmed: opera 15m si 5m no contradice fuerte", "research_ml: exploracion observe/paper con filtros mas abiertos", "spread/ask_size/one_trade_per_event_window"],
             "stake": ["manual fixed stake configurable between 0.1 and 100 USDT", "presets 1/2/3 remain available", "no martingale", "no averaging down"],
             "exit": ["SL: liquidate after configured window percent if PnL remains negative", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop defaults to 75% of window when PnL remains negative"],
             "prediction": ["hybrid Chainlink nowcast + technical probability drives edge/Kelly", "optional invert switch: Down becomes Up and Up becomes Down before order sizing"],
