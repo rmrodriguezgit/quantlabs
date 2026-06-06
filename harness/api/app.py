@@ -569,7 +569,7 @@ def _paper_trading_config_path() -> Path:
 
 POLYMARKET_STAKE_MIN = 0.1
 POLYMARKET_STAKE_MAX = 100.0
-POLYMARKET_STRATEGY_PROFILES = {"legacy", "adaptive_5m15m"}
+POLYMARKET_STRATEGY_PROFILES = {"legacy", "adaptive_5m15m", "target_75", "five_scalp_conservative", "fifteen_confirmed", "research_ml"}
 
 
 def _bounded_percent(value: Any, default: float, minimum: float, maximum: float) -> float:
@@ -621,7 +621,7 @@ def _write_paper_trading_config(config: dict[str, Any]) -> None:
 def _default_polymarket_rules() -> dict[str, Any]:
     return {
         "polymarket_btc_updown": {
-            "trade": ["enabled=true", "adaptive_5m15m profile", "5m: confidence>=0.82 edge>=0.10 ask<=0.60 unless confidence>=0.92", "15m: confidence>=0.76 edge>=0.06 ask<=0.65 unless confidence>=0.90", "spread<=0.08", "ask_size>=1", "one_trade_per_event_window"],
+            "trade": ["enabled=true", "catalogo de perfiles: target_75, 5m conservador, 15m confirmado, research_ml, adaptive_5m15m", "target_75: menos trades, mayor exigencia de confianza/edge/precio", "5m conservative: solo scalping 5m barato", "15m confirmed: opera 15m si 5m no contradice fuerte", "research_ml: exploracion observe/paper con filtros mas abiertos", "spread/ask_size/one_trade_per_event_window"],
             "stake": ["manual fixed stake configurable between 0.1 and 100 USDT", "presets 1/2/3 remain available", "no martingale", "no averaging down"],
             "exit": ["SL: liquidate after configured window percent if PnL remains negative", "TP: liquidate when position value is up 100% or more, e.g. 3.00 -> 6.00 USDT", "manual liquidation button remains available per trade", "time stop defaults to 75% of window when PnL remains negative"],
             "prediction": ["hybrid Chainlink nowcast + technical probability drives edge/Kelly", "optional invert switch: Down becomes Up and Up becomes Down before order sizing"],

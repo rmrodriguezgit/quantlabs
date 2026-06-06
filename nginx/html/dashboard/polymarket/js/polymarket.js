@@ -198,7 +198,15 @@ function friendlyError(value = '') {
 function syncControlSummary() {
   const invert = '';
   const err = controlState.lastError ? ` ${friendlyError(controlState.lastError)}` : '';
-  const profile = controlState.strategyProfile === 'adaptive_5m15m' ? 'Adaptivo' : 'Legacy';
+  const profileLabels = {
+    target_75:'Target 75%',
+    fifteen_confirmed:'15m confirmado',
+    five_scalp_conservative:'5m conservador',
+    adaptive_5m15m:'Adaptivo',
+    research_ml:'Research ML',
+    legacy:'Legacy'
+  };
+  const profile = profileLabels[controlState.strategyProfile] || controlState.strategyProfile;
   $('rulesNote').textContent = `${profile}: confianza ${controlState.threshold.toFixed(2)}, edge ${controlState.minEdge.toFixed(2)}, spread ${controlState.maxSpread.toFixed(2)}, profundidad ${controlState.minAskSize}, cierre ${controlState.minSecondsToClose}s. SL ${controlState.timeStop}% ventana. TP +${controlState.tp}%.${invert}${liveGateHint()}${err}`;
 }
 function applyLiveGateAvailability() {

@@ -24,7 +24,7 @@ class PaperTradingTool(BaseTool):
             'filters': ['volume_ratio', 'EMA50', 'Bollinger bands', 'ATR/risk'],
         },
         'polymarket_btc_updown': {
-            'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'legacy or adaptive_5m15m strategy_profile', '5m adaptive: confidence>=0.82, edge>=0.10, ask<=0.60 unless confidence>=0.92, seconds_to_close>=75', '15m adaptive: confidence>=0.76, edge>=0.06, ask<=0.65 unless confidence>=0.90, seconds_to_close>=90', 'spread<=0.08', 'ask_size>=1', 'one_trade_per_event_window'],
+            'trade': ['manual_enabled=true', 'mode in observe/paper/live', 'strategy_profile catalog: target_75, five_scalp_conservative, fifteen_confirmed, research_ml, adaptive_5m15m, legacy', 'target_75: confidence/edge/ask filters estrictos para buscar mayor precision con baja frecuencia', 'five_scalp_conservative: solo 5m, entradas baratas y edge alto', 'fifteen_confirmed: solo 15m, bloquea si 5m contradice fuerte', 'research_ml: filtros abiertos para observe/paper y dataset', 'spread/ask_size/one_trade_per_event_window'],
             'risk': ['stake fixed manually at 1/2/3 USDT', 'max one trade per 5m/15m window', 'live requires server flag plus UI enablement', 'price_to_beat=Chainlink candle open'],
             'prediction': ['hybrid Chainlink nowcast + technical probability drives edge/Kelly', 'optional invert switch flips UP/DOWN before order sizing'],
             'exit': ['stop_loss_time_75_when_window_elapsed_and_pnl_negative', 'take_profit_when_position_value_gain>=100pct (3.00 -> 6.00 USDT)', 'manual_liquidation_button_per_trade', 'time stop: after 75% of the window, liquidate if PnL remains negative', 'auto_claim_redeemable_profit_when_claim_relayer_configured'],

@@ -367,6 +367,58 @@ def test_adaptive_profile_blocks_expensive_5m_and_allows_15m(monkeypatch):
     assert result["candidates"][1]["passes_filters"] is True
 
 
+def test_target_75_blocks_15m_when_5m_strongly_disagrees(monkeypatch):
+    tool = PolymarketTool()
+
+    monkeypatch.setattr(tool, "_base_urls", lambda: ("https://gamma", "https://data", "https://clob"))
+    monkeypatch.setattr(
+        tool,
+        "_btc_updown_scalping_signal",
+        lambda gamma, clob, **kwargs: {
+            "signals": [
+                {"interval": "5m", "preferred_side": "Down", "confidence": 0.74, "hybrid_probability_up": 0.26},
+                {"interval": "15m", "preferred_side": "Up", "confidence": 0.88, "hybrid_probability_up": 0.88},
+            ],
+            "markets": [
+                {"interval": "5m", "seconds_to_close": 180, "tokens": [{"outcome": "Down", "book": {"best_bid": {"price": "0.30", "size": "10"}, "best_ask": {"price": "0.42", "size": "5"}}}]},
+                {"interval": "15m", "seconds_to_close": 720, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.44", "size": "10"}, "best_ask": {"price": "0.50", "size": "5"}}}]},
+            ],
+        },
+    )
+
+    result = tool.run(action="btc_updown_5m15m_coordinated_signal", role="trader", strategy_profile="target_75")
+
+    assert result["action"] == "NO_TRADE"
+    assert "cross_window_conflict" in result["candidates"][1]["reasons"]
+
+
+def test_five_scalp_conservative_disables_15m(monkeypatch):
+    tool = PolymarketTool()
+
+    monkeypatch.setattr(tool, "_base_urls", lambda: ("https://gamma", "https://data", "https://clob"))
+    monkeypatch.setattr(
+        tool,
+        "_btc_updown_scalping_signal",
+        lambda gamma, clob, **kwargs: {
+            "signals": [
+                {"interval": "5m", "preferred_side": "Up", "confidence": 0.90, "hybrid_probability_up": 0.90},
+                {"interval": "15m", "preferred_side": "Up", "confidence": 0.95, "hybrid_probability_up": 0.95},
+            ],
+            "markets": [
+                {"interval": "5m", "seconds_to_close": 180, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.43", "size": "10"}, "best_ask": {"price": "0.48", "size": "5"}}}]},
+                {"interval": "15m", "seconds_to_close": 720, "tokens": [{"outcome": "Up", "book": {"best_bid": {"price": "0.42", "size": "10"}, "best_ask": {"price": "0.48", "size": "5"}}}]},
+            ],
+        },
+    )
+
+    result = tool.run(action="btc_updown_5m15m_coordinated_signal", role="trader", strategy_profile="five_scalp_conservative")
+
+    assert result["action"] == "TRADE"
+    assert result["candidates"][0]["passes_filters"] is True
+    assert result["candidates"][1]["passes_filters"] is False
+    assert "strategy_interval_disabled" in result["candidates"][1]["reasons"]
+
+
 def test_independent_signal_allows_direction_conflict(monkeypatch):
     tool = PolymarketTool()
 

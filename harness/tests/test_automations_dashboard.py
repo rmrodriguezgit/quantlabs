@@ -61,5 +61,5 @@ def test_paper_trading_config_accepts_custom_stake(tmp_path, monkeypatch):
     assert payload["stake_min"] == 0.1
     assert payload["stake_max"] == 100.0
     assert payload["allowed_stakes"] == [1, 2, 3]
-    assert payload["allowed_strategy_profiles"] == ["adaptive_5m15m", "legacy"]
+    assert payload["allowed_strategy_profiles"] == ["adaptive_5m15m", "fifteen_confirmed", "five_scalp_conservative", "legacy", "research_ml", "target_75"]
     assert payload["polymarket_strategy_profile"] == "adaptive_5m15m"

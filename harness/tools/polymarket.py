@@ -240,6 +240,8 @@ class PolymarketTool(BaseTool):
             probability = self._side_probability(signal, preferred)
             edge = probability - micro['ask'] if probability is not None and micro.get('ask') is not None else None
             reasons = []
+            if not profile.get('enabled', True):
+                reasons.append('strategy_interval_disabled')
             if probability is None or probability < profile['threshold']:
                 reasons.append('confidence_below_threshold')
             if preferred not in {'Up', 'Down'}:
@@ -279,6 +281,7 @@ class PolymarketTool(BaseTool):
                 'passes_filters': not reasons,
                 'reasons': reasons,
             })
+        self._apply_cross_window_profile_guards(candidates, strategy_profile)
         passing = [c for c in candidates if c['passes_filters']]
         passing_sides = {c.get('preferred_side') for c in passing if c.get('preferred_side') in {'Up', 'Down'}}
         action = 'TRADE' if passing else 'NO_TRADE'
@@ -959,7 +962,7 @@ class PolymarketTool(BaseTool):
         }
         if profile in {'legacy', 'classic'}:
             return {'5m': dict(legacy), '15m': dict(legacy)}
-        if profile in {'adaptive', 'adaptive_5m15m', 'catalog'}:
+        if profile in {'adaptive', 'adaptive_5m15m', 'catalog', 'balanced'}:
             return {
                 '5m': {
                     **legacy,
@@ -978,7 +981,93 @@ class PolymarketTool(BaseTool):
                     'min_seconds_to_close': max(min_seconds_to_close, 90),
                 },
             }
-        raise ValueError('strategy_profile must be legacy or adaptive_5m15m')
+        if profile in {'target_75', 'high_accuracy'}:
+            return {
+                '5m': {
+                    **legacy,
+                    'threshold': max(threshold, 0.90),
+                    'min_edge': max(min_edge, 0.16),
+                    'max_spread': min(max_spread, 0.05),
+                    'max_ask': 0.52,
+                    'expensive_ask_threshold': 0.95,
+                    'min_seconds_to_close': max(min_seconds_to_close, 105),
+                },
+                '15m': {
+                    **legacy,
+                    'threshold': max(threshold, 0.84),
+                    'min_edge': max(min_edge, 0.10),
+                    'max_spread': min(max_spread, 0.06),
+                    'max_ask': 0.58,
+                    'expensive_ask_threshold': 0.93,
+                    'min_seconds_to_close': max(min_seconds_to_close, 180),
+                    'require_5m_not_against': True,
+                },
+            }
+        if profile in {'five_scalp_conservative', '5m_conservative'}:
+            return {
+                '5m': {
+                    **legacy,
+                    'threshold': max(threshold, 0.88),
+                    'min_edge': max(min_edge, 0.14),
+                    'max_spread': min(max_spread, 0.05),
+                    'max_ask': 0.55,
+                    'expensive_ask_threshold': 0.94,
+                    'min_seconds_to_close': max(min_seconds_to_close, 90),
+                },
+                '15m': {**legacy, 'enabled': False},
+            }
+        if profile in {'fifteen_confirmed', '15m_confirmed'}:
+            return {
+                '5m': {**legacy, 'enabled': False},
+                '15m': {
+                    **legacy,
+                    'threshold': max(threshold, 0.80),
+                    'min_edge': max(min_edge, 0.08),
+                    'max_spread': min(max_spread, 0.06),
+                    'max_ask': 0.62,
+                    'expensive_ask_threshold': 0.92,
+                    'min_seconds_to_close': max(min_seconds_to_close, 180),
+                    'require_5m_not_against': True,
+                },
+            }
+        if profile in {'research_ml', 'experimental_ml'}:
+            return {
+                '5m': {
+                    **legacy,
+                    'threshold': max(min(threshold, 0.74), 0.72),
+                    'min_edge': max(min_edge, 0.04),
+                    'max_spread': max(max_spread, 0.10),
+                    'max_ask': 0.70,
+                    'expensive_ask_threshold': 0.88,
+                    'min_seconds_to_close': max(min_seconds_to_close, 45),
+                },
+                '15m': {
+                    **legacy,
+                    'threshold': max(min(threshold, 0.74), 0.72),
+                    'min_edge': max(min_edge, 0.04),
+                    'max_spread': max(max_spread, 0.10),
+                    'max_ask': 0.70,
+                    'expensive_ask_threshold': 0.88,
+                    'min_seconds_to_close': max(min_seconds_to_close, 45),
+                },
+            }
+        raise ValueError('strategy_profile must be one of legacy, adaptive_5m15m, target_75, five_scalp_conservative, fifteen_confirmed or research_ml')
+
+    def _apply_cross_window_profile_guards(self, candidates: list[dict], strategy_profile: str) -> None:
+        if strategy_profile not in {'target_75', 'high_accuracy', 'fifteen_confirmed', '15m_confirmed'}:
+            return
+        by_interval = {str(candidate.get('interval')).lower(): candidate for candidate in candidates}
+        five = by_interval.get('5m') or {}
+        fifteen = by_interval.get('15m') or {}
+        if not fifteen or not fifteen.get('passes_filters'):
+            return
+        five_side = five.get('preferred_side')
+        fifteen_side = fifteen.get('preferred_side')
+        five_probability = self._float_or_none(five.get('probability') or five.get('confidence'))
+        if five_side in {'Up', 'Down'} and fifteen_side in {'Up', 'Down'} and five_side != fifteen_side and (five_probability or 0) >= 0.70:
+            reasons = fifteen.setdefault('reasons', [])
+            reasons.append('cross_window_conflict')
+            fifteen['passes_filters'] = False
 
     def _side_microstructure(self, market: dict, side: str | None):
         for token in market.get('tokens') or []:
