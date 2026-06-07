@@ -1,0 +1,10 @@
+[Unit]
+Description=Run QuantLabs night low-power mode at 23:00
+
+[Timer]
+OnCalendar=*-*-* 23:00:00
+Persistent=true
+Unit=quantlab-night-mode.service
+
+[Install]
+WantedBy=timers.target

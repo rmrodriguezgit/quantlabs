@@ -1,0 +1,8 @@
+[Unit]
+Description=QuantLabs day operating mode
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/quantlab/quantlab-ai-capital/deploy/systemd/quantlab-power-mode.sh day

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run QuantLabs day operating mode at 07:00
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+Persistent=true
+Unit=quantlab-day-mode.service
+
+[Install]
+WantedBy=timers.target
