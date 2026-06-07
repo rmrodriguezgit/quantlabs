@@ -30,6 +30,7 @@
     {href:'/dashboard/bitaxe/', icon:'⛏️', label:'BitAxe Miner'},
     {href:'/dashboard/harness/', icon:'🧠', label:'Agent Harness'},
     {href:'/dashboard/ocean/', icon:'∿', label:'OCEAN'},
+    {href:'/dashboard/documents/', icon:'□', label:'Documents'},
     {href:'/dashboard/polymarket/', icon:'▰', label:'Polymarket Live'},
     {href:'/dashboard/validation/', icon:'✓', label:'Validation'}
   ];
