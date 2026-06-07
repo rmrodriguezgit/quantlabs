@@ -1019,6 +1019,33 @@ def update_agents_rules():
     return jsonify(paper_trading_rules_payload())
 
 
+@app.post('/v1/document-intelligence/process')
+@require_auth({'admin', 'teacher', 'trader'})
+def document_intelligence_process():
+    data = request.get_json(force=True)
+    try:
+        result = tools.execute(
+            "document_intelligence",
+            role=request.identity.get("role"),
+            user_id=request.identity["user_id"],
+            file_id=data.get("file_id"),
+            path=data.get("path"),
+            language=data.get("language") or "spa",
+            dry_run=data.get("dry_run", True),
+        ).model_dump()
+    except (FileNotFoundError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
+    return jsonify(result)
+
+
+@app.get('/v1/document-intelligence/rules')
+@require_auth({'admin', 'teacher', 'trader'})
+def document_intelligence_rules():
+    return jsonify(tools.execute("document_intelligence", role=request.identity.get("role"), action="rules").model_dump())
+
+
 @app.get('/v1/agents/report')
 @require_auth({'admin', 'teacher', 'trader'})
 def agents_report():
