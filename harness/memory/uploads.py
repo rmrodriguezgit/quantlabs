@@ -21,17 +21,22 @@ class UploadStore:
         self.root = Path(settings.upload_root); self.root.mkdir(parents=True, exist_ok=True)
     def _user_root(self, user_id):
         path = self.root / user_key(user_id); path.mkdir(parents=True, exist_ok=True); return path
-    def save(self, user_id, file):
+    def save(self, user_id, file, scope="general"):
         original = file.filename or "archivo"; safe = secure_filename(original); ext = safe.rsplit(".",1)[-1].lower() if "." in safe else ""
         if ext not in ALLOWED_EXTENSIONS: raise ValueError("tipo de archivo no permitido")
         file_id=str(uuid.uuid4()); user_root=self._user_root(user_id); path=user_root/f"{file_id}.{ext}"; file.save(path)
-        meta={"id":file_id,"owner_id":user_key(user_id),"name":safe,"ext":ext,"size":path.stat().st_size,"path":str(path),"created_at":datetime.utcnow().isoformat()+"Z"}
+        meta={"id":file_id,"owner_id":user_key(user_id),"scope":self._safe_scope(scope),"name":safe,"ext":ext,"size":path.stat().st_size,"path":str(path),"created_at":datetime.utcnow().isoformat()+"Z"}
         meta['summary']=self._summarize(path, ext)
         (user_root/f"{file_id}.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False)); return meta
-    def list(self, user_id):
+    def list(self, user_id, scope="general"):
         out=[]
+        expected=self._safe_scope(scope) if scope else None
         for meta in self._user_root(user_id).glob("*.json"):
-            try: out.append(json.loads(meta.read_text()))
+            try:
+                item=json.loads(meta.read_text())
+                item_scope=item.get("scope") or "general"
+                if expected and item_scope != expected: continue
+                out.append(item)
             except Exception: pass
         return sorted(out,key=lambda x:x.get("created_at",""),reverse=True)
     def get(self, user_id, file_id):
@@ -45,10 +50,14 @@ class UploadStore:
         for file_id in file_ids[:5]:
             meta=self.get(user_id,file_id)
             if not meta: continue
+            if (meta.get("scope") or "general") == "escola": continue
             intro=f"Archivo adjunto: {meta['name']} ({meta['ext']}, {meta['size']} bytes)"
             summary=meta.get('summary') or self._summarize(Path(meta['path']), meta['ext'])
             chunks.append(intro+'\n'+summary)
         return '\n\n'.join(chunks)
+    def _safe_scope(self, scope):
+        value=str(scope or "general").strip().lower()
+        return value if value in {"general","escola"} else "general"
     def _summarize(self, path: Path, ext: str):
         try:
             if ext in {'txt','md','json'}:

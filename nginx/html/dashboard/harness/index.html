@@ -89,7 +89,7 @@
           </div>
           <div id="messages" class="messages"></div>
           <div id="attachments" class="attachments"></div>
-          <div id="attachmentPreview" class="attachment-preview empty">Selecciona un archivo adjunto para ver qué entendió Hermes.</div>
+          <button id="openAttachmentPreview" class="attachment-preview-trigger" type="button">Ver qué entendió Hermes</button>
           <form id="chatForm">
             <input id="fileInput" type="file" hidden multiple>
             <button id="attachBtn" type="button" class="attach-btn" title="Agregar archivos">＋</button>
@@ -112,6 +112,19 @@
     <div id="sidePanelBody" class="side-panel-body"></div>
   </aside>
   <div id="panelBackdrop" class="panel-backdrop"></div>
+  <div id="attachmentModal" class="attachment-modal" aria-hidden="true">
+    <div class="attachment-modal-backdrop" data-close-attachment></div>
+    <section class="attachment-modal-panel">
+      <div class="attachment-modal-head">
+        <div>
+          <p class="eyebrow">Archivo adjunto</p>
+          <h2>Qué entendió Hermes</h2>
+        </div>
+        <button class="panel-close" type="button" data-close-attachment>×</button>
+      </div>
+      <div id="attachmentPreview" class="attachment-preview empty">Selecciona un archivo adjunto para ver qué entendió Hermes.</div>
+    </section>
+  </div>
   <script src="../js/theme.js?v=20260531-theme-1"></script>
   <script>
     (function(){

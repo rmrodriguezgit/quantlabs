@@ -9,6 +9,7 @@ const short = (value, n = 90) => {
 let selectedFile = null;
 let lastCopy = '';
 let lastEvidence = [];
+let responseCopies = [];
 
 async function jsonFetch(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, {
@@ -25,6 +26,7 @@ async function jsonFetch(path, options = {}) {
 async function uploadFile(file) {
   const body = new FormData();
   body.append('file', file);
+  body.append('scope', 'escola');
   const response = await fetch(`${apiBase}/files`, {
     method: 'POST',
     credentials: 'same-origin',
@@ -90,14 +92,15 @@ function renderQuery(payload) {
   const answer = result.answer || {};
   const evidence = result.evidence || [];
   lastCopy = result.copy_ready || '';
+  const copyId = responseCopies.push(lastCopy) - 1;
   lastEvidence = evidence;
   renderStats(result.stats || {});
   renderEvidence(evidence);
-  addMessage('assistant', renderAssistantMarkdown(result, answer, evidence));
+  addMessage('assistant', renderAssistantMarkdown(result, answer, evidence, copyId));
   setStatus('Respuesta lista');
 }
 
-function renderAssistantMarkdown(result, answer, evidence) {
+function renderAssistantMarkdown(result, answer, evidence, copyId) {
   const pending = answer.pending?.length ? answer.pending.join(', ') : 'Ninguno';
   return `
     <div class="markdown-view">
@@ -113,7 +116,7 @@ function renderAssistantMarkdown(result, answer, evidence) {
         </tbody>
       </table>
       <div class="inline-actions">
-        <button class="small-action" type="button" data-copy-last>Copiar Markdown</button>
+        <button class="small-action icon-action" type="button" data-copy-response="${copyId}" title="Copiar respuesta" aria-label="Copiar respuesta">⧉</button>
         <button class="small-action" type="button" data-open-evidence>Ver evidencia (${evidence.length})</button>
       </div>
     </div>
@@ -197,6 +200,12 @@ async function copyOutput() {
   $('copyBtn').textContent = 'Copiado';
   setTimeout(() => { $('copyBtn').textContent = 'Copiar salida'; }, 1200);
 }
+async function copyResponse(index) {
+  const text = responseCopies[Number(index)];
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
+  setStatus('Respuesta copiada');
+}
 
 function autosizeQuestion() {
   const input = $('questionInput');
@@ -229,7 +238,8 @@ function bind() {
   });
   document.addEventListener('click', event => {
     if (event.target.matches('[data-close-modal]')) closeModals();
-    if (event.target.matches('[data-copy-last]')) copyOutput();
+    const copyButton = event.target.closest('[data-copy-response]');
+    if (copyButton) copyResponse(copyButton.dataset.copyResponse);
     if (event.target.matches('[data-open-evidence]')) openModal('evidenceModal');
   });
   document.addEventListener('keydown', event => {

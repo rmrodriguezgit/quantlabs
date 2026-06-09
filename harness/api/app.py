@@ -1112,7 +1112,7 @@ def upload_file():
     if not file or not file.filename:
         return jsonify({'error': 'archivo requerido'}), 400
     try:
-        return jsonify({'file': uploads.save(request.identity['user_id'], file)}), 201
+        return jsonify({'file': uploads.save(request.identity['user_id'], file, scope=request.form.get('scope') or 'general')}), 201
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
 
@@ -1120,7 +1120,7 @@ def upload_file():
 @app.get('/v1/files')
 @require_auth({'admin', 'teacher', 'trader'})
 def list_files():
-    return jsonify({'files': uploads.list(request.identity['user_id'])})
+    return jsonify({'files': uploads.list(request.identity['user_id'], scope=request.args.get('scope') or 'general')})
 
 
 @app.delete('/v1/files/<file_id>')

@@ -10,7 +10,7 @@ const el={
   responseStatus:document.getElementById('responseStatus'), tokenUsage:document.getElementById('tokenUsage'), diagnosticPanel:document.getElementById('diagnosticPanel'),
   searchNav:document.getElementById('searchNav'), pluginsNav:document.getElementById('pluginsNav'), automationsNav:document.getElementById('automationsNav'), artifactsNav:document.getElementById('artifactsNav'), projectNav:document.getElementById('projectNav'),
   chatSearch:document.getElementById('chatSearch'), sidePanel:document.getElementById('sidePanel'), sidePanelTitle:document.getElementById('sidePanelTitle'), sidePanelKicker:document.getElementById('sidePanelKicker'), sidePanelBody:document.getElementById('sidePanelBody'), closeSidePanel:document.getElementById('closeSidePanel'), panelBackdrop:document.getElementById('panelBackdrop'),
-  modelStatusPill:document.getElementById('modelStatusPill')
+  modelStatusPill:document.getElementById('modelStatusPill'), openAttachmentPreview:document.getElementById('openAttachmentPreview'), attachmentModal:document.getElementById('attachmentModal')
 };
 const AGENTS={
   planner:{icon:'🧭',label:'Planner',className:'agent-planner'},
@@ -373,7 +373,26 @@ async function autoTitleFromFirstPrompt(message){
 function renderAttachments(){
   if(!el.attachments)return;
   el.attachments.innerHTML=attachedFiles.map(f=>`<span class="attachment-chip ${f.id===selectedFileId?'active':''} ${activeFileIds.has(f.id)?'in-context':''}" data-preview-id="${f.id}"><label><input type="checkbox" data-context-id="${f.id}" ${activeFileIds.has(f.id)?'checked':''}> contexto</label>📎 ${esc(f.name)}<button data-id="${f.id}" title="Borrar archivo">✕</button></span>`).join('');
-  renderAttachmentPreview(selectedFileId?attachedFiles.find(f=>f.id===selectedFileId):attachedFiles[0]);
+  const current=selectedFileId?attachedFiles.find(f=>f.id===selectedFileId):attachedFiles[0];
+  if(current)selectedFileId=current.id;
+  updateAttachmentPreviewButton(current);
+}
+function updateAttachmentPreviewButton(file){
+  if(!el.openAttachmentPreview)return;
+  el.openAttachmentPreview.disabled=!file;
+  el.openAttachmentPreview.textContent=file?`Ver qué entendió Hermes · ${file.name}`:'Selecciona un archivo para ver qué entendió Hermes';
+  [...el.attachments.children].forEach(ch=>ch.classList.toggle('active',Boolean(file&&ch.dataset.previewId===file.id)));
+}
+function openAttachmentModal(file){
+  renderAttachmentPreview(file||attachedFiles.find(f=>f.id===selectedFileId)||attachedFiles[0]);
+  if(!el.attachmentModal)return;
+  el.attachmentModal.classList.add('open');
+  el.attachmentModal.setAttribute('aria-hidden','false');
+}
+function closeAttachmentModal(){
+  if(!el.attachmentModal)return;
+  el.attachmentModal.classList.remove('open');
+  el.attachmentModal.setAttribute('aria-hidden','true');
 }
 function renderAttachmentPreview(file){
   if(!el.attachmentPreview)return;
@@ -381,7 +400,7 @@ function renderAttachmentPreview(file){
   selectedFileId=file.id;
   el.attachmentPreview.className='attachment-preview';
   el.attachmentPreview.innerHTML=`<div class="preview-head"><strong>📎 ${esc(file.name)}</strong><span>${esc(file.ext||'archivo')} · ${(file.size||0).toLocaleString()} bytes · ${activeFileIds.has(file.id)?'en contexto':'fuera de contexto'}</span></div><pre>${esc(file.summary||'Sin vista previa disponible todavía.')}</pre>`;
-  [...el.attachments.children].forEach(ch=>ch.classList.toggle('active',ch.dataset.previewId===file.id));
+  updateAttachmentPreviewButton(file);
 }
 function renderContext(meta={}){if(!el.contextStats)return;const used=meta.last_prompt_tokens||0, windowSize=meta.context_window||16384, generated=meta.last_completion_tokens||0, total=meta.tokens_generated_total||0, pct=Math.min(100,Math.round((used/windowSize)*100));el.contextStats.innerHTML=`<div class="context-kpi"><small>Ventana de contexto</small><strong>${used.toLocaleString()} / ${windowSize.toLocaleString()}</strong><div class="context-bar"><span style="width:${pct}%"></span></div></div><div class="context-kpi"><small>Tokens generados · última respuesta</small><strong>${generated.toLocaleString()}</strong></div><div class="context-kpi"><small>Tokens generados · sesión</small><strong>${total.toLocaleString()}</strong></div>`}
 function renderModelStatus(data={}){
@@ -453,8 +472,11 @@ el.attachments.onclick=async e=>{
   if(e.target.matches('[data-context-id]')){
     const id=e.target.dataset.contextId; if(e.target.checked) activeFileIds.add(id); else activeFileIds.delete(id); renderAttachments(); return;
   }
-  const chip=e.target.closest('[data-preview-id]'); if(chip){selectedFileId=chip.dataset.previewId;renderAttachmentPreview(attachedFiles.find(f=>f.id===selectedFileId));}
+  const chip=e.target.closest('[data-preview-id]'); if(chip){selectedFileId=chip.dataset.previewId;openAttachmentModal(attachedFiles.find(f=>f.id===selectedFileId));}
 };
+if(el.openAttachmentPreview)el.openAttachmentPreview.onclick=()=>openAttachmentModal(attachedFiles.find(f=>f.id===selectedFileId)||attachedFiles[0]);
+document.addEventListener('click',e=>{if(e.target.matches('[data-close-attachment]'))closeAttachmentModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAttachmentModal()});
 
 function setActiveNav(button){[el.searchNav,el.pluginsNav,el.automationsNav,el.artifactsNav,el.projectNav].forEach(b=>b?.classList.remove('active'));button?.classList.add('active')}
 function openPanel(kind,title,html){el.sidePanelKicker.textContent=kind;el.sidePanelTitle.textContent=title;el.sidePanelBody.innerHTML=html;el.sidePanel.classList.add('open');el.panelBackdrop.classList.add('open');el.sidePanel.setAttribute('aria-hidden','false')}
