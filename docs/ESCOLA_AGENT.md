@@ -77,41 +77,28 @@ GET /v1/escola/rules
 
 ## Salida
 
-La respuesta incluye `formatted_json` y `copy_ready`. `copy_ready` está pensado
-para pegar directamente en chats, reportes o documentos: primero muestra el JSON
-formateado y después tablas Markdown.
+La respuesta API conserva `formatted_json` para integraciones, pero la salida
+principal `copy_ready` está pensada para pegar directamente en chats, reportes o
+documentos: muestra encabezados, texto en negritas y evidencia humanizada, sin
+volcar el JSON de la base NoSQL ni separadores de tabla crudos.
 
 ````markdown
 # ESCOLA
 
-## JSON
-```json
-{
-  "agente": "ESCOLA",
-  "consulta": "...",
-  "resultado": {
-    "resumen": "...",
-    "respuesta": "...",
-    "confianza": "media",
-    "pendientes": []
-  },
-  "evidencia": []
-}
-```
-
 ## Respuesta
-| Campo | Valor |
-| --- | --- |
-| Consulta | ... |
-| Resumen | ... |
-| Respuesta | ... |
-| Confianza | media |
-| Pendientes | Ninguno |
+**Consulta:** ...
 
-## Evidencia
-| Archivo | Score | Fragmento |
-| --- | --- | --- |
-| archivo.pdf | 0.42 | ... |
+**Resumen:** ...
+
+**Respuesta:**
+...
+
+**Confianza:** media
+
+**Pendientes:** Ninguno
+
+## Evidencia consultada
+1. archivo.pdf (score 0.42): ...
 ````
 
 ## Seguridad

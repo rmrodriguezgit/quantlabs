@@ -30,12 +30,34 @@ def test_escola_ingests_upload_and_returns_copy_ready_answer(tmp_path, monkeypat
     assert ingest["chunks"] >= 1
     assert result["agent"] == "ESCOLA"
     assert result["formatted_json"]["agente"] == "ESCOLA"
-    assert "## JSON" in result["copy_ready"]
-    assert "```json" in result["copy_ready"]
-    assert "| Campo | Valor |" in result["copy_ready"]
-    assert "| Archivo | Score | Fragmento |" in result["copy_ready"]
+    assert "**Consulta:**" in result["copy_ready"]
+    assert "## Evidencia consultada" in result["copy_ready"]
     assert "Modulo Becas" in result["copy_ready"]
+    assert "## JSON" not in result["copy_ready"]
+    assert "```json" not in result["copy_ready"]
+    assert "| --- |" not in result["copy_ready"]
     assert result["evidence"]
+
+
+def test_escola_humanizes_json_fragments_in_copy_ready(tmp_path, monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "upload_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    meta = _upload_text(
+        "admin-user",
+        "base.json",
+        '{"programas":{"lan":{"programa":"Licenciatura en Administración de Negocios","modalidad":"Escolar","anio":2025,"semestres":[{"semestre":5,"claves_materias":["LAN538","LAN539"]}]}}}',
+    )
+
+    supervisor = EscolaSupervisor()
+    supervisor.ingest_upload("admin-user", meta["id"], tags=["planes"])
+    result = supervisor.query("Que programa LAN aparece?")
+
+    assert "Licenciatura en Administración de Negocios" in result["copy_ready"]
+    assert '"programas"' not in result["copy_ready"]
+    assert "{ \"programas\"" not in result["copy_ready"]
+    assert "| --- |" not in result["copy_ready"]
 
 
 def test_escola_tool_requires_admin_for_ingest(tmp_path, monkeypatch):

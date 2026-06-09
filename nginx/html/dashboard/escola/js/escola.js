@@ -99,13 +99,10 @@ function renderQuery(payload) {
 
 function renderAssistantMarkdown(result, answer, evidence) {
   const pending = answer.pending?.length ? answer.pending.join(', ') : 'Ninguno';
-  const formatted = result.formatted_json || {};
   return `
     <div class="markdown-view">
       <h2>ESCOLA</h2>
       <p>${esc(answer.summary || 'Respuesta generada con la base documental.')}</p>
-      <h3>JSON</h3>
-      <pre class="code-block"><code>${esc(JSON.stringify(formatted, null, 2))}</code></pre>
       <h3>Respuesta</h3>
       <table>
         <tbody>

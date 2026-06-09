@@ -119,7 +119,7 @@ class EscolaSupervisor:
                     "document_id": item["document_id"],
                     "chunk_id": item["id"],
                     "score": item["score"],
-                    "preview": item["text"][:420],
+                    "preview": self._humanize_fragment(item["text"])[:420],
                 }
                 for item in chunks
             ],
@@ -160,7 +160,7 @@ class EscolaSupervisor:
             "storage": "jsonl",
             "supports": ["pdf", "docx", "csv", "xls", "xlsx", "txt", "md", "json", "ipynb", "png", "jpg", "jpeg"],
             "actions": ["ingest", "query", "list", "stats"],
-            "copy_format": ["JSON formateado", "Tabla Markdown de respuesta", "Tabla Markdown de evidencia", "Pendientes"],
+            "copy_format": ["Respuesta ChatGPT", "Bullets de evidencia", "Pendientes"],
             "safety": [
                 "no ejecuta acciones externas",
                 "no modifica documentos fuente",
@@ -186,8 +186,16 @@ class EscolaSupervisor:
                 "pending": ["Ingestar documentos fuente"],
             }
         key_terms = [term for term in self._tokens(question) if term not in STOP_WORDS][:8]
-        snippets = [self._best_sentence(item["text"], key_terms) for item in chunks[:4]]
-        snippets = [snippet for snippet in snippets if snippet]
+        snippets = []
+        seen = set()
+        for item in chunks[:8]:
+            snippet = self._best_sentence(item["text"], key_terms)
+            fingerprint = snippet.lower()[:140]
+            if snippet and fingerprint not in seen:
+                snippets.append(snippet)
+                seen.add(fingerprint)
+            if len(snippets) >= 4:
+                break
         confidence = "alta" if chunks[0]["score"] >= 0.42 else "media" if chunks[0]["score"] >= 0.25 else "baja"
         return {
             "summary": f"ESCOLA encontro {len(chunks)} fragmento(s) relevantes en la base documental.",
@@ -212,45 +220,36 @@ class EscolaSupervisor:
                     "document_id": item["document_id"],
                     "chunk": item["metadata"].get("chunk_index"),
                     "score": item["score"],
-                    "preview": self._clean(item["text"][:260]),
+                    "preview": self._humanize_fragment(item["text"])[:260],
                 }
                 for item in chunks[:6]
             ],
         }
 
     def _copy_ready(self, result: dict[str, Any]) -> str:
-        payload = result.get("formatted_json") or {}
         answer = result.get("answer") or {}
         evidence = result.get("evidence") or []
-        response_rows = [
-            ("Consulta", result.get("question")),
-            ("Resumen", answer.get("summary")),
-            ("Respuesta", answer.get("response")),
-            ("Confianza", answer.get("confidence")),
-            ("Pendientes", "; ".join(answer.get("pending") or ["Ninguno"])),
-        ]
-        evidence_rows = [
-            (
-                item.get("filename") or item.get("document_id"),
-                item.get("score"),
-                self._clean(item.get("preview", ""))[:220],
-            )
-            for item in evidence[:6]
-        ]
+        response = self._format_response_for_copy(answer.get("response") or "--")
+        pending = "; ".join(answer.get("pending") or ["Ninguno"])
+        evidence_lines = [
+            f"{idx}. {item.get('filename') or item.get('document_id')} (score {item.get('score')}): {self._clean(item.get('preview', ''))[:260]}"
+            for idx, item in enumerate(evidence[:6], start=1)
+        ] or ["1. Sin evidencia disponible."]
         return (
             "# ESCOLA\n\n"
-            "## JSON\n"
-            "```json\n"
-            f"{json.dumps(payload, indent=2, ensure_ascii=False)}\n"
-            "```\n\n"
             "## Respuesta\n"
-            f"{self._markdown_table(['Campo', 'Valor'], response_rows)}\n\n"
-            "## Evidencia\n"
-            f"{self._markdown_table(['Archivo', 'Score', 'Fragmento'], evidence_rows or [('Sin evidencia', '--', '--')])}"
+            f"**Consulta:** {self._clean(result.get('question'))}\n\n"
+            f"**Resumen:** {self._clean(answer.get('summary'))}\n\n"
+            f"**Respuesta:**\n{response}\n\n"
+            f"**Confianza:** {self._clean(answer.get('confidence'))}\n\n"
+            f"**Pendientes:** {pending}\n\n"
+            "## Evidencia consultada\n"
+            + "\n".join(evidence_lines)
         )
 
     def _best_sentence(self, text: str, terms: list[str]) -> str:
-        sentences = re.split(r"(?<=[.!?])\s+|\n+", str(text or ""))
+        human_text = self._humanize_fragment(text)
+        sentences = re.split(r"(?<=[.!?])\s+|\n+", human_text)
         best = ""
         best_score = -1
         for sentence in sentences:
@@ -262,6 +261,60 @@ class EscolaSupervisor:
                 best = clean
                 best_score = score
         return best[:520]
+
+    def _humanize_fragment(self, text: str) -> str:
+        value = self._clean(str(text or "").replace("Contenido extraído:", ""))
+        if not value:
+            return ""
+        parsed = self._try_parse_jsonish(value)
+        if parsed:
+            return parsed
+        if value.count("{") + value.count("[") + value.count('"') > 8:
+            return self._summarize_jsonish_text(value)
+        return value
+
+    def _try_parse_jsonish(self, value: str) -> str | None:
+        try:
+            payload = json.loads(value)
+        except Exception:
+            return None
+        return self._summarize_structured(payload)
+
+    def _summarize_structured(self, payload: Any) -> str:
+        items = []
+        priority = ("nombre", "institucion", "facultad", "programa", "modalidad", "anio", "documento", "descripcion")
+        if isinstance(payload, dict):
+            for key in priority:
+                if payload.get(key) not in (None, "", [], {}):
+                    items.append(f"{key}: {payload[key]}")
+            programas = payload.get("programas")
+            if isinstance(programas, dict):
+                names = [self._clean((program or {}).get("programa", key)) for key, program in list(programas.items())[:6]]
+                if names:
+                    items.append("programas: " + ", ".join(names))
+        return ". ".join(items)[:900] if items else self._summarize_jsonish_text(json.dumps(payload, ensure_ascii=False))
+
+    def _summarize_jsonish_text(self, value: str) -> str:
+        priority = ("nombre", "institucion", "facultad", "programa", "modalidad", "anio", "documento", "descripcion", "semestre", "clave", "materia")
+        pairs = []
+        for key in priority:
+            pattern = rf'"{re.escape(key)}"\s*:\s*("([^"]{{1,180}})"|[0-9]{{1,4}})'
+            for match in re.finditer(pattern, value, flags=re.IGNORECASE):
+                raw = match.group(2) or match.group(1)
+                clean = self._clean(raw.strip('"'))
+                if clean and f"{key}: {clean}" not in pairs:
+                    pairs.append(f"{key}: {clean}")
+                if len(pairs) >= 10:
+                    break
+            if len(pairs) >= 10:
+                break
+        claves = re.findall(r'"([A-Z]{2,8}[0-9A-Z]{2,6})"', value)
+        if claves:
+            pairs.append("claves detectadas: " + ", ".join(dict.fromkeys(claves[:12])))
+        if pairs:
+            return ". ".join(pairs)[:900]
+        readable = re.sub(r"[{}\[\]\",:]+", " ", value)
+        return self._clean(readable)[:900]
 
     def _chunk_text(self, text: str, max_chars: int = 1400, overlap: int = 180) -> list[str]:
         clean = self._clean(text)
@@ -298,6 +351,13 @@ class EscolaSupervisor:
     def _escape_markdown_cell(self, value: Any) -> str:
         text = self._clean(value)
         return text.replace("|", "\\|").replace("\n", "<br>")
+
+    def _format_response_for_copy(self, value: Any) -> str:
+        lines = [self._clean(line) for line in str(value or "").splitlines()]
+        lines = [line for line in lines if line]
+        if not lines:
+            return "--"
+        return "\n".join(lines)
 
     def _append_jsonl(self, path: Path, item: dict[str, Any]) -> None:
         with path.open("a", encoding="utf-8") as handle:
