@@ -114,6 +114,17 @@ def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypa
                 {"clave": "LARHUA", "nombre": "Humanismo en Acción", "creditos": 3}
               ]
             }]
+          }, {
+            "_id": "lan",
+            "programa": "Licenciatura en Administración de Negocios",
+            "total_semestres": 1,
+            "semestres": [{
+              "semestre": 1,
+              "materias": [
+                {"clave": "LANRDS", "nombre": "Radiografía Social", "creditos": 3},
+                {"clave": "LAN107", "nombre": "Contabilidad Financiera", "creditos": 7}
+              ]
+            }]
           }],
           "materias": [{
             "_id": "materia_larrds",
@@ -132,7 +143,7 @@ def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypa
 
     manager = EscolaDatabaseManager()
     imported = manager.import_file(db_file, name="facultad")
-    assert imported["stats"]["programas"] == 1
+    assert imported["stats"]["programas"] == 2
 
     supervisor = EscolaSupervisor(artifact_root := tmp_path / "artifacts")
     subjects = supervisor.query("Dame todas las materias de la licenciatura en Actuaría")
@@ -149,6 +160,14 @@ def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypa
     first_semester = supervisor.query("Materias de Actuaría de Primer Semestre")
     assert "Semestre 1" in first_semester["answer"]["response"]
     assert "Semestre 2" not in first_semester["answer"]["response"]
+
+    program_plan = supervisor.query("Licenciatura Administración de Negocios")
+    assert program_plan["answer"]["source"] == "database"
+    assert "Licenciatura en Administración de Negocios" in program_plan["answer"]["response"]
+    assert "Semestre 1" in program_plan["answer"]["response"]
+    assert "LANRDS: Radiografía Social · 3 créditos" in program_plan["answer"]["response"]
+    assert "programas" not in program_plan["answer"]["response"]
+    assert "valor_corregido" not in program_plan["answer"]["response"]
 
     content = supervisor.query("Dame el contenido de LARRDS")
     assert "Comprender la realidad social" in content["answer"]["response"]

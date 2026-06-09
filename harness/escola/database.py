@@ -79,7 +79,7 @@ class EscolaDatabaseManager:
             return None
         program_id = self._detect_program(lowered, data)
         semester_number = self._detect_semester(lowered)
-        if any(term in lowered for term in ["materia", "materias", "semestre", "plan", "curricular"]) and program_id:
+        if self._asks_for_program_plan(lowered, program_id):
             return self._answer_program_subjects(data, program_id, semester_number=semester_number)
         if any(term in lowered for term in ["optativa", "optativas", "ingles", "inglés", "frances", "francés", "idioma"]):
             return self._answer_optatives(data, program_id)
@@ -196,6 +196,22 @@ class EscolaDatabaseManager:
             if name and name in lowered:
                 return program.get("_id")
         return None
+
+    def _asks_for_program_plan(self, lowered: str, program_id: str | None) -> bool:
+        if not program_id:
+            return False
+        plan_terms = [
+            "carrera",
+            "licenciatura",
+            "materia",
+            "materias",
+            "semestre",
+            "plan",
+            "curricular",
+            "mapa",
+            "programa",
+        ]
+        return any(term in lowered for term in plan_terms)
 
     def _detect_subject(self, lowered: str, data: dict[str, Any]) -> dict[str, Any] | None:
         subjects = data.get("materias") or []
