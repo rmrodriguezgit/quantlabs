@@ -12,14 +12,15 @@ from .dexter_research import DexterResearchTool
 from .jupyter_gpu import JupyterGPUTool
 from .file_analyst import FileAnalystTool
 from .document_intelligence import DocumentIntelligenceTool
+from .escola import EscolaTool
 
 
 class ToolRegistry:
     allowed_by_role = {
         'guest': {'financial', 'web_api', 'polymarket', 'deep_research', 'dexter_research'},
-        'admin': {'shell', 'python', 'file', 'docker', 'financial', 'web_api', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'dexter_research', 'jupyter_gpu', 'file_analyst', 'document_intelligence'},
-        'teacher': {'python', 'file', 'financial', 'web_api', 'docker', 'polymarket', 'deep_research', 'dexter_research', 'jupyter_gpu', 'file_analyst', 'document_intelligence'},
-        'trader': {'python', 'file', 'financial', 'web_api', 'docker', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'dexter_research', 'jupyter_gpu', 'file_analyst', 'document_intelligence'},
+        'admin': {'shell', 'python', 'file', 'docker', 'financial', 'web_api', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'dexter_research', 'jupyter_gpu', 'file_analyst', 'document_intelligence', 'escola'},
+        'teacher': {'python', 'file', 'financial', 'web_api', 'docker', 'polymarket', 'deep_research', 'dexter_research', 'jupyter_gpu', 'file_analyst', 'document_intelligence', 'escola'},
+        'trader': {'python', 'file', 'financial', 'web_api', 'docker', 'mexc_spot', 'polymarket', 'paper_trading', 'deep_research', 'dexter_research', 'jupyter_gpu', 'file_analyst', 'document_intelligence', 'escola'},
     }
 
     def __init__(self):
@@ -40,6 +41,7 @@ class ToolRegistry:
                 JupyterGPUTool(),
                 FileAnalystTool(),
                 DocumentIntelligenceTool(),
+                EscolaTool(),
             ]
         }
 

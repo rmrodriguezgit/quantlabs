@@ -1047,6 +1047,58 @@ def document_intelligence_rules():
     return jsonify(tools.execute("document_intelligence", role=request.identity.get("role"), action="rules").model_dump())
 
 
+@app.post('/v1/escola/ingest')
+@require_auth({'admin'})
+def escola_ingest():
+    data = request.get_json(force=True)
+    try:
+        result = tools.execute(
+            "escola",
+            role=request.identity.get("role"),
+            user_id=request.identity["user_id"],
+            action="ingest",
+            file_id=data.get("file_id"),
+            tags=data.get("tags") or [],
+        ).model_dump()
+    except (FileNotFoundError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
+    return jsonify(result)
+
+
+@app.post('/v1/escola/query')
+@require_auth({'admin', 'teacher', 'trader'})
+def escola_query():
+    data = request.get_json(force=True)
+    try:
+        result = tools.execute(
+            "escola",
+            role=request.identity.get("role"),
+            user_id=request.identity["user_id"],
+            action="query",
+            question=data.get("question") or data.get("query") or "",
+            top_k=data.get("top_k") or 6,
+        ).model_dump()
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
+    return jsonify(result)
+
+
+@app.get('/v1/escola/documents')
+@require_auth({'admin', 'teacher', 'trader'})
+def escola_documents():
+    return jsonify(tools.execute("escola", role=request.identity.get("role"), action="list").model_dump())
+
+
+@app.get('/v1/escola/rules')
+@require_auth({'admin', 'teacher', 'trader'})
+def escola_rules():
+    return jsonify(tools.execute("escola", role=request.identity.get("role"), action="rules").model_dump())
+
+
 @app.get('/v1/agents/report')
 @require_auth({'admin', 'teacher', 'trader'})
 def agents_report():

@@ -31,6 +31,7 @@
     {href:'/dashboard/harness/', icon:'🧠', label:'Agent Harness'},
     {href:'/dashboard/ocean/', icon:'∿', label:'OCEAN'},
     {href:'/dashboard/documents/', icon:'□', label:'Documents'},
+    {href:'/dashboard/escola/', icon:'◇', label:'ESCOLA'},
     {href:'/dashboard/polymarket/', icon:'▰', label:'Polymarket Live'},
     {href:'/dashboard/validation/', icon:'✓', label:'Validation'}
   ];
