@@ -3,6 +3,7 @@ from io import BytesIO
 from werkzeug.datastructures import FileStorage
 
 from escola import EscolaSupervisor
+from escola.database import EscolaDatabaseManager
 from memory.uploads import UploadStore
 from tools.registry import ToolRegistry
 
@@ -86,6 +87,56 @@ def test_escola_lists_actuaria_subjects_by_semester(tmp_path, monkeypatch):
     assert "LAR105: Prácticas Preliminares de la Profesión" in result["answer"]["response"]
     assert "Semestre 2" in result["answer"]["response"]
     assert "LARHUA: Humanismo en Acción" in result["answer"]["response"]
+
+
+def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    db_file = tmp_path / "bd.json"
+    db_file.write_text(
+        """
+        {
+          "_meta": {"nombre": "BD Facultad"},
+          "programas": [{
+            "_id": "actuaria",
+            "programa": "Licenciatura en Actuaría",
+            "total_semestres": 1,
+            "semestres": [{
+              "semestre": 1,
+              "materias": [
+                {"clave": "LARRDS", "nombre": "Radiografía Social", "creditos": 3},
+                {"clave": "LARTHC", "nombre": "Taller de Habilidades Comunicativas", "creditos": 5}
+              ]
+            }]
+          }],
+          "materias": [{
+            "_id": "materia_larrds",
+            "programa_id": "actuaria",
+            "clave": "LARRDS",
+            "nombre": "Radiografía Social",
+            "semestre": 1,
+            "fines_aprendizaje": "Comprender la realidad social.",
+            "unidades": [{"numero_romano": "I", "nombre": "INDIVIDUO Y SOCIEDAD", "temas": [{"numero": "1.1", "nombre": "Marco conceptual"}]}]
+          }],
+          "optativas": []
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    manager = EscolaDatabaseManager()
+    imported = manager.import_file(db_file, name="facultad")
+    assert imported["stats"]["programas"] == 1
+
+    supervisor = EscolaSupervisor(artifact_root := tmp_path / "artifacts")
+    subjects = supervisor.query("Dame todas las materias de la licenciatura en Actuaría")
+    assert subjects["answer"]["source"] == "database"
+    assert "LARRDS: Radiografía Social · 3 créditos" in subjects["answer"]["response"]
+
+    content = supervisor.query("Dame el contenido de LARRDS")
+    assert "Comprender la realidad social" in content["answer"]["response"]
+    assert "1.1: Marco conceptual" in content["answer"]["response"]
 
 
 def test_escola_tool_requires_admin_for_ingest(tmp_path, monkeypatch):

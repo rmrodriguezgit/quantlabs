@@ -12,6 +12,7 @@ from typing import Any
 
 from config import settings
 from memory.uploads import UploadStore
+from .database import EscolaDatabaseManager
 
 
 TOKEN_RE = re.compile(r"[\wáéíóúñüÁÉÍÓÚÑÜ-]{3,}", re.IGNORECASE)
@@ -55,6 +56,7 @@ class EscolaSupervisor:
         self.audit_path = self.root / "audit.jsonl"
         self.root.mkdir(parents=True, exist_ok=True)
         self.uploads = UploadStore()
+        self.database = EscolaDatabaseManager(root)
 
     def ingest_upload(self, user_id: str, file_id: str, tags: list[str] | None = None) -> dict[str, Any]:
         meta = self.uploads.get(user_id, file_id)
@@ -132,6 +134,7 @@ class EscolaSupervisor:
             raise ValueError("question required")
         chunks = self.search(clean_question, top_k=top_k)
         answer = self._compose_answer(clean_question, chunks)
+        source = answer.get("source") or "rag"
         result = {
             "agent": "ESCOLA",
             "question": clean_question,
@@ -148,6 +151,7 @@ class EscolaSupervisor:
                 for item in chunks
             ],
             "stats": self.stats(),
+            "source": source,
             "created_at": datetime.now(UTC).isoformat(),
         }
         result["copy_ready"] = self._copy_ready(result) if copy_ready else None
@@ -174,6 +178,7 @@ class EscolaSupervisor:
             "documents": len(documents),
             "chunks": len(chunks),
             "path": str(self.root),
+            "database": self.database.stats(),
             "updated_at": documents[0].get("created_at") if documents else None,
         }
 
@@ -184,6 +189,7 @@ class EscolaSupervisor:
             "storage": "jsonl",
             "supports": ["pdf", "docx", "csv", "xls", "xlsx", "txt", "md", "json", "ipynb", "png", "jpg", "jpeg"],
             "actions": ["ingest", "query", "list", "stats"],
+            "database_actions": ["database_import", "database_stats"],
             "copy_format": ["Respuesta ChatGPT", "Bullets de evidencia", "Pendientes"],
             "safety": [
                 "no ejecuta acciones externas",
@@ -203,12 +209,18 @@ class EscolaSupervisor:
 
     def _compose_answer(self, question: str, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         if not chunks:
+            database_answer = self.database.answer(question)
+            if database_answer:
+                return database_answer
             return {
                 "summary": "No encontre evidencia indexada para responder.",
                 "response": "Sube e ingesta archivos del programa antes de consultar ESCOLA.",
                 "confidence": "baja",
                 "pending": ["Ingestar documentos fuente"],
             }
+        database_answer = self.database.answer(question)
+        if database_answer:
+            return database_answer
         structured = self._academic_subjects_answer(question)
         if structured:
             return structured

@@ -48,6 +48,7 @@ function parseTags() {
 function renderStats(stats = {}) {
   $('docsMetric').textContent = stats.documents ?? '--';
   $('chunksMetric').textContent = stats.chunks ?? '--';
+  if (stats.database) renderDatabase(stats.database);
 }
 
 function openModal(id) {
@@ -74,6 +75,38 @@ function renderDocuments(payload) {
       <p>${esc(doc.chunks)} chunks · ${esc((doc.tags || []).join(', ') || 'sin tags')}</p>
     </div>
   `).join('') : '<div class="empty">Sin documentos indexados.</div>';
+}
+
+function renderDatabase(payload = {}) {
+  const stats = payload.stats || {};
+  $('dbStatus').textContent = payload.active ? `${stats.nombre || 'BD activa'}` : 'Sin BD activa';
+  $('dbStats').innerHTML = payload.active ? `
+    <div class="answer-card"><small>Programas</small><strong>${esc(stats.programas ?? 0)}</strong></div>
+    <div class="answer-card"><small>Materias</small><strong>${esc(stats.materias ?? 0)}</strong></div>
+    <div class="answer-card"><small>Optativas</small><strong>${esc(stats.optativas ?? 0)}</strong></div>
+  ` : '<div class="empty">Importa la BD NoSQL para consultas estructuradas.</div>';
+}
+
+async function refreshDatabase() {
+  const data = await jsonFetch('/escola/database');
+  renderDatabase(data.output || data);
+}
+
+async function importDatabase() {
+  try {
+    $('importDbBtn').disabled = true;
+    setStatus('Importando BD NoSQL');
+    const result = await jsonFetch('/escola/database/import', {
+      method: 'POST',
+      body: JSON.stringify({path: $('dbPathInput').value.trim(), name: 'facultad_negocios'})
+    });
+    renderDatabase({active: true, stats: result.output?.stats || {}});
+    setStatus('BD NoSQL integrada');
+  } catch (error) {
+    setStatus(`BD: ${error.message}`);
+  } finally {
+    $('importDbBtn').disabled = false;
+  }
 }
 
 function addMessage(role, content) {
@@ -222,6 +255,8 @@ function bind() {
     document.querySelector('.drop-zone').classList.add('ready');
   });
   $('ingestBtn').addEventListener('click', handleIngest);
+  $('refreshDbBtn').addEventListener('click', refreshDatabase);
+  $('importDbBtn').addEventListener('click', importDatabase);
   $('queryForm').addEventListener('submit', handleQuery);
   $('copyBtn').addEventListener('click', copyOutput);
   $('openAdminBtn').addEventListener('click', () => openModal('adminModal'));
@@ -248,6 +283,7 @@ function bind() {
   refreshDocuments().catch(error => {
     setStatus(`ESCOLA: ${error.message}`);
   });
+  refreshDatabase().catch(() => {});
 }
 
 bind();

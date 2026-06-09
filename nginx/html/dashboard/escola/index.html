@@ -60,8 +60,14 @@
 <div id="adminModal" class="modal" aria-hidden="true">
   <div class="modal-backdrop" data-close-modal></div>
   <section class="modal-panel">
-    <div class="modal-head"><div><p>ADMIN</p><h2>Ingesta ESCOLA</h2></div><button class="small-action" type="button" data-close-modal>Cerrar</button></div>
+    <div class="modal-head"><div><p>ADMIN</p><h2>Gestor ESCOLA</h2></div><button class="small-action" type="button" data-close-modal>Cerrar</button></div>
     <div class="modal-body">
+      <section class="db-manager">
+        <div class="db-head"><div><small>BD NoSQL</small><strong id="dbStatus">Sin BD activa</strong></div><button id="refreshDbBtn" class="small-action" type="button">Actualizar</button></div>
+        <label class="field"><small>Ruta en servidor</small><input id="dbPathInput" type="text" value="/app/storage/artifacts/escola/databases/bd_facultad_negocios_nosql.json"></label>
+        <button id="importDbBtn" class="primary-action" type="button">Importar BD NoSQL</button>
+        <div id="dbStats" class="db-stats"></div>
+      </section>
       <div class="admin-state"><span id="ingestState">IDLE</span></div>
       <label class="drop-zone" for="escolaFile">
         <input id="escolaFile" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,.csv,.xls,.xlsx,.txt,.md,.json,.ipynb">

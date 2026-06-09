@@ -17,6 +17,8 @@ class EscolaTool(BaseTool):
         question: str | None = None,
         tags: list[str] | None = None,
         top_k: int = 6,
+        path: str | None = None,
+        name: str | None = None,
         **_,
     ):
         if role not in {"admin", "teacher", "trader"}:
@@ -27,6 +29,14 @@ class EscolaTool(BaseTool):
             return supervisor.rules()
         if action == "stats":
             return supervisor.stats()
+        if action == "database_stats":
+            return supervisor.database.stats()
+        if action == "database_import":
+            if role != "admin":
+                raise PermissionError("escola database import requires admin role")
+            if not path:
+                raise ValueError("path required")
+            return supervisor.database.import_file(path, name=name)
         if action == "list":
             return {"documents": supervisor.list_documents(), "stats": supervisor.stats()}
         if action == "ingest":

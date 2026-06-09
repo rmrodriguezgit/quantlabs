@@ -1093,6 +1093,31 @@ def escola_documents():
     return jsonify(tools.execute("escola", role=request.identity.get("role"), action="list").model_dump())
 
 
+@app.get('/v1/escola/database')
+@require_auth({'admin', 'teacher', 'trader'})
+def escola_database():
+    return jsonify(tools.execute("escola", role=request.identity.get("role"), action="database_stats").model_dump())
+
+
+@app.post('/v1/escola/database/import')
+@require_auth({'admin'})
+def escola_database_import():
+    data = request.get_json(force=True)
+    try:
+        result = tools.execute(
+            "escola",
+            role=request.identity.get("role"),
+            action="database_import",
+            path=data.get("path"),
+            name=data.get("name"),
+        ).model_dump()
+    except (FileNotFoundError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
+    return jsonify(result)
+
+
 @app.get('/v1/escola/rules')
 @require_auth({'admin', 'teacher', 'trader'})
 def escola_rules():
