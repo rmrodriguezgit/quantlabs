@@ -101,12 +101,17 @@ def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypa
           "programas": [{
             "_id": "actuaria",
             "programa": "Licenciatura en Actuaría",
-            "total_semestres": 1,
+            "total_semestres": 2,
             "semestres": [{
               "semestre": 1,
               "materias": [
                 {"clave": "LARRDS", "nombre": "Radiografía Social", "creditos": 3},
                 {"clave": "LARTHC", "nombre": "Taller de Habilidades Comunicativas", "creditos": 5}
+              ]
+            }, {
+              "semestre": 2,
+              "materias": [
+                {"clave": "LARHUA", "nombre": "Humanismo en Acción", "creditos": 3}
               ]
             }]
           }],
@@ -133,6 +138,17 @@ def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypa
     subjects = supervisor.query("Dame todas las materias de la licenciatura en Actuaría")
     assert subjects["answer"]["source"] == "database"
     assert "LARRDS: Radiografía Social · 3 créditos" in subjects["answer"]["response"]
+
+    semester = supervisor.query("Materias de Actuaría de Semestre 1")
+    assert semester["answer"]["source"] == "database"
+    assert "Semestre 1" in semester["answer"]["response"]
+    assert "LARRDS: Radiografía Social · 3 créditos" in semester["answer"]["response"]
+    assert "Semestre 2" not in semester["answer"]["response"]
+    assert "LARHUA" not in semester["answer"]["response"]
+
+    first_semester = supervisor.query("Materias de Actuaría de Primer Semestre")
+    assert "Semestre 1" in first_semester["answer"]["response"]
+    assert "Semestre 2" not in first_semester["answer"]["response"]
 
     content = supervisor.query("Dame el contenido de LARRDS")
     assert "Comprender la realidad social" in content["answer"]["response"]

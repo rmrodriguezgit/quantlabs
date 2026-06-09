@@ -159,8 +159,33 @@ function renderAssistantMarkdown(result, answer, evidence, copyId) {
 function renderResponseList(value) {
   const lines = String(value || '').split('\n').map(line => line.trim()).filter(Boolean);
   if (!lines.length) return '--';
-  if (lines.every(line => line.startsWith('- '))) {
-    return `<ul>${lines.map(line => `<li>${esc(line.replace(/^- /, ''))}</li>`).join('')}</ul>`;
+  let html = '';
+  let openList = false;
+  const closeList = () => {
+    if (openList) {
+      html += '</ul>';
+      openList = false;
+    }
+  };
+  lines.forEach((line, index) => {
+    if (line.startsWith('- ')) {
+      if (!openList) {
+        html += '<ul class="response-list">';
+        openList = true;
+      }
+      html += `<li>${esc(line.replace(/^- /, ''))}</li>`;
+      return;
+    }
+    closeList();
+    if (/^semestre\s+\d+/i.test(line)) {
+      html += `<h4>${esc(line)}</h4>`;
+    } else {
+      html += `<p class="${index === 0 ? 'response-title' : 'response-line'}">${esc(line)}</p>`;
+    }
+  });
+  closeList();
+  if (html) {
+    return `<div class="response-markdown">${html}</div>`;
   }
   return esc(lines.join('\n'));
 }

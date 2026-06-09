@@ -78,8 +78,9 @@ class EscolaDatabaseManager:
         if not lowered:
             return None
         program_id = self._detect_program(lowered, data)
+        semester_number = self._detect_semester(lowered)
         if any(term in lowered for term in ["materia", "materias", "semestre", "plan", "curricular"]) and program_id:
-            return self._answer_program_subjects(data, program_id)
+            return self._answer_program_subjects(data, program_id, semester_number=semester_number)
         if any(term in lowered for term in ["optativa", "optativas", "ingles", "inglés", "frances", "francés", "idioma"]):
             return self._answer_optatives(data, program_id)
         subject = self._detect_subject(lowered, data)
@@ -89,13 +90,21 @@ class EscolaDatabaseManager:
             return self._answer_database_summary(data)
         return None
 
-    def _answer_program_subjects(self, data: dict[str, Any], program_id: str) -> dict[str, Any]:
+    def _answer_program_subjects(
+        self,
+        data: dict[str, Any],
+        program_id: str,
+        semester_number: int | None = None,
+    ) -> dict[str, Any]:
         program = self._program_by_id(data, program_id)
         if not program:
             return None
         lines = [program.get("programa") or program_id]
         total = 0
-        for semester in program.get("semestres") or []:
+        semesters = program.get("semestres") or []
+        if semester_number is not None:
+            semesters = [semester for semester in semesters if self._as_int(semester.get("semestre")) == semester_number]
+        for semester in semesters:
             lines.append("")
             lines.append(f"Semestre {semester.get('semestre')}")
             for subject in semester.get("materias") or []:
@@ -103,11 +112,15 @@ class EscolaDatabaseManager:
                 credits = subject.get("creditos")
                 suffix = f" · {credits} créditos" if credits not in (None, "") else ""
                 lines.append(f"- {subject.get('clave')}: {subject.get('nombre')}{suffix}")
+        if semester_number is not None and not total:
+            lines.append("")
+            lines.append(f"No encontré materias para el semestre {semester_number}.")
+        summary_semester = f" del semestre {semester_number}" if semester_number is not None else ""
         return {
-            "summary": f"Se consultó la BD NoSQL académica: {program.get('programa')} con {total} materia(s).",
+            "summary": f"Se consultó la BD NoSQL académica: {program.get('programa')}{summary_semester} con {total} materia(s).",
             "response": "\n".join(lines),
             "confidence": "alta",
-            "pending": [],
+            "pending": [] if total else ["No se encontraron materias para el filtro solicitado."],
             "source": "database",
         }
 
@@ -197,11 +210,59 @@ class EscolaDatabaseManager:
                 return subject
         return None
 
+    def _detect_semester(self, lowered: str) -> int | None:
+        ordinal_map = {
+            "primer": 1,
+            "primero": 1,
+            "uno": 1,
+            "segundo": 2,
+            "dos": 2,
+            "tercer": 3,
+            "tercero": 3,
+            "tres": 3,
+            "cuarto": 4,
+            "cuatro": 4,
+            "quinto": 5,
+            "cinco": 5,
+            "sexto": 6,
+            "seis": 6,
+            "septimo": 7,
+            "séptimo": 7,
+            "siete": 7,
+            "octavo": 8,
+            "ocho": 8,
+            "noveno": 9,
+            "nueve": 9,
+            "decimo": 10,
+            "décimo": 10,
+            "diez": 10,
+        }
+        numeric_patterns = [
+            r"\bsemestre\s*(\d{1,2})\b",
+            r"\b(\d{1,2})\s*(?:er|ro|do|to|o)?\s*semestre\b",
+        ]
+        for pattern in numeric_patterns:
+            match = re.search(pattern, lowered)
+            if match:
+                number = self._as_int(match.group(1))
+                if number:
+                    return number
+        for word, number in ordinal_map.items():
+            if re.search(rf"\b{re.escape(word)}\s+semestre\b|\bsemestre\s+{re.escape(word)}\b", lowered):
+                return number
+        return None
+
     def _program_by_id(self, data: dict[str, Any], program_id: str) -> dict[str, Any] | None:
         for program in data.get("programas") or []:
             if program.get("_id") == program_id or program.get("codigo_origen") == program_id:
                 return program
         return None
+
+    def _as_int(self, value: Any) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def _stats_for_data(self, data: dict[str, Any]) -> dict[str, Any]:
         return {
