@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/style.css?v=20260531-logo">
-  <link rel="stylesheet" href="./css/escola.css?v=20260609-1">
+  <link rel="stylesheet" href="./css/escola.css?v=20260609-chat">
 </head>
 <body class="escola-page">
 <header>
@@ -22,59 +22,72 @@
 <div class="layout">
   <aside></aside>
   <main class="escola-shell">
-    <section class="escola-command fade">
+    <section class="chat-topbar fade">
       <div>
         <p class="eyebrow">ESCOLA RAG</p>
-        <h1>Base documental del programa</h1>
+        <h1>Consulta documental</h1>
       </div>
-      <div class="escola-metrics">
+      <div class="top-actions">
         <div class="metric"><span>Documentos</span><strong id="docsMetric">--</strong></div>
         <div class="metric"><span>Chunks</span><strong id="chunksMetric">--</strong></div>
-        <div class="metric"><span>Modo</span><strong id="modeMetric">RAG</strong></div>
+        <button id="openAdminBtn" class="ghost-action" type="button">Admin</button>
+        <button id="openEvidenceBtn" class="ghost-action" type="button">Evidencia</button>
+        <button id="copyBtn" class="primary-action slim" type="button">Copiar salida</button>
       </div>
     </section>
 
-    <section class="escola-grid fade">
-      <article class="panel ingest-panel">
-        <div class="panel-head"><div><p>ADMIN</p><h2>Ingesta</h2></div><span id="ingestState">IDLE</span></div>
-        <div class="panel-body">
-          <label class="drop-zone" for="escolaFile">
-            <input id="escolaFile" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,.csv,.xls,.xlsx,.txt,.md,.json,.ipynb">
-            <span id="fileName">Seleccionar archivo</span>
-            <small id="fileMeta">PDF, Excel, CSV, texto, imagen o notebook</small>
-          </label>
-          <label class="field"><small>Tags</small><input id="tagsInput" type="text" placeholder="programa, reglamento, becas"></label>
-          <button id="ingestBtn" class="primary-action" type="button">Subir e ingestar</button>
-          <div id="documentsList" class="documents-list"></div>
-        </div>
-      </article>
-
-      <article class="panel query-panel">
-        <div class="panel-head"><div><p>CONSULTA</p><h2>Inferencia</h2></div><span id="queryState">READY</span></div>
-        <div class="panel-body">
-          <textarea id="questionInput" class="question-input" rows="7" placeholder="Pregunta sobre el programa, reglamento, requisitos, casos o salidas esperadas."></textarea>
-          <div class="query-controls">
-            <label><small>Top K</small><input id="topK" type="number" min="1" max="12" value="6"></label>
-            <button id="queryBtn" class="primary-action" type="button">Consultar ESCOLA</button>
+    <section class="chat-stage fade">
+      <div id="chatStream" class="chat-stream">
+        <article class="message assistant">
+          <div class="avatar">E</div>
+          <div class="message-body">
+            <div class="markdown-view">
+              <h2>ESCOLA</h2>
+              <p>Haz una consulta sobre los documentos indexados. La respuesta se mostrara en formato visual, con JSON legible, tablas renderizadas y evidencia disponible en modal.</p>
+            </div>
           </div>
-          <div id="answerCards" class="answer-cards"></div>
-        </div>
-      </article>
-
-      <article class="panel copy-panel">
-        <div class="panel-head"><div><p>SALIDA</p><h2>Copiar y pegar</h2></div><button id="copyBtn" class="small-action" type="button">Copiar</button></div>
-        <pre id="copyBox" class="copy-box">Sin consulta.</pre>
-      </article>
-
-      <article class="panel evidence-panel">
-        <div class="panel-head"><div><p>EVIDENCIA</p><h2>Fragmentos</h2></div><span id="evidenceState">--</span></div>
-        <div id="evidenceList" class="evidence-list"></div>
-      </article>
+        </article>
+      </div>
+      <form id="queryForm" class="chat-composer">
+        <textarea id="questionInput" rows="1" placeholder="Pregunta sobre el programa, reglamento, requisitos, casos o salidas esperadas."></textarea>
+        <label class="topk-control"><span>Top K</span><input id="topK" type="number" min="1" max="12" value="6"></label>
+        <button id="queryBtn" class="primary-action send" type="submit">Enviar</button>
+      </form>
     </section>
   </main>
 </div>
+
+<div id="adminModal" class="modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close-modal></div>
+  <section class="modal-panel">
+    <div class="modal-head"><div><p>ADMIN</p><h2>Ingesta ESCOLA</h2></div><button class="small-action" type="button" data-close-modal>Cerrar</button></div>
+    <div class="modal-body">
+      <div class="admin-state"><span id="ingestState">IDLE</span></div>
+      <label class="drop-zone" for="escolaFile">
+        <input id="escolaFile" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,.csv,.xls,.xlsx,.txt,.md,.json,.ipynb">
+        <span id="fileName">Seleccionar archivo</span>
+        <small id="fileMeta">PDF, Excel, CSV, texto, imagen o notebook</small>
+      </label>
+      <label class="field"><small>Tags</small><input id="tagsInput" type="text" placeholder="programa, reglamento, becas"></label>
+      <button id="ingestBtn" class="primary-action" type="button">Subir e ingestar</button>
+      <div id="documentsList" class="documents-list"></div>
+    </div>
+  </section>
+</div>
+
+<div id="evidenceModal" class="modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close-modal></div>
+  <section class="modal-panel wide">
+    <div class="modal-head"><div><p>EVIDENCIA</p><h2>Fragmentos usados</h2></div><button class="small-action" type="button" data-close-modal>Cerrar</button></div>
+    <div class="modal-body">
+      <div id="evidenceState" class="evidence-count">Sin consulta</div>
+      <div id="evidenceList" class="evidence-list"></div>
+    </div>
+  </section>
+</div>
+
 <script src="../js/platform-menu.js?v=20260609-escola"></script>
 <script src="../js/session.js?v=20260517-user"></script>
-<script src="./js/escola.js?v=20260609-1"></script>
+<script src="./js/escola.js?v=20260609-chat"></script>
 </body>
 </html>
