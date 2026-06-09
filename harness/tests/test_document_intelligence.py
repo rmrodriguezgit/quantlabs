@@ -51,3 +51,26 @@ def test_document_intelligence_tool_requires_review_for_missing_client(tmp_path,
     assert result["verification"]["requires_human_review"] is True
     assert "cliente" in result["verification"]["missing_fields"]
     assert result["communication"]["status"] == "blocked"
+
+
+def test_document_intelligence_prompt_guidance_requires_missing_requested_fields(tmp_path):
+    document = tmp_path / "factura.txt"
+    document.write_text(
+        "Cliente: ACME SA de CV\n"
+        "Correo: contacto@acme.mx\n"
+        "Monto: $1,250.00\n",
+        encoding="utf-8",
+    )
+
+    result = DocumentIntelligenceSupervisor(artifact_root=tmp_path / "artifacts").process(
+        document,
+        extraction_prompt="Extrae cliente, correo, monto, fecha de vencimiento y folio.",
+    )
+
+    assert result["guidance"]["requested_fields"] == ["cliente", "correo", "fecha_vencimiento", "folio", "monto"]
+    assert result["guidance"]["prompt_field_hits"]["cliente"] is True
+    assert result["guidance"]["prompt_field_hits"]["fecha_vencimiento"] is False
+    assert result["guidance"]["prompt_field_hits"]["folio"] is False
+    assert result["verification"]["requires_human_review"] is True
+    assert "prompt_fields" in result["verification"]["missing_fields"]
+    assert result["verification"]["prompt_missing_fields"] == ["fecha_vencimiento", "folio"]

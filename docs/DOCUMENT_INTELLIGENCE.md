@@ -25,6 +25,7 @@ Procesar documentos PDF, imágenes, Excel, CSV, texto o JSON para:
 
 - Extraer texto y tablas.
 - Detectar cliente, correo, RFC, teléfono, monto, fecha y concepto.
+- Usar una guía opcional de extracción para priorizar campos solicitados.
 - Verificar campos críticos.
 - Decidir si requiere revisión humana.
 - Generar un borrador de correo sin enviarlo automáticamente.
@@ -61,6 +62,8 @@ Reglas:
 - No automatiza si falta cliente.
 - No automatiza si no hay correo único válido.
 - No automatiza si hay contradicciones.
+- El prompt de extracción solo guía qué campos buscar; no autoriza acciones ni envío.
+- Si el prompt pide campos que no se encuentran, el documento queda en revisión humana.
 - Requiere revisión humana si la confianza es menor a `0.85`.
 - Siempre guarda auditoría JSONL.
 
@@ -92,7 +95,8 @@ Content-Type: application/json
 {
   "file_id": "uuid-del-archivo",
   "language": "spa",
-  "dry_run": true
+  "dry_run": true,
+  "extraction_prompt": "Extrae cliente, RFC, monto, fecha de vencimiento, folio y riesgos."
 }
 ```
 
@@ -102,9 +106,15 @@ También puede procesarse un path permitido por política:
 {
   "path": "/app/uploads/shared/documento.xlsx",
   "language": "spa",
-  "dry_run": true
+  "dry_run": true,
+  "extraction_prompt": "Identifica cliente, correo, total y observaciones."
 }
 ```
+
+`extraction_prompt` es opcional. Sirve para guiar la extracción en documentos
+genéricos o variables, por ejemplo facturas, contratos, reportes o capturas. El
+supervisor convierte la guía en campos solicitados y los cruza contra el texto
+extraído. Si faltan, aparecen en `verification.prompt_missing_fields`.
 
 ## Respuesta esperada
 
@@ -124,10 +134,19 @@ La API devuelve un `ToolResult` del Harness. El resultado útil está en `output
       "concepto": "Renovacion de servicio",
       "riesgos": []
     },
+    "guidance": {
+      "extraction_prompt": "Extrae cliente, RFC, monto, fecha de vencimiento, folio y riesgos.",
+      "requested_fields": ["cliente", "fecha_vencimiento", "folio", "monto", "rfc", "riesgos"],
+      "prompt_field_hits": {
+        "cliente": true,
+        "fecha_vencimiento": false
+      }
+    },
     "verification": {
-      "confidence": 1.0,
-      "requires_human_review": false,
-      "safe_to_email": true
+      "confidence": 0.8,
+      "prompt_missing_fields": ["fecha_vencimiento"],
+      "requires_human_review": true,
+      "safe_to_email": false
     },
     "communication": {
       "status": "ready_to_send_with_approval",
@@ -150,6 +169,7 @@ tools.execute(
     file_id="uuid-del-archivo",
     language="spa",
     dry_run=True,
+    extraction_prompt="Extrae cliente, correo, monto y fecha de vencimiento.",
 )
 ```
 

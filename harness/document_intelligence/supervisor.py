@@ -23,6 +23,19 @@ RFC_RE = re.compile(r"\b[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}\b", re.IGNORECASE)
 PHONE_RE = re.compile(r"(?:\+?\d[\d\s().-]{7,}\d)")
 MONEY_RE = re.compile(r"(?:\$|USD|USDT|MXN|Monto[:\s]*)\s*([0-9][0-9,]*(?:\.\d{1,2})?)", re.IGNORECASE)
 DATE_RE = re.compile(r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})\b")
+PROMPT_FIELD_ALIASES = {
+    "cliente": ["cliente", "razon social", "razón social", "empresa", "nombre"],
+    "correo": ["correo", "email", "e-mail"],
+    "rfc": ["rfc"],
+    "telefono": ["telefono", "teléfono", "phone", "celular"],
+    "monto": ["monto", "importe", "total", "saldo", "precio"],
+    "fecha": ["fecha"],
+    "fecha_vencimiento": ["fecha de vencimiento", "vencimiento", "vence"],
+    "folio": ["folio", "factura", "invoice", "numero de factura", "número de factura"],
+    "concepto": ["concepto", "asunto", "descripcion", "descripción"],
+    "riesgos": ["riesgo", "riesgos", "observaciones", "alertas"],
+}
+MAX_EXTRACTION_PROMPT_CHARS = 2000
 
 
 @dataclass
@@ -44,7 +57,13 @@ class DocumentIntelligenceSupervisor:
         for path in (self.audit_dir, self.extracted_dir, self.analysis_dir):
             path.mkdir(parents=True, exist_ok=True)
 
-    def process(self, path: str | Path, language: str = "spa", dry_run: bool = True) -> dict[str, Any]:
+    def process(
+        self,
+        path: str | Path,
+        language: str = "spa",
+        dry_run: bool = True,
+        extraction_prompt: str | None = None,
+    ) -> dict[str, Any]:
         file_path = Path(path).expanduser().resolve()
         if not file_path.exists():
             raise FileNotFoundError("document not found")
@@ -53,8 +72,9 @@ class DocumentIntelligenceSupervisor:
             raise ValueError(f"unsupported document type: {ext}")
 
         document_id = str(uuid.uuid4())
+        guidance_prompt = self._normalize_prompt(extraction_prompt)
         extraction = self.extract(file_path, ext, language)
-        analysis = self.analyze(extraction)
+        analysis = self.analyze(extraction, guidance_prompt)
         verification = self.verify(analysis)
         next_agent = self.next_agent(verification, analysis)
         result = {
@@ -74,6 +94,11 @@ class DocumentIntelligenceSupervisor:
             },
             "analysis": analysis,
             "verification": verification,
+            "guidance": {
+                "extraction_prompt": guidance_prompt,
+                "requested_fields": analysis.get("requested_fields", []),
+                "prompt_field_hits": analysis.get("prompt_field_hits", {}),
+            },
             "next_agent": next_agent,
             "communication": self.email_draft(analysis, verification),
             "dry_run": bool(dry_run),
@@ -105,7 +130,7 @@ class DocumentIntelligenceSupervisor:
             return ExtractionResult("image_ocr", text, [], {"width": image.width, "height": image.height, "ocr_language": language})
         raise ValueError(f"unsupported document type: {ext}")
 
-    def analyze(self, extraction: ExtractionResult) -> dict[str, Any]:
+    def analyze(self, extraction: ExtractionResult, extraction_prompt: str | None = None) -> dict[str, Any]:
         text = extraction.text or ""
         tables_text = "\n".join(json.dumps(t.get("preview", []), ensure_ascii=False) for t in extraction.tables[:5])
         combined = f"{text}\n{tables_text}".strip()
@@ -127,7 +152,7 @@ class DocumentIntelligenceSupervisor:
         if len(emails) > 1:
             risks.append("multiple_emails")
 
-        return {
+        analysis = {
             "summary": self._summary(combined, extraction),
             "cliente": client,
             "correos": emails,
@@ -143,6 +168,18 @@ class DocumentIntelligenceSupervisor:
             "riesgos": risks,
             "accion_recomendada": "generar_borrador" if not risks else "revision_humana",
         }
+        requested_fields = self._requested_fields_from_prompt(extraction_prompt)
+        prompt_field_hits = {
+            field: self._field_has_value(analysis, field, combined)
+            for field in requested_fields
+        }
+        if any(not found for found in prompt_field_hits.values()):
+            analysis["riesgos"].append("missing_prompt_fields")
+            analysis["accion_recomendada"] = "revision_humana"
+        analysis["extraction_prompt"] = extraction_prompt
+        analysis["requested_fields"] = requested_fields
+        analysis["prompt_field_hits"] = prompt_field_hits
+        return analysis
 
     def verify(self, analysis: dict[str, Any]) -> dict[str, Any]:
         missing = []
@@ -152,6 +189,13 @@ class DocumentIntelligenceSupervisor:
             missing.append("correo_unico")
         if analysis.get("estado_documento") != "extraido":
             missing.append("texto_extraido")
+        prompt_missing = [
+            field
+            for field, found in (analysis.get("prompt_field_hits") or {}).items()
+            if not found
+        ]
+        if prompt_missing:
+            missing.append("prompt_fields")
         contradictions = []
         if len(analysis.get("correos") or []) > 1:
             contradictions.append("multiples_correos_detectados")
@@ -163,6 +207,7 @@ class DocumentIntelligenceSupervisor:
         return {
             "confidence": confidence,
             "missing_fields": missing,
+            "prompt_missing_fields": prompt_missing,
             "contradictions": contradictions,
             "requires_human_review": bool(missing or contradictions or confidence < 0.75),
             "safe_to_email": bool(confidence >= 0.85 and not missing and not contradictions),
@@ -226,6 +271,8 @@ class DocumentIntelligenceSupervisor:
             "confidence": result["verification"]["confidence"],
             "safe_to_email": result["verification"]["safe_to_email"],
             "source": result["source"],
+            "prompt_provided": bool((result.get("guidance") or {}).get("extraction_prompt")),
+            "requested_fields": (result.get("guidance") or {}).get("requested_fields", []),
         }
         path = self.audit_dir / f"{datetime.now(UTC).date().isoformat()}.jsonl"
         with path.open("a", encoding="utf-8") as handle:
@@ -272,3 +319,38 @@ class DocumentIntelligenceSupervisor:
 
     def _clean_space(self, value: str) -> str:
         return " ".join(str(value or "").strip().split())
+
+    def _normalize_prompt(self, prompt: str | None) -> str | None:
+        if prompt is None:
+            return None
+        cleaned = self._clean_space(prompt)
+        if not cleaned:
+            return None
+        return cleaned[:MAX_EXTRACTION_PROMPT_CHARS]
+
+    def _requested_fields_from_prompt(self, prompt: str | None) -> list[str]:
+        if not prompt:
+            return []
+        lowered = prompt.lower()
+        requested = [
+            field
+            for field, aliases in PROMPT_FIELD_ALIASES.items()
+            if any(alias in lowered for alias in aliases)
+        ]
+        requested_set = set(requested)
+        if "fecha_vencimiento" in requested_set:
+            requested_set.discard("fecha")
+        return sorted(requested_set)
+
+    def _field_has_value(self, analysis: dict[str, Any], field: str, text: str) -> bool:
+        if field == "telefono":
+            return bool(analysis.get("telefonos"))
+        if field == "fecha":
+            return bool(analysis.get("fechas"))
+        if field == "fecha_vencimiento":
+            return bool(re.search(r"(vencimiento|vence|due date)", text, flags=re.IGNORECASE) and analysis.get("fechas"))
+        if field == "folio":
+            return bool(re.search(r"(folio|factura|invoice|n[uú]mero)", text, flags=re.IGNORECASE))
+        if field == "riesgos":
+            return bool(analysis.get("riesgos") or analysis.get("observaciones"))
+        return analysis.get(field) not in (None, "", [], {})

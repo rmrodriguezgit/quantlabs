@@ -25,6 +25,7 @@ class DocumentIntelligenceTool(BaseTool):
         path: str | None = None,
         language: str = "spa",
         dry_run: bool = True,
+        extraction_prompt: str | None = None,
         **_,
     ):
         if role not in {"admin", "teacher", "trader"}:
@@ -34,7 +35,12 @@ class DocumentIntelligenceTool(BaseTool):
             return self.rules()
         if action == "process":
             file_path, filename = self._resolve_file(user_id, file_id, path)
-            result = DocumentIntelligenceSupervisor().process(file_path, language=language, dry_run=dry_run)
+            result = DocumentIntelligenceSupervisor().process(
+                file_path,
+                language=language,
+                dry_run=dry_run,
+                extraction_prompt=extraction_prompt,
+            )
             result["source"]["file_id"] = file_id
             result["source"]["filename"] = filename
             return result
@@ -50,6 +56,7 @@ class DocumentIntelligenceTool(BaseTool):
                 "no automatic email sending",
                 "human review required when confidence < 0.85",
                 "multiple emails or missing client block automation",
+                "optional extraction prompts guide fields only and never authorize actions",
                 "all decisions are written to audit JSONL",
             ],
         }

@@ -62,6 +62,7 @@ function renderResult(payload) {
   const verification = result.verification || {};
   const extraction = result.extraction || {};
   const communication = result.communication || {};
+  const guidance = result.guidance || {};
   const confidence = Math.round(Number(verification.confidence || 0) * 100);
 
   $('statusChip').textContent = result.status || '--';
@@ -78,12 +79,14 @@ function renderResult(payload) {
   $('docIdBadge').textContent = short(result.document_id || '--', 18);
 
   const missing = verification.missing_fields || [];
+  const promptMissing = verification.prompt_missing_fields || [];
   const contradictions = verification.contradictions || [];
   const risks = analysis.riesgos || [];
   $('verifyList').innerHTML = [
     ['Revision humana', verification.requires_human_review ? 'Si' : 'No', verification.requires_human_review ? 'badge-warn' : 'badge-ok'],
     ['Correo seguro', verification.safe_to_email ? 'Con aprobacion' : 'Bloqueado', verification.safe_to_email ? 'badge-ok' : 'badge-warn'],
     ['Faltantes', missing.length ? missing.join(', ') : 'Ninguno', missing.length ? 'badge-warn' : 'badge-ok'],
+    ['Guia pendiente', promptMissing.length ? promptMissing.join(', ') : 'Completa', promptMissing.length ? 'badge-warn' : 'badge-ok'],
     ['Contradicciones', contradictions.length ? contradictions.join(', ') : 'Ninguna', contradictions.length ? 'badge-bad' : 'badge-ok'],
     ['Riesgos', risks.length ? risks.join(', ') : 'Sin riesgos', risks.length ? 'badge-warn' : 'badge-ok']
   ].map(([label, value, state]) => `<div class="verify-item"><div><strong>${esc(label)}</strong><small>${esc(value)}</small></div><span class="${state}">${esc(state === 'badge-ok' ? 'OK' : 'CHECK')}</span></div>`).join('');
@@ -96,6 +99,7 @@ function renderResult(payload) {
     ['Monto', analysis.monto ?? '--'],
     ['Fechas', (analysis.fechas || []).join(', ')],
     ['Concepto', analysis.concepto],
+    ['Campos guia', (guidance.requested_fields || []).join(', ') || '--'],
     ['Accion', analysis.accion_recomendada]
   ];
   $('fieldsGrid').innerHTML = fields.map(([label, value]) => `<div class="field-card"><small>${esc(label)}</small><strong title="${esc(value || '--')}">${esc(value || '--')}</strong></div>`).join('');
@@ -120,6 +124,8 @@ function renderResult(payload) {
     ['Extraccion', extraction.source_type],
     ['Creado', result.created_at],
     ['Dry run', result.dry_run ? 'true' : 'false'],
+    ['Guia', guidance.extraction_prompt || '--'],
+    ['Campos guia', (guidance.requested_fields || []).join(', ') || '--'],
     ['File ID', source.file_id || '--']
   ].map(([label, value]) => `<div class="audit-item"><small>${esc(label)}</small><strong title="${esc(value || '--')}">${esc(value || '--')}</strong></div>`).join('');
 }
@@ -139,7 +145,8 @@ async function handleProcess() {
       file_id: fileId || undefined,
       path: path || undefined,
       language: $('ocrLanguage').value || 'spa',
-      dry_run: $('dryRun').checked
+      dry_run: $('dryRun').checked,
+      extraction_prompt: $('extractionPrompt').value.trim() || undefined
     };
     const result = await processDocument(payload);
     renderResult(result);

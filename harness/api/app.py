@@ -1032,6 +1032,7 @@ def document_intelligence_process():
             path=data.get("path"),
             language=data.get("language") or "spa",
             dry_run=data.get("dry_run", True),
+            extraction_prompt=data.get("extraction_prompt") or data.get("prompt"),
         ).model_dump()
     except (FileNotFoundError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400

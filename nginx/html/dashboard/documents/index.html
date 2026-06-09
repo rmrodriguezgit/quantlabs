@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/style.css?v=20260531-logo">
-  <link rel="stylesheet" href="./css/documents.css?v=20260607-1">
+  <link rel="stylesheet" href="./css/documents.css?v=20260609-prompt">
 </head>
 <body class="docs-page">
 <header>
@@ -51,6 +51,10 @@
             <label><small>Idioma OCR</small><select id="ocrLanguage"><option value="spa">spa</option><option value="eng">eng</option><option value="spa+eng">spa+eng</option></select></label>
             <label class="toggle-line"><input id="dryRun" type="checkbox" checked><span></span><strong>Solo borrador</strong></label>
           </div>
+          <label class="prompt-box">
+            <small>Guia de extraccion</small>
+            <textarea id="extractionPrompt" rows="4" maxlength="2000" placeholder="Ej. Extrae cliente, RFC, monto, fecha de vencimiento, folio y riesgos."></textarea>
+          </label>
           <button id="processBtn" class="primary-action" type="button">Procesar documento</button>
         </div>
       </article>
@@ -87,6 +91,6 @@
 </div>
 <script src="../js/platform-menu.js?v=20260607-documents"></script>
 <script src="../js/session.js?v=20260517-user"></script>
-<script src="./js/documents.js?v=20260607-1"></script>
+<script src="./js/documents.js?v=20260609-prompt"></script>
 </body>
 </html>
