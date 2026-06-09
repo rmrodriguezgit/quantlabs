@@ -29,6 +29,11 @@ def test_escola_ingests_upload_and_returns_copy_ready_answer(tmp_path, monkeypat
 
     assert ingest["chunks"] >= 1
     assert result["agent"] == "ESCOLA"
+    assert result["formatted_json"]["agente"] == "ESCOLA"
+    assert "## JSON" in result["copy_ready"]
+    assert "```json" in result["copy_ready"]
+    assert "| Campo | Valor |" in result["copy_ready"]
+    assert "| Archivo | Score | Fragmento |" in result["copy_ready"]
     assert "Modulo Becas" in result["copy_ready"]
     assert result["evidence"]
 

@@ -77,26 +77,42 @@ GET /v1/escola/rules
 
 ## Salida
 
-La respuesta incluye `copy_ready`, pensado para pegar directamente:
+La respuesta incluye `formatted_json` y `copy_ready`. `copy_ready` está pensado
+para pegar directamente en chats, reportes o documentos: primero muestra el JSON
+formateado y después tablas Markdown.
 
-```text
-ESCOLA
-Consulta: ...
+````markdown
+# ESCOLA
 
-Resumen:
-...
-
-Respuesta:
-- ...
-
-Confianza: media
-
-Evidencia:
-- archivo.pdf | score 0.42: ...
-
-Pendientes:
-- Ninguno
+## JSON
+```json
+{
+  "agente": "ESCOLA",
+  "consulta": "...",
+  "resultado": {
+    "resumen": "...",
+    "respuesta": "...",
+    "confianza": "media",
+    "pendientes": []
+  },
+  "evidencia": []
+}
 ```
+
+## Respuesta
+| Campo | Valor |
+| --- | --- |
+| Consulta | ... |
+| Resumen | ... |
+| Respuesta | ... |
+| Confianza | media |
+| Pendientes | Ninguno |
+
+## Evidencia
+| Archivo | Score | Fragmento |
+| --- | --- | --- |
+| archivo.pdf | 0.42 | ... |
+````
 
 ## Seguridad
 

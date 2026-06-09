@@ -112,7 +112,7 @@ class EscolaSupervisor:
             "agent": "ESCOLA",
             "question": clean_question,
             "answer": answer,
-            "copy_ready": self._copy_ready(clean_question, answer, chunks) if copy_ready else None,
+            "formatted_json": self._formatted_json(clean_question, answer, chunks),
             "evidence": [
                 {
                     "filename": item["metadata"].get("filename"),
@@ -126,6 +126,7 @@ class EscolaSupervisor:
             "stats": self.stats(),
             "created_at": datetime.now(UTC).isoformat(),
         }
+        result["copy_ready"] = self._copy_ready(result) if copy_ready else None
         self._audit("query", {"question": clean_question, "matches": len(chunks)})
         return result
 
@@ -159,7 +160,7 @@ class EscolaSupervisor:
             "storage": "jsonl",
             "supports": ["pdf", "docx", "csv", "xls", "xlsx", "txt", "md", "json", "ipynb", "png", "jpg", "jpeg"],
             "actions": ["ingest", "query", "list", "stats"],
-            "copy_format": ["Resumen", "Respuesta", "Evidencia", "Pendientes"],
+            "copy_format": ["JSON formateado", "Tabla Markdown de respuesta", "Tabla Markdown de evidencia", "Pendientes"],
             "safety": [
                 "no ejecuta acciones externas",
                 "no modifica documentos fuente",
@@ -195,20 +196,57 @@ class EscolaSupervisor:
             "pending": [] if confidence != "baja" else ["Validar manualmente: la coincidencia documental fue baja"],
         }
 
-    def _copy_ready(self, question: str, answer: dict[str, Any], chunks: list[dict[str, Any]]) -> str:
-        evidence = "\n".join(
-            f"- {item['metadata'].get('filename')} | score {item['score']}: {self._clean(item['text'][:180])}"
-            for item in chunks[:4]
-        ) or "- Sin evidencia"
-        pending = "\n".join(f"- {item}" for item in answer.get("pending") or ["Ninguno"])
+    def _formatted_json(self, question: str, answer: dict[str, Any], chunks: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "agente": "ESCOLA",
+            "consulta": question,
+            "resultado": {
+                "resumen": answer.get("summary"),
+                "respuesta": answer.get("response"),
+                "confianza": answer.get("confidence"),
+                "pendientes": answer.get("pending") or [],
+            },
+            "evidencia": [
+                {
+                    "archivo": item["metadata"].get("filename"),
+                    "document_id": item["document_id"],
+                    "chunk": item["metadata"].get("chunk_index"),
+                    "score": item["score"],
+                    "preview": self._clean(item["text"][:260]),
+                }
+                for item in chunks[:6]
+            ],
+        }
+
+    def _copy_ready(self, result: dict[str, Any]) -> str:
+        payload = result.get("formatted_json") or {}
+        answer = result.get("answer") or {}
+        evidence = result.get("evidence") or []
+        response_rows = [
+            ("Consulta", result.get("question")),
+            ("Resumen", answer.get("summary")),
+            ("Respuesta", answer.get("response")),
+            ("Confianza", answer.get("confidence")),
+            ("Pendientes", "; ".join(answer.get("pending") or ["Ninguno"])),
+        ]
+        evidence_rows = [
+            (
+                item.get("filename") or item.get("document_id"),
+                item.get("score"),
+                self._clean(item.get("preview", ""))[:220],
+            )
+            for item in evidence[:6]
+        ]
         return (
-            "ESCOLA\n"
-            f"Consulta: {question}\n\n"
-            f"Resumen:\n{answer.get('summary')}\n\n"
-            f"Respuesta:\n{answer.get('response')}\n\n"
-            f"Confianza: {answer.get('confidence')}\n\n"
-            f"Evidencia:\n{evidence}\n\n"
-            f"Pendientes:\n{pending}"
+            "# ESCOLA\n\n"
+            "## JSON\n"
+            "```json\n"
+            f"{json.dumps(payload, indent=2, ensure_ascii=False)}\n"
+            "```\n\n"
+            "## Respuesta\n"
+            f"{self._markdown_table(['Campo', 'Valor'], response_rows)}\n\n"
+            "## Evidencia\n"
+            f"{self._markdown_table(['Archivo', 'Score', 'Fragmento'], evidence_rows or [('Sin evidencia', '--', '--')])}"
         )
 
     def _best_sentence(self, text: str, terms: list[str]) -> str:
@@ -247,6 +285,19 @@ class EscolaSupervisor:
 
     def _clean(self, text: str) -> str:
         return " ".join(str(text or "").strip().split())
+
+    def _markdown_table(self, headers: list[str], rows: list[tuple[Any, ...]]) -> str:
+        header = "| " + " | ".join(self._escape_markdown_cell(value) for value in headers) + " |"
+        separator = "| " + " | ".join("---" for _ in headers) + " |"
+        body = [
+            "| " + " | ".join(self._escape_markdown_cell(value) for value in row) + " |"
+            for row in rows
+        ]
+        return "\n".join([header, separator, *body])
+
+    def _escape_markdown_cell(self, value: Any) -> str:
+        text = self._clean(value)
+        return text.replace("|", "\\|").replace("\n", "<br>")
 
     def _append_jsonl(self, path: Path, item: dict[str, Any]) -> None:
         with path.open("a", encoding="utf-8") as handle:
