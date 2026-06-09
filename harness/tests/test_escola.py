@@ -60,6 +60,34 @@ def test_escola_humanizes_json_fragments_in_copy_ready(tmp_path, monkeypatch):
     assert "| --- |" not in result["copy_ready"]
 
 
+def test_escola_lists_actuaria_subjects_by_semester(tmp_path, monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "upload_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "artifact_root", str(tmp_path / "artifacts"))
+    meta = _upload_text(
+        "admin-user",
+        "planes.txt",
+        '"programa": "Licenciatura en Actuaría", '
+        '"semestre": 1, "claves_materias": ["LARRDS", "LAR105"], '
+        '"semestre": 2, "claves_materias": ["LARHUA"], '
+        '"clave": "LARRDS", "nombre": "Radiografía Social", '
+        '"clave": "LAR105", "nombre": "Prácticas Preliminares de la Profesión", '
+        '"clave": "LARHUA", "nombre": "Humanismo en Acción"',
+    )
+
+    supervisor = EscolaSupervisor()
+    supervisor.ingest_upload("admin-user", meta["id"], tags=["planes"])
+    result = supervisor.query("Dame todas las materias de la licenciatura en Actuaría")
+
+    assert "Licenciatura en Actuaría" in result["answer"]["response"]
+    assert "Semestre 1" in result["answer"]["response"]
+    assert "LARRDS: Radiografía Social" in result["answer"]["response"]
+    assert "LAR105: Prácticas Preliminares de la Profesión" in result["answer"]["response"]
+    assert "Semestre 2" in result["answer"]["response"]
+    assert "LARHUA: Humanismo en Acción" in result["answer"]["response"]
+
+
 def test_escola_tool_requires_admin_for_ingest(tmp_path, monkeypatch):
     from config import settings
 

@@ -22,6 +22,7 @@ ESCOLA usa:
 - JSONL como base NoSQL simple.
 - Chunks de texto con embeddings hash locales.
 - Búsqueda híbrida: similitud vectorial y coincidencia de términos.
+- Extracción estructurada para consultas académicas de materias por programa y semestre cuando hay mapas curriculares en la evidencia.
 - Respuesta formateada para copiar: resumen, respuesta, confianza, evidencia y pendientes.
 
 ## Roles

@@ -20,6 +20,20 @@ STOP_WORDS = {
     "programa", "archivo", "archivos", "documento", "documentos", "sobre", "puedes", "quiero",
     "necesito", "consulta", "respuesta", "salida", "formato", "facil", "fácil",
 }
+ACADEMIC_PROGRAMS = {
+    "actuaria": {
+        "id": "actuaria",
+        "prefix": "LAR",
+        "name": "Licenciatura en Actuaría",
+        "aliases": ["actuaria", "actuaría", "licenciatura en actuaria", "licenciatura en actuaría"],
+    },
+    "lan": {
+        "id": "lan",
+        "prefix": "LAN",
+        "name": "Licenciatura en Administración de Negocios",
+        "aliases": ["administracion de negocios", "administración de negocios", "lan"],
+    },
+}
 
 
 @dataclass
@@ -46,7 +60,7 @@ class EscolaSupervisor:
         meta = self.uploads.get(user_id, file_id)
         if not meta:
             raise FileNotFoundError("file_id not found")
-        summary = meta.get("summary") or ""
+        summary = self._source_text(meta)
         if not summary.strip():
             raise ValueError("archivo sin texto extraible")
         document_id = self._document_id(file_id, meta.get("name"))
@@ -92,6 +106,16 @@ class EscolaSupervisor:
             })
         self._audit("ingest", {"document_id": document_id, "file_id": file_id, "chunks": len(chunks)})
         return {**document, "already_indexed": False}
+
+    def _source_text(self, meta: dict[str, Any]) -> str:
+        ext = (meta.get("ext") or "").lower()
+        path = Path(meta.get("path") or "")
+        if ext in {"txt", "md", "json", "csv"} and path.exists():
+            try:
+                return "Contenido extraído:\n" + path.read_text(errors="ignore")
+            except Exception:
+                pass
+        return meta.get("summary") or ""
 
     def list_documents(self) -> list[dict[str, Any]]:
         return sorted(self._read_jsonl(self.docs_path), key=lambda item: item.get("created_at", ""), reverse=True)
@@ -185,6 +209,9 @@ class EscolaSupervisor:
                 "confidence": "baja",
                 "pending": ["Ingestar documentos fuente"],
             }
+        structured = self._academic_subjects_answer(question)
+        if structured:
+            return structured
         key_terms = [term for term in self._tokens(question) if term not in STOP_WORDS][:8]
         snippets = []
         seen = set()
@@ -203,6 +230,91 @@ class EscolaSupervisor:
             "confidence": confidence,
             "pending": [] if confidence != "baja" else ["Validar manualmente: la coincidencia documental fue baja"],
         }
+
+    def _academic_subjects_answer(self, question: str) -> dict[str, Any] | None:
+        lowered = question.lower()
+        if not any(term in lowered for term in ("materia", "materias", "plan", "curricular", "semestre")):
+            return None
+        program = self._detect_academic_program(lowered)
+        if not program:
+            return None
+        corpus = "\n".join(item.get("text") or "" for item in self._read_jsonl(self.chunks_path))
+        curriculum = self._extract_curriculum(corpus, program["prefix"])
+        names = self._extract_subject_names(corpus, program["prefix"])
+        if not curriculum and not names:
+            return None
+        lines = [program["name"]]
+        total_subjects = 0
+        named_subjects = 0
+        if curriculum:
+            for semester in sorted(curriculum):
+                lines.append("")
+                lines.append(f"Semestre {semester}")
+                for code in curriculum[semester]:
+                    name = names.get(code)
+                    total_subjects += 1
+                    if name:
+                        named_subjects += 1
+                    lines.append(f"- {code}: {name or 'nombre no disponible en fragmentos indexados'}")
+        else:
+            lines.append("")
+            lines.append("Materias detectadas")
+            for code, name in sorted(names.items()):
+                total_subjects += 1
+                named_subjects += 1
+                lines.append(f"- {code}: {name}")
+        pending = []
+        if total_subjects and named_subjects < total_subjects:
+            pending.append(f"Faltan nombres para {total_subjects - named_subjects} clave(s); el índice actual solo contiene fragmentos parciales del JSON fuente.")
+        return {
+            "summary": f"Se extrajo el mapa curricular disponible para {program['name']}: {total_subjects} materia(s) detectada(s), {named_subjects} con nombre.",
+            "response": "\n".join(lines),
+            "confidence": "alta" if total_subjects and named_subjects == total_subjects else "media",
+            "pending": pending,
+        }
+
+    def _detect_academic_program(self, lowered_question: str) -> dict[str, Any] | None:
+        for program in ACADEMIC_PROGRAMS.values():
+            if any(alias in lowered_question for alias in program["aliases"]):
+                return program
+        return None
+
+    def _extract_curriculum(self, corpus: str, prefix: str) -> dict[int, list[str]]:
+        curriculum: dict[int, list[str]] = {}
+        pattern = re.compile(r'"semestre"\s*:\s*(\d+).*?"claves_materias"\s*:\s*\[(.*?)\]', re.IGNORECASE | re.DOTALL)
+        for match in pattern.finditer(corpus):
+            semester = int(match.group(1))
+            codes = [code for code in re.findall(r'"([A-Z]{3,8}[0-9A-Z]{2,6})"', match.group(2)) if code.startswith(prefix)]
+            if codes:
+                existing = curriculum.setdefault(semester, [])
+                for code in codes:
+                    if code not in existing:
+                        existing.append(code)
+        # Fallback for the plan JSON, where subjects are full objects under each semester.
+        sem_pattern = re.compile(r'"semestre"\s*:\s*(\d+).*?"materias"\s*:\s*\[(.*?)(?=\]\s*},\s*{\s*"semestre"|\]\s*}\s*\])', re.IGNORECASE | re.DOTALL)
+        for match in sem_pattern.finditer(corpus):
+            semester = int(match.group(1))
+            if semester in curriculum:
+                continue
+            codes = [code for code in re.findall(r'"clave"\s*:\s*"([^"]+)"', match.group(2)) if code.startswith(prefix)]
+            if codes:
+                existing = curriculum.setdefault(semester, [])
+                for code in codes:
+                    if code not in existing:
+                        existing.append(code)
+        return curriculum
+
+    def _extract_subject_names(self, corpus: str, prefix: str) -> dict[str, str]:
+        names: dict[str, str] = {}
+        pattern = re.compile(r'\{[^{}]*"clave"\s*:\s*"([^"]+)"[^{}]*"nombre"\s*:\s*"([^"]+)"[^{}]*\}', re.IGNORECASE | re.DOTALL)
+        for code, name in pattern.findall(corpus):
+            if code.startswith(prefix):
+                names.setdefault(code, self._clean(name))
+        pair_pattern = re.compile(r'"clave"\s*:\s*"([^"]+)"\s*,\s*"nombre"\s*:\s*"([^"]+)"', re.IGNORECASE)
+        for code, name in pair_pattern.findall(corpus):
+            if code.startswith(prefix):
+                names.setdefault(code, self._clean(name))
+        return names
 
     def _formatted_json(self, question: str, answer: dict[str, Any], chunks: list[dict[str, Any]]) -> dict[str, Any]:
         return {
