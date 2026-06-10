@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import requests
+
 from config import settings
 from memory.uploads import UploadStore
 from .database import EscolaDatabaseManager
@@ -236,12 +238,60 @@ class EscolaSupervisor:
             if len(snippets) >= 4:
                 break
         confidence = "alta" if chunks[0]["score"] >= 0.42 else "media" if chunks[0]["score"] >= 0.25 else "baja"
+        llm_response = self._llm_synthesis(question, chunks[:6])
+        if llm_response:
+            return {
+                "summary": f"ESCOLA uso RAG documental y LLM local con {len(chunks)} fragmento(s) relevantes.",
+                "response": llm_response,
+                "confidence": confidence,
+                "pending": [] if confidence != "baja" else ["Validar manualmente: la coincidencia documental fue baja"],
+                "source": "rag_llm",
+            }
         return {
             "summary": f"ESCOLA encontro {len(chunks)} fragmento(s) relevantes en la base documental.",
             "response": "\n".join(f"- {snippet}" for snippet in snippets) or chunks[0]["text"][:700],
             "confidence": confidence,
             "pending": [] if confidence != "baja" else ["Validar manualmente: la coincidencia documental fue baja"],
+            "source": "rag",
         }
+
+    def _llm_synthesis(self, question: str, chunks: list[dict[str, Any]]) -> str | None:
+        context = "\n\n".join(
+            f"Fuente {idx + 1}: {self._humanize_fragment(item.get('text') or '')[:1200]}"
+            for idx, item in enumerate(chunks)
+        )
+        if not context.strip():
+            return None
+        payload = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres ESCOLA, un agente academico. Responde en español, con formato limpio para copiar. "
+                        "Usa solo el contexto proporcionado. Si falta evidencia, dilo en Pendientes. "
+                        "No pegues JSON crudo."
+                    ),
+                },
+                {"role": "user", "content": f"Consulta: {question}\n\nContexto:\n{context}"},
+            ],
+            "temperature": 0.1,
+            "stream": False,
+            "max_tokens": 700,
+        }
+        try:
+            response = requests.post(
+                f"{settings.llama_base_url}/v1/chat/completions",
+                json=payload,
+                timeout=(0.8, 18),
+            )
+            response.raise_for_status()
+            content = ((response.json().get("choices") or [{}])[0].get("message") or {}).get("content")
+        except Exception:
+            return None
+        content = str(content or "").strip()
+        if not content:
+            return None
+        return content.replace("| --- |", "").strip()
 
     def _academic_subjects_answer(self, question: str) -> dict[str, Any] | None:
         lowered = question.lower()

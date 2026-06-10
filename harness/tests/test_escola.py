@@ -134,6 +134,31 @@ def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypa
             "semestre": 1,
             "fines_aprendizaje": "Comprender la realidad social.",
             "unidades": [{"numero_romano": "I", "nombre": "INDIVIDUO Y SOCIEDAD", "temas": [{"numero": "1.1", "nombre": "Marco conceptual"}]}]
+          }, {
+            "_id": "materia_lan_lanrds",
+            "programa_id": "lan",
+            "clave": "LANRDS",
+            "nombre": "Radiografía Social",
+            "semestre": 1,
+            "area": "Currícula Común",
+            "tipo": "Obligatoria",
+            "creditos": 3,
+            "horas_independientes": 16,
+            "instalacion": "Aula",
+            "fines_aprendizaje": "Comprender la realidad social."
+          }, {
+            "_id": "materia_lan_lan107",
+            "programa_id": "lan",
+            "clave": "LAN107",
+            "nombre": "Contabilidad Financiera",
+            "semestre": 1,
+            "area": "Economía y Finanzas",
+            "tipo": "Obligatoria",
+            "creditos": 7,
+            "horas_independientes": 32,
+            "instalacion": "Aula",
+            "fines_aprendizaje": "Aplicar registros contables financieros.",
+            "estadisticas": {"total_unidades": 2, "total_temas": 4, "total_subtemas": 0}
           }],
           "optativas": []
         }
@@ -168,6 +193,19 @@ def test_escola_database_manager_answers_subjects_and_content(tmp_path, monkeypa
     assert "LANRDS: Radiografía Social · 3 créditos" in program_plan["answer"]["response"]
     assert "programas" not in program_plan["answer"]["response"]
     assert "valor_corregido" not in program_plan["answer"]["response"]
+
+    credits = supervisor.query("Cuantos creditos tiene Administracion de Negocios")
+    assert credits["answer"]["source"] == "database"
+    assert "Créditos: 10" in credits["answer"]["response"]
+
+    subject_search = supervisor.query("Que materias tienen contabilidad")
+    assert subject_search["answer"]["source"] == "database"
+    assert "LAN107: Contabilidad Financiera" in subject_search["answer"]["response"]
+
+    subject_detail = supervisor.query("LAN107")
+    assert subject_detail["answer"]["source"] == "database"
+    assert "Créditos: 7" in subject_detail["answer"]["response"]
+    assert "Economía y Finanzas" in subject_detail["answer"]["response"]
 
     content = supervisor.query("Dame el contenido de LARRDS")
     assert "Comprender la realidad social" in content["answer"]["response"]
