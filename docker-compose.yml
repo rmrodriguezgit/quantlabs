@@ -211,10 +211,13 @@ services:
       - /home/quantlab/notebooks:/app/notebooks
       - /srv/quantlab-harness/uploads:/app/uploads
       - /srv/quantlab-harness/conversations:/app/conversations
+    runtime: nvidia
     environment:
       - LLAMA_BASE_URL=http://llm:8080
       - QUANTLAB_API_BASE_URL=http://flask:5000
       - FILE_ANALYST_URL=http://file_analyst:8010
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     depends_on:
       - auth
       - llm
